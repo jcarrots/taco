@@ -1,0 +1,20 @@
+taco/
+├─ CMakeLists.txt
+├─ pyproject.toml                 # scikit-build-core for Python wheel
+├─ README.md
+├─ LICENSE
+├─ .gitignore
+├─ cmake/                         # CMake helper modules
+│  ├─ FindcuTENSOR.cmake          # (optional)
+│  └─ TACOOptions.cmake           # feature flags, warnings, LTO, etc.
+├─ docs/                          # (later) Sphinx or MkDocs
+│  ├─ index.md
+│  └─ api.md
+├─ examples/
+│  ├─ minimal/config.yaml         # tiny working example
+│  └─ mpi_sweep/sweep.yaml
+├─ benchmarks/                    # micro + end-to-end perf
+│  ├─ micro/                      # kernels, matvecs
+│  └─ macro/                      # full propagations
+└─ ci/                            # CI workflows/scripts
+   └─ github/workflows/build.yml

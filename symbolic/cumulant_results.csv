@@ -1,0 +1,8 @@
+label,value
+kappa_3,M_1*M_2*M_3 - M_1*M_2_3 - M_1_2*M_3 + M_1_2_3
+kappa_3 (zero mean),M_1_2_3
+kappa_4,-M_1*M_2*M_3*M_4 + M_1*M_2*M_3_4 + M_1*M_2_3*M_4 - M_1*M_2_3_4 + M_1_2*M_3*M_4 - M_1_2*M_3_4 - M_1_2_3*M_4 + M_1_2_3_4
+kappa_4 (zero mean),-M_1_2*M_3_4 + M_1_2_3_4
+nest connected?,True
+cross connected?,True
+parallel connected?,False
