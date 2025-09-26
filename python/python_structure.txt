@@ -1,0 +1,23 @@
+taco/python/
+├─ taco/
+│  ├─ __init__.py                 # version, import surface
+│  ├─ _version.py
+│  ├─ _taco_pybind.*.so           # built extension (pybind11)
+│  ├─ core.py                     # small OO wrapper over pybind (Engine, Liouvillian)
+│  ├─ schema/
+│  │  └─ config.py                # Pydantic models for YAML
+│  ├─ cli/
+│  │  ├─ __init__.py
+│  │  ├─ run.py                   # `taco run config.yaml`
+│  │  ├─ bench.py                 # microbench CLI
+│  │  └─ tune.py                  # autotuning knobs
+│  ├─ post/
+│  │  ├─ blp.py                   # BLP analysis util
+│  │  └─ viz.py                   # quick plots (optional)
+│  └─ utils/
+│     ├─ io.py                    # HDF5/CSV helpers
+│     ├─ log.py
+│     └─ env.py                   # ${ENV:…} expansion, ${now}
+└─ tests/
+   ├─ test_api_smoke.py           # build L + propagate 2-level
+   └─ test_yaml_roundtrip.py
