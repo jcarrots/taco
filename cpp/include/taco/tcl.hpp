@@ -76,3 +76,11 @@ private:
 
     Eigen::MatrixXcd U_;
     Eigen::MatrixXcd U_dag_;
+    Eigen::VectorXd eps_;
+    Eigen::MatrixXcd H_ls_eig_;
+
+    std::vector<JumpOperator> lab_jump_ops_;
+    std::vector<FrequencyBucket> buckets_;
+};
+
+}  // namespace taco::tcl

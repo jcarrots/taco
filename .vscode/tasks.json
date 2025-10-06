@@ -1,0 +1,47 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "configure",
+      "type": "shell",
+      "command": "powershell",
+      "args": ["-NoProfile","-ExecutionPolicy","Bypass","-File","scripts/dev.ps1","-Action","configure"]
+    },
+    {
+      "label": "build-debug",
+      "type": "shell",
+      "command": "powershell",
+      "args": ["-NoProfile","-ExecutionPolicy","Bypass","-File","scripts/dev.ps1","-Action","build","-Config","Debug"],
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": ["$msCompile"]
+    },
+    {
+      "label": "build-release",
+      "type": "shell",
+      "command": "powershell",
+      "args": ["-NoProfile","-ExecutionPolicy","Bypass","-File","scripts/dev.ps1","-Action","build","-Config","Release"],
+      "problemMatcher": ["$msCompile"]
+    },
+    {
+      "label": "run-debug",
+      "type": "shell",
+      "command": "powershell",
+      "args": ["-NoProfile","-ExecutionPolicy","Bypass","-File","scripts/dev.ps1","-Action","run","-Config","Debug"],
+      "dependsOn": ["build-debug"]
+    },
+    {
+      "label": "run-release",
+      "type": "shell",
+      "command": "powershell",
+      "args": ["-NoProfile","-ExecutionPolicy","Bypass","-File","scripts/dev.ps1","-Action","run","-Config","Release"],
+      "dependsOn": ["build-release"]
+    },
+    {
+      "label": "clean",
+      "type": "shell",
+      "command": "powershell",
+      "args": ["-NoProfile","-ExecutionPolicy","Bypass","-File","scripts/dev.ps1","-Action","clean"]
+    }
+  ]
+}
+

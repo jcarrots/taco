@@ -1,12 +1,13 @@
 # TACO — TCL-Accelerated Compute Orchestrator 🌮
-A fast parallel time-convolutionless (TCL) runtime for open-quantum-system dynamics on CPU & GPU.
+A fast parallel and scalable time-convolutionless (TCL) runtime for open-quantum-system dynamics on CPU & GPU.
 
 This is TCL = **Time-Convolutionless** master-equation solvers.
 
 ## Features
-- CPU (OpenMP) and GPU (CUDA/ROCm) backends
-- TCL2/4/6 generators, rTCL hooks, adaptive timestepping
-- MPI/distributed sweeps, checkpointing, metrics
+- CPU (OpenMP/MPI) and GPU (CUDA) backends
+- TCL2/4/6 generators(manually encoded)
+- TCL2n(symbolic generated and simplified once future computing power make it possible)
+
 
 ## Install
 pip install taco-qme

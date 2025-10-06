@@ -1,0 +1,10 @@
+^C:\USERS\59405\TACO\BUILD\_DEPS\EIGEN-SUBBUILD\CMAKELISTS.TXT
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SC:/Users/59405/taco/build/_deps/eigen-subbuild -BC:/Users/59405/taco/build/_deps/eigen-subbuild --check-stamp-file C:/Users/59405/taco/build/_deps/eigen-subbuild/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd

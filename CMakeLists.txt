@@ -1,0 +1,54 @@
+cmake_minimum_required(VERSION 3.20)
+
+project(taco_tcl LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+include(FetchContent)
+
+# Fetch Eigen (header-only)
+FetchContent_Declare(
+  eigen
+  URL https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.tar.gz
+  URL_HASH SHA256=8586084f71f9bde545ee7fa6d00288b264a2b7ac3607b974e54d13e7162c1c72
+)
+FetchContent_MakeAvailable(eigen)
+
+add_library(taco_tcl STATIC
+  cpp/src/tcl/tcl2.cpp
+  cpp/src/core/correlation.cpp
+)
+target_include_directories(taco_tcl PUBLIC
+  cpp/include
+)
+
+# Eigen provides an interface target when pulled as a subproject
+if(TARGET Eigen3::Eigen)
+  target_link_libraries(taco_tcl PUBLIC Eigen3::Eigen)
+else()
+  # Fallback: include directories only
+  target_include_directories(taco_tcl PUBLIC ${eigen_SOURCE_DIR})
+endif()
+
+if (MSVC)
+  target_compile_options(taco_tcl PRIVATE /W4 /permissive-)
+else()
+  target_compile_options(taco_tcl PRIVATE -Wall -Wextra -Wpedantic)
+endif()
+
+# FFT backend: prefer pocketfft (BSD); fall back to built-in radix-2
+find_package(pocketfft CONFIG QUIET)
+if (TARGET pocketfft::pocketfft)
+  target_link_libraries(taco_tcl PRIVATE pocketfft::pocketfft)
+  target_compile_definitions(taco_tcl PRIVATE TACO_USE_POCKETFFT=1)
+elseif (EXISTS "${CMAKE_SOURCE_DIR}/third_party/pocketfft/pocketfft_hdronly.h")
+  target_include_directories(taco_tcl PRIVATE ${CMAKE_SOURCE_DIR}/third_party/pocketfft)
+  target_compile_definitions(taco_tcl PRIVATE TACO_USE_POCKETFFT=1)
+else()
+  message(STATUS "pocketfft not found; using built-in radix-2 FFT")
+endif()
+
+add_executable(tcl2_demo examples/tcl2_demo.cpp)
+target_link_libraries(tcl2_demo PRIVATE taco_tcl)
