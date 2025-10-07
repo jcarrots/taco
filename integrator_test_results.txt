@@ -1,0 +1,12 @@
+Integration Tests Results
+ok   trapz x^2 [0,1] (err=0.0000001667)
+ok   simpson x^2 [0,1] (err=0.0000000000)
+ok   trapz flip sign (err=0.0000000000)
+ok   simpson sin [0,pi] (err=0.0000000000)
+ok   gaussian over R (err=0.0000000000)
+ok   discrete trapz sin [0,pi] (err=0.0000000001)
+ok   cumulative trapz 1 (err=0.0000000000)
+ok   convolve Full (fft vs trapz) (err=0.0003014675)
+ok   convolve Same (fft vs trapz) (err=0.0000754853)
+ok   convolve Valid (fft vs trapz) (err=0.0000754853)
+All integration tests passed.

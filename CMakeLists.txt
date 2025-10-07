@@ -52,3 +52,9 @@ endif()
 
 add_executable(tcl2_demo examples/tcl2_demo.cpp)
 target_link_libraries(tcl2_demo PRIVATE taco_tcl)
+
+add_executable(integrator_tests tests/integrator_tests.cpp)
+ target_link_libraries(integrator_tests PRIVATE taco_tcl)
+ target_include_directories(integrator_tests PRIVATE cpp/src)
+ target_include_directories(integrator_tests PRIVATE cpp/include)
+

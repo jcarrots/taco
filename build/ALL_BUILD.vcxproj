@@ -173,6 +173,10 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
       <CopyToOutputDirectory>Never</CopyToOutputDirectory>
     </ProjectReference>
+    <ProjectReference Include="C:\Users\59405\taco\build\integrator_tests.vcxproj">
+      <Project>{3C532353-2056-383C-93C7-366A93DAFB5D}</Project>
+      <Name>integrator_tests</Name>
+    </ProjectReference>
     <ProjectReference Include="C:\Users\59405\taco\build\taco_tcl.vcxproj">
       <Project>{9D287FC8-A6B2-36FE-B5C3-5F949D62D5E5}</Project>
       <Name>taco_tcl</Name>

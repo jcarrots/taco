@@ -1,57 +1,89 @@
-Dev Loop
-========
+Integration Utilities
+---------------------
+Headers: `taco/correlation_fft.hpp`, `cpp/src/core/integrator.hpp`
 
-A fast local build/run loop for the C++ TCL2 core.
+- Quadrature
+  - `integrate_trapezoid(f, a, b, n)`; `integrate_simpson(f, a, b, n)`; `integrate_infinite_R(f, tol)` (composite Simpson)
+- Discrete grids
+  - `integrate_discrete_trapz(y, dx)`; `cumulative_trapz(y, dx)` (prefix trapezoid)
+- Convolution (uniform `dx`)
+  - `convolve_trapz(a, b, dx, mode)` (per-window trapezoid end-weights)
+  - `convolve_fft(a, b, dx, mode)` (endpoint weights applied once, then IFFT·dx)
+  - `ConvMode::{Full, Same, Valid}`
 
-Prereqs
--------
-- CMake 3.20+
-- MSVC (Visual Studio 2022 Build Tools) on Windows, or any C++17 compiler
+Notes on convolution accuracy
+-----------------------------
+- Time-domain uses local per-output end-weights; FFT uses a global separable weighting.
+- Differences appear near edges; interior typically matches closely.
+- To reduce discrepancy without changing `n`,`m`:
+  - Decrease `dx` (denser sampling)
+  - Increase zero-padding in FFT (2×–4×)
+  - Compare interior only (ignore first/last ~`m` outputs) if edges aren’t used
 
-One-shot commands
------------------
-- Configure: `cmake -S . -B build`
-- Build: `cmake --build build --config Debug -j 8`
-- Run demo: `build/Debug/tcl2_demo.exe`
+Running the integration tests
+-----------------------------
+- Build: `cmake --build build --config Release --target integrator_tests -j 8`
+- Run:  `build/Release/integrator_tests.exe`
+- Output: writes `integrator_test_results.txt` next to the exe and in the current directory.
 
-Scripted dev loop (Windows PowerShell)
---------------------------------------
-- Build Debug: `powershell -ExecutionPolicy Bypass -File scripts/dev.ps1 -Action build -Config Debug`
-- Run Debug: `powershell -ExecutionPolicy Bypass -File scripts/dev.ps1 -Action run -Config Debug`
-- Clean: `powershell -ExecutionPolicy Bypass -File scripts/dev.ps1 -Action clean`
+Choosing dt, N, m (rules of thumb)
+----------------------------------
+- Resolve oscillations: =12–16 points per period of the highest `?` ? `dt = 2p/(p·?max)` (p˜12–16)
+- Cover kernel support: if `tc` is a decay time, `N·dt = 6–8·tc` and similarly for `m·dt`
+- For correlation FFT, ensure `Tper = Nfft·dt` comfortably exceeds your analysis window to avoid wrap-arounddetected by CMake).
+- Fallback: in-house radix-2 FFT (power-of-two). `bcf_fft_fun` zero-pads up to a power of two automatically.
 
-VS Code
--------
-- Tasks: Terminal â†’ Run Task (build/run debug or release)
-- Debug: choose "Launch tcl2_demo (Debug)" and press F5
+Correlation FFT API
+-------------------
+Header: `taco/correlation_fft.hpp`
 
-Notes
------
-- Library code: `cpp/include/taco/*.hpp`, `cpp/src/tcl/tcl2.cpp`
-- Demo: `examples/tcl2_demo.cpp`
-- Eigen is fetched automatically via CMake FetchContent.
+- Build C(t) from a spectral density J(Ï‰) at inverse temperature Î²:
+  - `bcf::bcf_fft_fun(N, dt, J, beta, t, C)`
+  - Returns non-negative times `t[0..N]` and complex `C[0..N]`.
+- Choose `dt` so Nyquist `Ï€/dt` exceeds the support of J(Ï‰), and `N` so `NÂ·dt` covers your largest Ï„.
 
-FFTW Requirement
-----------------
-FFTW3 is now required for builds. Install it per platform, then configure CMake so it is found.
+Propagation Helpers
+-------------------
+Header: `taco/propagate.hpp`
 
-- Windows (vcpkg recommended)
-  - Install: `vcpkg install fftw3:x64-windows`
-  - Configure:
-    - `cmake -S . -B build -DCMAKE_TOOLCHAIN_FILE=C:\path\to\vcpkg\scripts\buildsystems\vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows`
-  - Notes: if using shared FFTW, ensure `fftw3.dll` is on PATH when running.
+- Generator-agnostic fixed-step drivers:
+  - `propagate_rk4(gen, rho, t0, tf, dt, on_sample)`
+  - `propagate_expm(gen, rho, t0, tf, dt, on_sample)` (small N only; dense L)
+- Utilities:
+  - `hermitize_and_normalize(rho)`
+  - `build_liouvillian_at(gen, t)`, `precompute_expm(L, dt)`, `apply_precomputed_expm(M, rho)`
 
-- Ubuntu/Debian
-  - Install: `sudo apt-get install libfftw3-dev`
-  - Configure: `cmake -S . -B build`
 
-- macOS (Homebrew)
-  - Install: `brew install fftw`
-  - Configure: `cmake -S . -B build -DCMAKE_PREFIX_PATH="$(brew --prefix fftw)"`
 
-- Custom install
-  - Provide path via one of:
-    - `-DCMAKE_PREFIX_PATH=C:\fftw\install` (must contain FFTW3Config.cmake)
-    - `-DFFTW3_DIR=C:\fftw\install\lib\cmake\fftw3`
+Integration Utilities
+---------------------
+Header: 	aco/correlation_fft.hpp and cpp/src/core/integrator.hpp`n
+- Quadrature
+  - integrate_trapezoid(f, a, b, n); integrate_simpson(f, a, b, n); integrate_infinite_R(f, tol) (composite Simpson).
+- Discrete grids
+  - integrate_discrete_trapz(y, dx); cumulative_trapz(y, dx) (prefix trapezoid).
+- Convolution (uniform dx)
+  - convolve_trapz(a, b, dx, mode) (per-window trapezoid end-weights).
+  - convolve_fft(a, b, dx, mode) (endpoint weights applied once, then IFFT·dx).
+  - ConvMode::{Full, Same, Valid}. 
 
-If configuration fails with "FFTW3 not found", install FFTW3 development files or point CMake to your install using the options above.
+Notes on convolution accuracy
+-----------------------------
+- Time-domain uses local per-output end-weights; FFT uses a global separable weighting.
+- Differences appear near edges; interior typically matches closely.
+- To reduce discrepancy without changing n,m:
+  - Decrease dx (denser sampling).
+  - Increase zero-padding in FFT (2×–4×).
+  - Compare interior only (ignore first/last ~m outputs) if edges aren’t used.
+
+Running the integration tests
+-----------------------------
+- Build: cmake --build build --config Release --target integrator_tests -j 8`n- Run:  uild/Release/integrator_tests.exe`n- Output: writes integrator_test_results.txt next to the exe and in the current directory.
+
+Choosing dt, N, m (rules of thumb)
+----------------------------------
+- Resolve oscillations: =12–16 points per period of the highest ? ? dt = 2p/(p·?max) (p˜12–16).
+- Cover kernel support: if tc is a decay time, N·dt = 6–8·tc and similarly for m·dt.
+- For correlation FFT, ensure Tper = Nfft·dt comfortably exceeds your analysis window to avoid wrap-around.
+
+
