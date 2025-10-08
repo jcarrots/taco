@@ -58,3 +58,17 @@ add_executable(integrator_tests tests/integrator_tests.cpp)
  target_include_directories(integrator_tests PRIVATE cpp/src)
  target_include_directories(integrator_tests PRIVATE cpp/include)
 
+
+add_executable(gamma_tests tests/gamma_tests.cpp)
+ target_link_libraries(gamma_tests PRIVATE taco_tcl)
+
+# Optional: Boost (header-only) for Ei in S(omega) analytic checks
+find_package(Boost QUIET)
+if (Boost_FOUND)
+  target_include_directories(gamma_tests PRIVATE ${Boost_INCLUDE_DIRS})
+  target_compile_definitions(gamma_tests PRIVATE HAS_BOOST_MATH=1)
+  message(STATUS "Boost found: enabling Ei-based S(omega) checks in gamma_tests")
+else()
+  message(STATUS "Boost not found: skipping Ei-based S(omega) checks in gamma_tests")
+endif()
+
