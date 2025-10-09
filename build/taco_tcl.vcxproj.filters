@@ -7,6 +7,9 @@
     <ClCompile Include="C:\Users\59405\taco\cpp\src\core\correlation.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="C:\Users\59405\taco\cpp\src\tcl\generator.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="C:\Users\59405\taco\CMakeLists.txt" />

@@ -33,11 +33,31 @@ Header: `taco/correlation_fft.hpp`
 - `bcf::bcf_fft_fun(N, dt, J, beta, t, C)` builds time‑domain C(t) from spectral J(ω) at inverse temperature β
 - Choose `dt` so `π/dt` exceeds J’s support; choose `N` so `N·dt` covers your required time window
 
+Modules Overview
+----------------
+For a map of the main headers and how they fit together (operators, eigensystems, baths, Γ integrators, TCL2 builders, and models), see:
+
+- docs/MODULES.md
+
 Propagation Helpers
 -------------------
 Header: `taco/propagate.hpp`
 - Steppers: `propagate_rk4`, `propagate_expm` (small N)
 - Utilities: `hermitize_and_normalize`, `build_liouvillian_at`, `precompute_expm`, `apply_precomputed_expm`
+
+- Spin-Boson Simulator
+----------------------
+- Build: `cmake --build build --config Release --target spin_boson`
+- Run with defaults: `build/Release/spin_boson.exe`
+- Outputs (CSV):
+  - `spin_boson_observables.csv` — time, ⟨σ_z⟩, excited population
+  - `spin_boson_density.csv` — time, full density matrix entries (real/imag)
+- Override parameters via `--key=value` flags:
+  - System/bath: `--delta`, `--epsilon`, `--alpha`, `--omega_c`, `--beta`, `--rank`, `--coupling=sz|sx|sy|sm|sp`
+  - Simulation: `--t0`, `--tf`, `--dt`, `--sample_every`
+  - Correlation grid: `--ncorr`, `--dt_corr`
+  - Output files: `--observables=...`, `--density=...`
+- Example: `spin_boson.exe --delta=0.8 --epsilon=0.1 --tf=20 --dt=0.02 --coupling=sx`
 
 Integration Utilities
 ---------------------
@@ -68,4 +88,3 @@ Choosing dt, N, m
 - Resolve oscillations: ≥12–16 points per period of highest `ω` → `dt ≤ 2π/(p·ωmax)`, p≈12–16
 - Cover kernel support: if `τc` is a decay time, `N·dt ≥ 6–8·τc` and similarly for `m·dt`
 - For correlation FFT, ensure `Tper = Nfft·dt` comfortably exceeds your analysis window to avoid wrap‑around
-

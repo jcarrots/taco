@@ -19,6 +19,7 @@ FetchContent_MakeAvailable(eigen)
 add_library(taco_tcl STATIC
   cpp/src/tcl/tcl2.cpp
   cpp/src/core/correlation.cpp
+  cpp/src/tcl/generator.cpp
 )
 target_include_directories(taco_tcl PUBLIC
   cpp/include
@@ -53,6 +54,12 @@ endif()
 add_executable(tcl2_demo examples/tcl2_demo.cpp)
 target_link_libraries(tcl2_demo PRIVATE taco_tcl)
 
+add_executable(generator_demo examples/generator_demo.cpp)
+target_link_libraries(generator_demo PRIVATE taco_tcl)
+
+add_executable(spin_boson examples/spin_boson.cpp)
+target_link_libraries(spin_boson PRIVATE taco_tcl)
+
 add_executable(integrator_tests tests/integrator_tests.cpp)
  target_link_libraries(integrator_tests PRIVATE taco_tcl)
  target_include_directories(integrator_tests PRIVATE cpp/src)
@@ -61,6 +68,10 @@ add_executable(integrator_tests tests/integrator_tests.cpp)
 
 add_executable(gamma_tests tests/gamma_tests.cpp)
  target_link_libraries(gamma_tests PRIVATE taco_tcl)
+
+add_executable(spin_boson_tests tests/spin_boson_tests.cpp)
+ target_link_libraries(spin_boson_tests PRIVATE taco_tcl)
+ target_include_directories(spin_boson_tests PRIVATE cpp/include)
 
 # Optional: Boost (header-only) for Ei in S(omega) analytic checks
 find_package(Boost QUIET)
