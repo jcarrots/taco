@@ -13,6 +13,9 @@ bath:
   omega_c: 5.0        # cutoff frequency
   beta: 5.0           # inverse temperature (1/kT)
   rank: 1             # number of bath channels
+  spectral: ohmic     # ohmic | subohmic | superohmic | custom
+  exponent: 1.0       # spectral exponent s (ignored unless needed)
+  cutoff: exponential # exponential | drude
 
 correlation_grid:
   ncorr: 8192         # number of correlation samples (N+1 internally)
@@ -30,4 +33,3 @@ generator:
 output:
   observables: spin_boson_observables.csv
   density: spin_boson_density.csv
-

@@ -1,3 +1,5 @@
+#include <algorithm>
+#include <cctype>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -8,7 +10,7 @@
 #include "taco/ops.hpp"
 #include "taco/propagate.hpp"
 #include "taco/spin_boson.hpp"
-#include "taco/tcl.hpp"
+#include "taco/tcl2.hpp"
 
 int main(int argc, char* argv[]) {
     using namespace taco;
@@ -23,6 +25,10 @@ int main(int argc, char* argv[]) {
         std::size_t rank{1};
         std::string coupling{"sz"};
         std::string generator_type{"tcl2"};
+        std::string spectral_family{"ohmic"};
+        double spectral_exponent{1.0};
+        bool spectral_exponent_explicit{false};
+        std::string cutoff_type{"exponential"};
         double t0{0.0};
         double tf{10.0};
         double dt{0.01};
@@ -75,6 +81,12 @@ int main(int argc, char* argv[]) {
             else if (key == "rank") settings.rank = parse_size(value);
             else if (key == "coupling") settings.coupling = value;
             else if (key == "generator") settings.generator_type = value;
+            else if (key == "spectral") settings.spectral_family = value;
+            else if (key == "s") {
+                settings.spectral_exponent = parse_double(value);
+                settings.spectral_exponent_explicit = true;
+            }
+            else if (key == "cutoff") settings.cutoff_type = value;
             else if (key == "t0") settings.t0 = parse_double(value);
             else if (key == "tf") settings.tf = parse_double(value);
             else if (key == "dt") settings.dt = parse_double(value);
@@ -92,6 +104,31 @@ int main(int argc, char* argv[]) {
         }
     }
 
+    if (settings.generator_type != "tcl2") {
+        std::cerr << "Only generator=tcl2 is currently supported (requested '"
+                  << settings.generator_type << "')" << std::endl;
+        return 1;
+    }
+    if (settings.sample_every == 0) {
+        std::cerr << "sample_every must be >= 1" << std::endl;
+        return 1;
+    }
+
+    auto to_lower = [](std::string s) {
+        std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c){ return static_cast<char>(std::tolower(c)); });
+        return s;
+    };
+
+    settings.coupling = to_lower(settings.coupling);
+    std::string spectral = to_lower(settings.spectral_family);
+    settings.cutoff_type = to_lower(settings.cutoff_type);
+
+    if (!settings.spectral_exponent_explicit) {
+        if (spectral == "ohmic") settings.spectral_exponent = 1.0;
+        else if (spectral == "subohmic") settings.spectral_exponent = 0.5;
+        else if (spectral == "superohmic") settings.spectral_exponent = 3.0;
+    }
+
     // Map coupling keyword to operator
     Eigen::MatrixXcd coupling_matrix;
     if (settings.coupling == "sz") coupling_matrix = ops::sigma_z();
@@ -105,13 +142,32 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    if (settings.generator_type != "tcl2") {
-        std::cerr << "Only generator=tcl2 is currently supported (requested '"
-                  << settings.generator_type << "')" << std::endl;
+    bath::CutoffType cutoff = bath::CutoffType::Exponential;
+    if (settings.cutoff_type == "exponential") cutoff = bath::CutoffType::Exponential;
+    else if (settings.cutoff_type == "drude") cutoff = bath::CutoffType::Drude;
+    else {
+        std::cerr << "Unknown cutoff type: " << settings.cutoff_type
+                  << " (supported: exponential, drude)" << std::endl;
         return 1;
     }
-    if (settings.sample_every == 0) {
-        std::cerr << "sample_every must be >= 1" << std::endl;
+
+    bath::PowerLawSpectrum spectrum;
+    try {
+        if (spectral == "ohmic") {
+            spectrum = bath::PowerLawSpectrum::ohmic(settings.alpha, settings.omega_c, cutoff);
+        } else if (spectral == "subohmic") {
+            spectrum = bath::PowerLawSpectrum::sub_ohmic(settings.alpha, settings.omega_c, settings.spectral_exponent, cutoff);
+        } else if (spectral == "superohmic") {
+            spectrum = bath::PowerLawSpectrum::super_ohmic(settings.alpha, settings.omega_c, settings.spectral_exponent, cutoff);
+        } else if (spectral == "custom") {
+            spectrum = bath::PowerLawSpectrum{settings.alpha, settings.omega_c, settings.spectral_exponent, cutoff};
+        } else {
+            std::cerr << "Unknown spectral family: " << settings.spectral_family
+                      << " (supported: ohmic, subohmic, superohmic, custom)" << std::endl;
+            return 1;
+        }
+    } catch (const std::exception& ex) {
+        std::cerr << "Error configuring spectral density: " << ex.what() << std::endl;
         return 1;
     }
 
@@ -137,6 +193,9 @@ int main(int argc, char* argv[]) {
               << ", beta=" << settings.beta
               << ", rank=" << settings.rank
               << "\n  coupling=" << settings.coupling
+              << ", spectral=" << spectral
+              << " (s=" << spectrum.s << ")"
+              << ", cutoff=" << (cutoff == bath::CutoffType::Exponential ? "exponential" : "drude")
               << ", generator=" << settings.generator_type
               << "\n  t0=" << settings.t0
               << ", tf=" << settings.tf
@@ -148,7 +207,7 @@ int main(int argc, char* argv[]) {
               << "\n  density file=" << settings.density_file
               << std::endl;
 
-    spin_boson::Model model(params, settings.Ncorr, settings.dt_corr, opts);
+    spin_boson::Model model(params, settings.Ncorr, settings.dt_corr, spectrum, opts);
     auto& generator = model.generator;
     generator.reset(settings.t0);
 

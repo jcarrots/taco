@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include <cmath>
 #include <complex>
 #include <cstddef>
 #include <stdexcept>
@@ -17,12 +18,44 @@ namespace taco::bath {
 
 // --------------------------- Spectral densities -----------------------------
 
-struct OhmicDrude {
-    double alpha{0.05};     // coupling strength
-    double omega_c{5.0};    // cutoff frequency
-    // J(ω) = 2 α ω exp(-ω/ωc) for ω>0; 0 otherwise
+enum class CutoffType { Exponential, Drude };
+
+struct PowerLawSpectrum {
+    double alpha{0.05};      // coupling strength
+    double omega_c{5.0};     // cutoff frequency
+    double s{1.0};           // spectral exponent (ohmic=1, sub-ohmic<1, super-ohmic>1)
+    CutoffType cutoff{CutoffType::Exponential};
+
     inline double J(double w) const noexcept {
-        return (w > 0.0) ? (2.0 * alpha * w * std::exp(-w / omega_c)) : 0.0;
+        if (!(w > 0.0)) return 0.0;
+        const double power = std::pow(w, s);
+        double cutoff_factor = 1.0;
+        switch (cutoff) {
+            case CutoffType::Exponential:
+                cutoff_factor = std::exp(-w / omega_c);
+                break;
+            case CutoffType::Drude:
+                cutoff_factor = (omega_c * omega_c) / (w * w + omega_c * omega_c);
+                break;
+        }
+        return 2.0 * alpha * power * cutoff_factor;
+    }
+
+    static PowerLawSpectrum ohmic(double alpha, double omega_c,
+                                  CutoffType cutoff = CutoffType::Exponential) {
+        return PowerLawSpectrum{alpha, omega_c, 1.0, cutoff};
+    }
+
+    static PowerLawSpectrum sub_ohmic(double alpha, double omega_c, double s_value,
+                                      CutoffType cutoff = CutoffType::Exponential) {
+        if (!(s_value < 1.0)) throw std::invalid_argument("sub_ohmic requires s < 1.0");
+        return PowerLawSpectrum{alpha, omega_c, s_value, cutoff};
+    }
+
+    static PowerLawSpectrum super_ohmic(double alpha, double omega_c, double s_value,
+                                        CutoffType cutoff = CutoffType::Exponential) {
+        if (!(s_value > 1.0)) throw std::invalid_argument("super_ohmic requires s > 1.0");
+        return PowerLawSpectrum{alpha, omega_c, s_value, cutoff};
     }
 };
 

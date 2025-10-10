@@ -1,6 +1,6 @@
 // Core TCL2 implementation: builds frequency buckets, integrates bath correlations,
 // and applies Hamiltonian + dissipative dynamics in the eigen basis.
-#include "taco/tcl.hpp"
+#include "taco/tcl2.hpp"
 
 #include <algorithm>
 #include <cmath>

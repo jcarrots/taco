@@ -6,7 +6,7 @@
 #include <vector>
 
 #include "taco/bath.hpp"
-#include "taco/tcl.hpp"
+#include "taco/tcl2.hpp"
 
 namespace demo {
 
