@@ -18,6 +18,8 @@ FetchContent_MakeAvailable(eigen)
 
 add_library(taco_tcl STATIC
   cpp/src/tcl/tcl4_kernels.cpp
+  cpp/src/tcl/tcl4_mikx.cpp
+  cpp/src/tcl/tcl4_assemble.cpp
   cpp/src/tcl/tcl4.cpp
   cpp/src/tcl/tcl2_generator.cpp
   cpp/src/core/correlation.cpp
