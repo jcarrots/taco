@@ -161,3 +161,17 @@ Choosing dt, N, m
 - Resolve oscillations: ≥12–16 points per period of highest `ω` → `dt ≤ 2π/(p·ωmax)`, p≈12–16
 - Cover kernel support: if `τc` is a decay time, `N·dt ≥ 6–8·τc` and similarly for `m·dt`
 - For correlation FFT, ensure `Tper = Nfft·dt` comfortably exceeds your analysis window to avoid wrap‑around
+
+TCL4 MIKX Notes
+----------------
+- API: `MikxTensors build_mikx(const Tcl4Map& map, const TripleKernelSeries& kernels, std::size_t time_index)`
+- Inputs: `kernels.F/C/R[f1][f2][f3]` is an `Eigen::VectorXcd` time series; `time_index` selects the sample.
+- Outputs:
+  - `M`, `I`, `K`: `N^2×N^2` matrices with row `(j,k)` and col `(p,q)` flattened as `j*N + k`, `p*N + q`.
+  - `X`: flat `N^6` vector, row‑major over `(j,k,p,q,r,s)`.
+- Mapping to MATLAB MIKX.m:
+  - `M = F[f(j,k), f(j,q), f(p,j)] − R[f(j,q), f(p,q), f(q,k)]`
+  - `I = F[f(j,k), f(q,p), f(k,q)]`
+  - `K = R[f(j,k), f(p,q), f(q,j)]`
+  - `X = C[f(j,k), f(p,q), f(r,s)] + R[f(j,k), f(p,q), f(r,s)]`
+- Layout: row‑major flatteners maximize locality for the current nested loops (s→r→q→p→k→j).

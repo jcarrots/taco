@@ -26,7 +26,7 @@ taco/
 │  │  ├─ generator.hpp        # TCL2 superoperator builders (unitary + dissipator)
 │  │  ├─ tcl2.hpp             # stateful TCL2 generator API
 │  │  ├─ tcl4_kernels.hpp     # TCL4 kernel builders (F, C, R)
-│  │  ├─ tcl4_mikx.hpp        # TCL4 M/I/K/X tensor builder (work in progress)
+    │  │  ├─ tcl4_mikx.hpp        # TCL4 M/I/K/X tensor builder
 │  │  ├─ tcl4_assemble.hpp    # TCL4 Liouvillian assembly (work in progress)
 │  │  └─ spin_boson.hpp       # spin-boson parameters + model wrapper
 │  └─ src/
@@ -37,7 +37,7 @@ taco/
 │        ├─ generator.cpp           # TCL2 builder implementation (L unitary/dissipator)
 │        ├─ tcl2_generator.cpp      # stateful TCL2Generator implementation
 │        └─ tcl4_kernels.cpp        # F/C/R kernel time-series (discrete integrals)
-│        ├─ tcl4_mikx.cpp           # placeholder for M/I/K/X assembly
+    │        ├─ tcl4_mikx.cpp           # M/I/K/X assembly (explicit contractions)
 │        └─ tcl4_assemble.cpp       # placeholder for TCL4 Liouvillian assembly
 ├─ configs/
 │   └─ spin_boson.yaml        # (duplicated above for clarity)

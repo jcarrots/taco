@@ -31,11 +31,23 @@ This document captures the steps required to translate the MATLAB TCL4 workflow 
 
 ## Phase 2 – M, I, K, X Assembly (MIKX)
 
-- Implement `taco::tcl4::build_mikx(F_tensor, C_tensor, R_tensor, map)` matching MATLAB `MIKX.m`:
-  - Input tensors `A2_1`, `A3_1`, `A4_1` (size `N^6` for system indices). v1 representation: `std::vector<std::complex<double>>` with indexing helpers or nested loops.
-  - Output: `M(j,k,p,q)`, `I(j,k,p,q)`, `K(j,k,p,q)` (4-index) + `X(i,k,p,q,r,s)` (6-index).
-  - Reproduce the identity tensor contractions performed in MATLAB `tensorprod`, `permute` using explicit loops.
-  - Later optimization: restructure as series of reshapes + matrix multiplications.
+Status: Implemented
+
+- Implemented `taco::tcl4::build_mikx(map, kernels, time_index)` to mirror MATLAB `MIKX.m` contractions.
+- Inputs: `TripleKernelSeries kernels` where `F/C/R[f1][f2][f3]` is an `Eigen::VectorXcd` time series; `time_index` selects the sample.
+- Outputs:
+  - `M`, `I`, `K`: `Eigen::MatrixXcd` of size `N^2 × N^2` with row `(j,k)` and col `(p,q)` flattened as `j*N + k`, `p*N + q`.
+  - `X`: `std::vector<std::complex<double>>` of length `N^6` stored row‑major over `(j,k,p,q,r,s)`.
+- Contractions (direct index mapping to MATLAB formulas):
+  - `M(j,k,p,q) = F[f(j,k), f(j,q), f(p,j)] − R[f(j,q), f(p,q), f(q,k)]`
+  - `I(j,k,p,q) = F[f(j,k), f(q,p), f(k,q)]`
+  - `K(j,k,p,q) = R[f(j,k), f(p,q), f(q,j)]`
+  - `X(j,k,p,q,r,s) = C[f(j,k), f(p,q), f(r,s)] + R[f(j,k), f(p,q), f(r,s)]`
+- Layout decisions:
+  - Pair‑flatten `flat2(N,a,b) = a*N + b` (row‑major) to match innermost loops.
+  - Six‑index flatten `flat6(N,j,k,p,q,r,s)` uses row‑major (last index varies fastest) for sequential writes across `s`.
+  - Frequency lookup via `map.pair_to_freq(a,b)`; validated to be non‑negative for all required pairs.
+- Future optimization: batch reshapes + GEMM to reduce scalar indexing overhead.
 
 ## Phase 3 – Liouvillian Assembly (NAKZWAN)
 
