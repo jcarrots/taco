@@ -175,3 +175,30 @@ TCL4 MIKX Notes
   - `K = R[f(j,k), f(p,q), f(q,j)]`
   - `X = C[f(j,k), f(p,q), f(r,s)] + R[f(j,k), f(p,q), f(r,s)]`
 - Layout: row‑major flatteners maximize locality for the current nested loops (s→r→q→p→k→j).
+
+TCL4 F/C/R Methods
+------------------
+- Two parallel implementations are surfaced via `taco::tcl4::FCRMethod`:
+  - `Convolution` (default): fast path intended to use FFT‑based Volterra convolutions and pagewise GEMM.
+  - `Direct`: time-domain construction (current implementation).
+- APIs:
+  - `compute_FCR_time_series_direct(...)`
+  - `compute_FCR_time_series_convolution(...)` (scalar path uses FFT-based Volterra convolution; matrix path still delegates to Direct)
+  - `compute_FCR_time_series(..., method=FCRMethod::Convolution)`
+  - `compute_triple_kernels(..., method=FCRMethod::Convolution)`
+- Default selection is `Convolution` so future upgrades don’t change call sites.
+- Implementation status: scalar (1×1) series use the FFT-based convolution path; matrix-valued kernels still fall back to the direct method pending page-wise GEMM integration.
+
+TCL4 Vector Path & Rebuild Helpers
+----------------------------------
+- Kernels operate on unique Γ(ω,t) columns (bucket‑major) as `Eigen::VectorXcd` for cache locality.
+- Frequency “transpose” in F is implemented by using the mirrored bucket: Γ^T(ω_b) ≡ Γ(−ω_b).
+- Rebuild helpers (for inspection or downstream consumers):
+  - `build_gamma_matrix_at(map, gamma_series, t_idx)` → N×N Γ at a given time.
+  - `build_FCR_6d_at(map, kernels, t_idx, F,C,R)` → flat N^6 tensors at time t_idx.
+  - `build_FCR_6d_final(map, kernels, F,C,R)` → convenience for last time index.
+
+Frequency Buckets Symmetry
+--------------------------
+- `taco::tcl4::Tcl4Map` includes `mirror_index[b]` such that `omegas[mirror_index[b]] ≈ -omegas[b]` (and self for `ω≈0`).
+- Use this to implement operations that require flipping frequency sign (e.g., frequency‑domain “transpose” across +/−ω) without reordering buckets.

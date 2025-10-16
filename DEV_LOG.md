@@ -17,6 +17,66 @@ Template (copy/paste for new entries)
 
 -----------------------------------------------------------------------
 
+Date: 2025-10-16
+Summary: Implement TCL4 Liouvillian assembly (NAKZWAN) in C++
+Details:
+  - Rationale:
+    - Complete Phase 3 of TCL4 pipeline by porting MATLAB NAKZWAN_v9.m to C++ so the M/I/K/X tensors produce the fourth-order correction matrix GW.
+  - Files:
+    - Core: cpp/src/tcl/tcl4_assemble.cpp
+  - Notes:
+    - Function `assemble_liouvillian(const MikxTensors&, const std::vector<Eigen::MatrixXcd>&)` now computes T(n,i,m,j) with nested sums over coupling channels and indices, using the same index mapping as MATLAB and `tcl4_mikx`.
+    - Indexing:
+      - 4D tensors M/I/K are accessed as M(b,i,n,a) = M[row=(b,i), col=(n,a)] etc. with row/col flatteners `flat2(N,·,·)`.
+      - 6D tensor X is accessed as X(j,k,p,q,r,s) with row-major `flat6` (matches `tcl4_mikx`).
+    - Output GW is symmetrized as `T + T.adjoint()` (MATLAB `'`).
+    - Validates shapes and coupling operator dimensions; throws on mismatch.
+  - Migration:
+    - None. Performance optimizations (blocking/parallelization) can be added later after correctness validation against MATLAB.
+
+Date: 2025-10-16
+Summary: Add FCRMethod and default to Convolution; direct path retained
+Details:
+  - Rationale:
+    - Support parallel implementations of TCL4 F/C/R kernels with a stable, explicit selection knob. Default to the faster convolution path without changing call sites later.
+  - Files:
+    - Headers: cpp/include/taco/tcl4_kernels.hpp (added FCRMethod; direct/convolution selectors; wrapper), cpp/include/taco/tcl4.hpp (method plumbed into triple-series)
+    - Sources: cpp/src/tcl/tcl4_kernels.cpp (factored direct; added convolution stub delegating to direct), cpp/src/tcl/tcl4.cpp (method parameter)
+    - Docs: DEV_GUIDE.md (methods section), docs/TCL4_PLAN.md (Phase 1b plan)
+  - Notes:
+    - `compute_FCR_time_series_convolution` currently calls the Direct implementation; will be replaced with FFT‑based Volterra convolution.
+    - API defaults to `FCRMethod::Convolution` in both per‑pair and triple‑series builders.
+  - Migration:
+    - Existing calls to `compute_FCR_time_series(G1,G2,omega,dt,op2)` still compile via the wrapper. Behavior currently unchanged because Convolution delegates to Direct.
+
+Date: 2025-10-16
+Summary: Change F builder to use mirrored frequency for Γ^T (drop channel apply_op)
+Details:
+  - Rationale:
+    - In the TCL4 kernel construction, the transpose acts in frequency space: Γ(ω)^T = Γ(−ω). Implement this by selecting the mirrored bucket instead of transposing channel matrices.
+  - Files:
+    - Kernels: cpp/src/tcl/tcl4_kernels.cpp (removed `apply_op`; F now uses provided G2 as-is)
+    - Triple driver: cpp/src/tcl/tcl4.cpp (build both original and mirrored G2; compute F with mirrored, C/R with original)
+  - Notes:
+    - Mirror lookups use `Tcl4Map::mirror_index`; zero bucket maps to itself.
+    - `SpectralOp` parameter remains in signatures for now but is ignored in the direct path; callers pass `Identity`.
+  - Migration:
+    - No public API change required. Behavior now matches intended Γ^T semantics.
+
+Date: 2025-10-16
+Summary: Add scalar-series F/C/R builders and use Γ columns directly
+Details:
+  - Rationale:
+    - Avoid building vectors of 1×1 matrices per time sample; improve cache locality and reduce allocations by operating on `Eigen::VectorXcd` time columns directly.
+  - Files:
+    - Kernels: cpp/include/taco/tcl4_kernels.hpp (vector-based overloads), cpp/src/tcl/tcl4_kernels.cpp (implementations)
+    - Triple driver: cpp/src/tcl/tcl4.cpp (now passes `gamma_series.col(...)` to vector overloads)
+  - Notes:
+    - Direct method uses tk = k·dt on the fly; no explicit time array required.
+    - Convolution method will later replace the direct versions under the `FCRMethod::Convolution` dispatch.
+  - Migration:
+    - No API breaks; existing matrix-series path remains for multi-channel generalization.
+
 Date: 2025-10-10
 Summary: Implement TCL4 M/I/K/X assembly (Phase 2) with explicit contractions
 Details:

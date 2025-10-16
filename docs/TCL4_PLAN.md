@@ -23,11 +23,23 @@ This document captures the steps required to translate the MATLAB TCL4 workflow 
   - `volterra_conv_matmul(F, G, dt)` – causal convolution via FFT (time-major) returning `∫₀^t F(t−s)G(s) ds`.
   - Support operations on `G2`: op ∈ {identity, transpose, conjugation, Hermitian}; mimic MATLAB’s `apply_op_g2`.
 
-### 1.2 Driver for All Triples
+### 1.2 Driver for All Triples (vector path)
 - Implement `compute_FCR_timeseries_all(system, GammaSeries, dt, nmax)` producing time-series arrays for all `(ω1, ω2, ω3)` combinations. Shapes:
   - `F_all`, `C_all`, `R_all` – stored as `std::vector<Eigen::MatrixXcd>` or custom tensor wrapper (`time × nf × nf × nf`).
   - Use `map` mappings to fill data in the same layout as MATLAB (`map.ij` style conversions).
 - For each time index `k` (matching `tcl4_driver` logic: `tidx = 2*nmax*ns + 1`), later reshape these into 6D tensors for system indices.
+  - Current implementation computes F/C/R using Γ columns (`Eigen::VectorXcd`) with `FCRMethod::Convolution` by default; Γ^T is realized by using the mirrored frequency bucket.
+
+## Phase 1b – Convolution F/C/R (Fast Path)
+
+- Introduce `taco::tcl4::FCRMethod { Convolution (default), Direct }`.
+- Implement `compute_FCR_time_series_convolution` using FFT‑based Volterra convolution and pagewise GEMM:
+  - Precompute phase factors; use zero‑padding (2×–4×) to reduce circular wrap.
+  - Overlap‑add or sufficiently long grids to mimic causal convolution.
+  - Compare against the Direct path (max abs/rel errors, especially at edges).
+- Wire method selection through `compute_FCR_time_series(..., method)` and `compute_triple_kernels(..., method)`.
+- Keep default = `Convolution` so call sites remain stable as we optimize.
+- Status: scalar (1×1) path implemented with FFT-based Volterra convolution; matrix-valued FFT path still TODO.
 
 ## Phase 2 – M, I, K, X Assembly (MIKX)
 
@@ -65,6 +77,9 @@ Status: Implemented
   - Optionally, helper overload to accept a `tcl::TCL2Generator` (stateful) to reuse Simpson integrals.
 - Update `examples/spin_boson.cpp` CLI: new flag `--generator=tcl2|tcl4|both` to compute TCL4 correction and optionally add to TCL2 Liouvillian.
 - Provide YAML knobs (`spectral`, `cutoff`, `generator`) already extended earlier.
+ - Convenience rebuild helpers are available:
+   - `build_gamma_matrix_at(map, gamma_series, t_idx)`
+   - `build_FCR_6d_at(map, kernels, t_idx, F,C,R)` and `build_FCR_6d_final(...)`
 
 ## Phase 5 – Validation & Testing
 

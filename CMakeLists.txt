@@ -64,6 +64,9 @@ target_link_libraries(generator_demo PRIVATE taco_tcl)
 add_executable(spin_boson examples/spin_boson.cpp)
 target_link_libraries(spin_boson PRIVATE taco_tcl)
 
+add_executable(tcl4_driver examples/tcl4_driver.cpp)
+target_link_libraries(tcl4_driver PRIVATE taco_tcl)
+
 add_executable(integrator_tests tests/integrator_tests.cpp)
  target_link_libraries(integrator_tests PRIVATE taco_tcl)
  target_include_directories(integrator_tests PRIVATE cpp/src)
@@ -86,4 +89,3 @@ if (Boost_FOUND)
 else()
   message(STATUS "Boost not found: skipping Ei-based S(omega) checks in gamma_tests")
 endif()
-
