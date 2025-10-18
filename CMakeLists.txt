@@ -8,6 +8,9 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 include(FetchContent)
 
+# Optional: OpenMP for CPU parallelization
+option(TACO_WITH_OPENMP "Enable OpenMP parallelization" ON)
+
 # Fetch Eigen (header-only)
 FetchContent_Declare(
   eigen
@@ -28,6 +31,16 @@ add_library(taco_tcl STATIC
 target_include_directories(taco_tcl PUBLIC
   cpp/include
 )
+
+if (TACO_WITH_OPENMP)
+  find_package(OpenMP QUIET)
+  if (OpenMP_CXX_FOUND)
+    target_link_libraries(taco_tcl PRIVATE OpenMP::OpenMP_CXX)
+    message(STATUS "OpenMP enabled for taco_tcl")
+  else()
+    message(STATUS "OpenMP not found; building without OpenMP")
+  endif()
+endif()
 
 # Eigen provides an interface target when pulled as a subproject
 if(TARGET Eigen3::Eigen)
@@ -67,6 +80,12 @@ target_link_libraries(spin_boson PRIVATE taco_tcl)
 add_executable(tcl4_driver examples/tcl4_driver.cpp)
 target_link_libraries(tcl4_driver PRIVATE taco_tcl)
 
+add_executable(spin_boson_tcl4 examples/spin_boson_tcl4.cpp)
+target_link_libraries(spin_boson_tcl4 PRIVATE taco_tcl)
+
+add_executable(tcl4_bench examples/tcl4_bench.cpp)
+target_link_libraries(tcl4_bench PRIVATE taco_tcl)
+
 add_executable(integrator_tests tests/integrator_tests.cpp)
  target_link_libraries(integrator_tests PRIVATE taco_tcl)
  target_include_directories(integrator_tests PRIVATE cpp/src)
@@ -79,6 +98,10 @@ add_executable(gamma_tests tests/gamma_tests.cpp)
 add_executable(spin_boson_tests tests/spin_boson_tests.cpp)
  target_link_libraries(spin_boson_tests PRIVATE taco_tcl)
  target_include_directories(spin_boson_tests PRIVATE cpp/include)
+
+add_executable(tcl4_tests tests/tcl4_tests.cpp)
+ target_link_libraries(tcl4_tests PRIVATE taco_tcl)
+ target_include_directories(tcl4_tests PRIVATE cpp/include)
 
 # Optional: Boost (header-only) for Ei in S(omega) analytic checks
 find_package(Boost QUIET)

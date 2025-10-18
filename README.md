@@ -21,3 +21,11 @@ import taco as tc
 L = tc.kernels.tcl4.build_liouvillian(H, C_ops, bath, order=4)
 rt = tc.runtime.Engine(backend="gpu")  # "cpu" | "gpu" | "mpi"
 ρt = rt.propagate(L, ρ0, tspan, dt_adapt=True)
+
+## TCL4 Demo & Test
+- Demo driver: `tcl4_driver` builds Γ via FFT and runs TCL4 assembly
+  - Build: `cmake --build build --config Release --target tcl4_driver`
+  - Run (Win): `build\Release\tcl4_driver.exe --dt=0.000625 --nmax=2 --ns=2048`
+- Test: `tcl4_tests` compares Direct vs Convolution F/C/R
+  - Build: `cmake --build build --config Release --target tcl4_tests`
+  - Run: `build\Release\tcl4_tests.exe`

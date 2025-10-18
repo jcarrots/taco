@@ -29,6 +29,8 @@ This document captures the steps required to translate the MATLAB TCL4 workflow 
   - Use `map` mappings to fill data in the same layout as MATLAB (`map.ij` style conversions).
 - For each time index `k` (matching `tcl4_driver` logic: `tidx = 2*nmax*ns + 1`), later reshape these into 6D tensors for system indices.
   - Current implementation computes F/C/R using Γ columns (`Eigen::VectorXcd`) with `FCRMethod::Convolution` by default; Γ^T is realized by using the mirrored frequency bucket.
+  - Results are kept in frequency space (unique buckets). Dedicated rebuild helpers project back to full frequency‑index tensors:
+    - `build_FCR_6d_at(map, kernels, t_idx, F,C,R)` and `build_FCR_6d_series(...)`.
 
 ## Phase 1b – Convolution F/C/R (Fast Path)
 
@@ -48,7 +50,7 @@ Status: Implemented
 - Implemented `taco::tcl4::build_mikx(map, kernels, time_index)` to mirror MATLAB `MIKX.m` contractions.
 - Inputs: `TripleKernelSeries kernels` where `F/C/R[f1][f2][f3]` is an `Eigen::VectorXcd` time series; `time_index` selects the sample.
 - Outputs:
-  - `M`, `I`, `K`: `Eigen::MatrixXcd` of size `N^2 × N^2` with row `(j,k)` and col `(p,q)` flattened as `j*N + k`, `p*N + q`.
+- `M`, `I`, `K`: `Eigen::MatrixXcd` of size `N^2 × N^2` with row `(j,k)` and col `(p,q)` flattened using column‑major mapping to match vec/unvec: `idx = row + col*N` (so `(j,k)` → `j + k*N`, `(p,q)` → `p + q*N`).
   - `X`: `std::vector<std::complex<double>>` of length `N^6` stored row‑major over `(j,k,p,q,r,s)`.
 - Contractions (direct index mapping to MATLAB formulas):
   - `M(j,k,p,q) = F[f(j,k), f(j,q), f(p,j)] − R[f(j,q), f(p,q), f(q,k)]`
@@ -72,8 +74,10 @@ Status: Implemented
 
 - Add `taco/tcl4.hpp` exposing:
   - `struct Tcl4Components { Eigen::MatrixXcd L_tcl4; /* plus optionally F,C,R,M,I,K,X logs */ }`
-  - `build_tcl4_components(const sys::System&, const Eigen::MatrixXcd& GammaSeries, double dt, std::size_t time_index, const Options&)`
-    - Internally: Phase 1 (F,C,R for selected time), Phase 2 (MIKX), Phase 3 (assemble).
+  - High‑level wrappers:
+    - `build_TCL4_generator(system, gamma_series, dt, time_index, method)` → GW at time index.
+    - `build_correction_series(system, gamma_series, dt, method)` → GW for all times.
+    - Rebuild helpers as noted in Phase 1.2.
   - Optionally, helper overload to accept a `tcl::TCL2Generator` (stateful) to reuse Simpson integrals.
 - Update `examples/spin_boson.cpp` CLI: new flag `--generator=tcl2|tcl4|both` to compute TCL4 correction and optionally add to TCL2 Liouvillian.
 - Provide YAML knobs (`spectral`, `cutoff`, `generator`) already extended earlier.

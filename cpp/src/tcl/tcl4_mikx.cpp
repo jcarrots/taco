@@ -17,9 +17,10 @@ inline std::size_t flat6(std::size_t N,
               + static_cast<std::size_t>(r)) * NN + static_cast<std::size_t>(s));
 }
 
-inline std::size_t flat2(std::size_t N, int a, int b)
+// Column-major pair flattening: idx(row,col) = row + col*N
+inline std::size_t flat2(std::size_t N, int row, int col)
 {
-    return static_cast<std::size_t>(a) * static_cast<std::size_t>(N) + static_cast<std::size_t>(b);
+    return static_cast<std::size_t>(row) + static_cast<std::size_t>(col) * N;
 }
 
 inline std::size_t freq_idx_checked(const Eigen::MatrixXi& pair_to_freq,

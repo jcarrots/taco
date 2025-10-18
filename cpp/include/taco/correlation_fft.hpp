@@ -197,10 +197,10 @@ inline void bcf_fft_fun(std::size_t N, double dt, JCallable J, double beta,
         S[Nfft/2] = cd( 0.25 * PI * J(omegaNy) * (1.0 + 2.0 / (eNy - 1.0)), 0.0 );
     }
 
-    // Inverse FFT -> time domain using a tiny plan
+    // Forward FFT -> time domain using a tiny plan (matches MATLAB: C = fft(S) * (dω/π))
     {
         FFTPlan plan(Nfft);
-        plan.exec_inverse(S);
+        plan.exec_forward(S);
     }
     const double scale = domega / PI;  // matches continuum normalization
 
@@ -214,4 +214,3 @@ inline void bcf_fft_fun(std::size_t N, double dt, JCallable J, double beta,
 }
 
 } // namespace bcf
-

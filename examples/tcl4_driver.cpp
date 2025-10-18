@@ -6,6 +6,9 @@
 #include <cmath>
 
 #include <Eigen/Dense>
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 
 #include "taco/ops.hpp"
 #include "taco/system.hpp"
@@ -48,6 +51,13 @@ int main(int argc, char** argv) {
             else if (key == "method") {
                 if (val == "direct") S.method = tcl4::FCRMethod::Direct;
                 else S.method = tcl4::FCRMethod::Convolution;
+            } else if (key == "threads") {
+#ifdef _OPENMP
+                int th = parse_int(val);
+                if (th > 0) omp_set_num_threads(th);
+#else
+                (void)val; // no-op if OpenMP not enabled
+#endif
             }
         } catch (const std::exception& ex) {
             std::cerr << "Error parsing " << arg << ": " << ex.what() << "\n";
@@ -61,6 +71,11 @@ int main(int argc, char** argv) {
               << ", omega_c=" << S.omega_c << ", alpha=" << S.alpha
               << ", method=" << (S.method == tcl4::FCRMethod::Convolution ? "convolution" : "direct")
               << "\n";
+#ifdef _OPENMP
+    std::cout << "OpenMP: max_threads=" << omp_get_max_threads() << "\n";
+#else
+    std::cout << "OpenMP: disabled at build time\n";
+#endif
 
     // --- System: 2-level, H = sigma_x/2, coupling A = sigma_z/2 ---
     Matrix H = 0.5 * ops::sigma_x();
@@ -118,4 +133,3 @@ int main(int argc, char** argv) {
 
     return 0;
 }
-

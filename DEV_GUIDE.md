@@ -30,7 +30,8 @@ FFT Backend
 Correlation FFT API
 -------------------
 Header: `taco/correlation_fft.hpp`
-- `bcf::bcf_fft_fun(N, dt, J, beta, t, C)` builds time‑domain C(t) from spectral J(ω) at inverse temperature β
+- `bcf::bcf_fft_fun(N, dt, J, beta, t, C)` builds time‑domain C(t) from spectral J(ω) at inverse temperature β.
+- Convention: we compute `C = fft(S) * (dω/π)` on a symmetric KMS spectrum `S(ω)` (DC/+ω/Nyquist/−ω). This matches the MATLAB helper (`bcf_fft_ohmic_simple.m`).
 - Choose `dt` so `π/dt` exceeds J’s support; choose `N` so `N·dt` covers your required time window
 
 Modules Overview
@@ -167,14 +168,15 @@ TCL4 MIKX Notes
 - API: `MikxTensors build_mikx(const Tcl4Map& map, const TripleKernelSeries& kernels, std::size_t time_index)`
 - Inputs: `kernels.F/C/R[f1][f2][f3]` is an `Eigen::VectorXcd` time series; `time_index` selects the sample.
 - Outputs:
-  - `M`, `I`, `K`: `N^2×N^2` matrices with row `(j,k)` and col `(p,q)` flattened as `j*N + k`, `p*N + q`.
+  - `M`, `I`, `K`: `N^2×N^2` matrices with row `(j,k)` and col `(p,q)` flattened using column‑major pair mapping to match `vec`/`unvec`:
+    - row `(j,k)` → `idx = j + k*N`
+    - col `(p,q)` → `idx = p + q*N`
   - `X`: flat `N^6` vector, row‑major over `(j,k,p,q,r,s)`.
 - Mapping to MATLAB MIKX.m:
   - `M = F[f(j,k), f(j,q), f(p,j)] − R[f(j,q), f(p,q), f(q,k)]`
   - `I = F[f(j,k), f(q,p), f(k,q)]`
   - `K = R[f(j,k), f(p,q), f(q,j)]`
   - `X = C[f(j,k), f(p,q), f(r,s)] + R[f(j,k), f(p,q), f(r,s)]`
-- Layout: row‑major flatteners maximize locality for the current nested loops (s→r→q→p→k→j).
 
 TCL4 F/C/R Methods
 ------------------
@@ -197,6 +199,19 @@ TCL4 Vector Path & Rebuild Helpers
   - `build_gamma_matrix_at(map, gamma_series, t_idx)` → N×N Γ at a given time.
   - `build_FCR_6d_at(map, kernels, t_idx, F,C,R)` → flat N^6 tensors at time t_idx.
   - `build_FCR_6d_final(map, kernels, F,C,R)` → convenience for last time index.
+  - `build_FCR_6d_series(map, kernels, F_series, C_series, R_series)` → full time series, time‑major; `F_series[t]` is flat N^6.
+
+TCL4 Driver & Tests
+-------------------
+- Driver: `examples/tcl4_driver.cpp` runs the full TCL4 pipeline (Γ via FFT → F/C/R → MIKX → assemble) and prints diagnostics.
+- Test: `tests/tcl4_tests.cpp` compares Direct vs Convolution F/C/R across multiple (N, dt, T) cases and reports max relative errors.
+- Spin‑Boson TCL4 demo: `examples/spin_boson_tcl4.cpp` composes `L_total = L2 + α²·GW` and propagates ρ(t) (frozen‑L Euler) while printing ⟨σ_z⟩.
+
+High‑Level TCL4 Wrappers
+------------------------
+- Build `GW` at a single time: `build_TCL4_generator(system, gamma_series, dt, time_index, method)`.
+- Build `GW` for all times: `build_correction_series(system, gamma_series, dt, method)`.
+- These call `compute_triple_kernels` internally (frequency space) and then `build_mikx` + `assemble_liouvillian` with `system.A_eig`.
 
 Frequency Buckets Symmetry
 --------------------------

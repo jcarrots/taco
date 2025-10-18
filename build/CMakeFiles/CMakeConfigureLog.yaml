@@ -1758,3 +1758,1479 @@ events:
         
       exitCode: 0
 ...
+
+---
+events:
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "C:/Program Files/CMake/share/cmake-3.30/Modules/Internal/CheckSourceCompiles.cmake:101 (try_compile)"
+      - "C:/Program Files/CMake/share/cmake-3.30/Modules/Internal/CheckCompilerFlag.cmake:18 (cmake_check_source_compiles)"
+      - "C:/Program Files/CMake/share/cmake-3.30/Modules/CheckCXXCompilerFlag.cmake:34 (cmake_check_compiler_flag)"
+      - "build/_deps/eigen-src/CMakeLists.txt:71 (check_cxx_compiler_flag)"
+      - "build/_deps/eigen-src/CMakeLists.txt:88 (ei_add_cxx_compiler_flag)"
+    checks:
+      - "Performing Test COMPILER_SUPPORT_std=cpp03"
+    directories:
+      source: "C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-giyx0e"
+      binary: "C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-giyx0e"
+    cmakeVariables:
+      CMAKE_CXX_FLAGS: "/DWIN32 /D_WINDOWS /EHsc"
+      CMAKE_EXE_LINKER_FLAGS: "/machine:x64"
+      CMAKE_MODULE_PATH: "C:/Users/59405/taco/build/_deps/eigen-src/cmake"
+    buildResult:
+      variable: "COMPILER_SUPPORT_std=cpp03"
+      cached: true
+      stdout: |
+        Change Dir: 'C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-giyx0e'
+        
+        Run Build Command(s): "C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/MSBuild/Current/Bin/amd64/MSBuild.exe" cmTC_0e468.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:n
+        MSBuild version 17.10.4+10fbfbf2e for .NET Framework
+        Build started 10/7/2025 1:31:11 PM.
+        
+        Project "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-giyx0e\\cmTC_0e468.vcxproj" on node 1 (default targets).
+        PrepareForBuild:
+          Creating directory "cmTC_0e468.dir\\Debug\\".
+          Structured output is enabled. The formatting of compiler diagnostics will reflect the error hierarchy. See https://aka.ms/cpp/structured-output for more details.
+          Creating directory "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-giyx0e\\Debug\\".
+          Creating directory "cmTC_0e468.dir\\Debug\\cmTC_0e468.tlog\\".
+        InitializeBuildStatus:
+          Creating "cmTC_0e468.dir\\Debug\\cmTC_0e468.tlog\\unsuccessfulbuild" because "AlwaysCreate" was specified.
+          Touching "cmTC_0e468.dir\\Debug\\cmTC_0e468.tlog\\unsuccessfulbuild".
+        ClCompile:
+          C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC\\14.40.33807\\bin\\HostX64\\x64\\CL.exe /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D COMPILER_SUPPORT_std=cpp03 /D "CMAKE_INTDIR=\\"Debug\\"" /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_0e468.dir\\Debug\\\\" /Fd"cmTC_0e468.dir\\Debug\\vc143.pdb" /external:W1 /Gd /TP /errorReport:queue  -std=c++03 "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-giyx0e\\src.cxx"
+          Microsoft (R) C/C++ Optimizing Compiler Version 19.40.33808 for x64
+          Copyright (C) Microsoft Corporation.  All rights reserved.
+          cl /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D COMPILER_SUPPORT_std=cpp03 /D "CMAKE_INTDIR=\\"Debug\\"" /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_0e468.dir\\Debug\\\\" /Fd"cmTC_0e468.dir\\Debug\\vc143.pdb" /external:W1 /Gd /TP /errorReport:queue  -std=c++03 "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-giyx0e\\src.cxx"
+        cl : command line  warning D9002: ignoring unknown option '-std=c++03' [C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-giyx0e\\cmTC_0e468.vcxproj]
+          src.cxx
+        Link:
+          C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC\\14.40.33807\\bin\\HostX64\\x64\\link.exe /ERRORREPORT:QUEUE /OUT:"C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-giyx0e\\Debug\\cmTC_0e468.exe" /INCREMENTAL /ILK:"cmTC_0e468.dir\\Debug\\cmTC_0e468.ilk" /NOLOGO kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-giyx0e/Debug/cmTC_0e468.pdb" /SUBSYSTEM:CONSOLE /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-giyx0e/Debug/cmTC_0e468.lib" /MACHINE:X64  /machine:x64 cmTC_0e468.dir\\Debug\\src.obj
+          cmTC_0e468.vcxproj -> C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-giyx0e\\Debug\\cmTC_0e468.exe
+        FinalizeBuildStatus:
+          Deleting file "cmTC_0e468.dir\\Debug\\cmTC_0e468.tlog\\unsuccessfulbuild".
+          Touching "cmTC_0e468.dir\\Debug\\cmTC_0e468.tlog\\cmTC_0e468.lastbuildstate".
+        Done Building Project "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-giyx0e\\cmTC_0e468.vcxproj" (default targets).
+        
+        Build succeeded.
+        
+        "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-giyx0e\\cmTC_0e468.vcxproj" (default target) (1) ->
+        (ClCompile target) -> 
+          cl : command line  warning D9002: ignoring unknown option '-std=c++03' [C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-giyx0e\\cmTC_0e468.vcxproj]
+        
+            1 Warning(s)
+            0 Error(s)
+        
+        Time Elapsed 00:00:01.08
+        
+      exitCode: 0
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "C:/Program Files/CMake/share/cmake-3.30/Modules/CMakeDetermineVSServicePack.cmake:106 (try_compile)"
+      - "build/_deps/eigen-src/cmake/EigenDetermineVSServicePack.cmake:8 (_DetermineVSServicePack_CheckVersionWithTryCompile)"
+      - "build/_deps/eigen-src/cmake/EigenTesting.cmake:460 (EigenDetermineVSServicePack)"
+      - "build/_deps/eigen-src/cmake/EigenTesting.cmake:598 (ei_get_compilerver)"
+      - "build/_deps/eigen-src/cmake/EigenConfigureTesting.cmake:8 (ei_set_build_string)"
+      - "build/_deps/eigen-src/CMakeLists.txt:487 (include)"
+    directories:
+      source: "C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-jl06fn"
+      binary: "C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-jl06fn"
+    cmakeVariables:
+      CMAKE_CXX_FLAGS: "/DWIN32 /D_WINDOWS /EHsc /EHsc /wd4127 /wd4505 /wd4714"
+      CMAKE_EXE_LINKER_FLAGS: "/machine:x64"
+      CMAKE_MODULE_PATH: "C:/Users/59405/taco/build/_deps/eigen-src/cmake"
+    buildResult:
+      variable: "_CompileResult"
+      cached: true
+      stdout: |
+        Change Dir: 'C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-jl06fn'
+        
+        Run Build Command(s): "C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/MSBuild/Current/Bin/amd64/MSBuild.exe" cmTC_01087.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:n
+        MSBuild version 17.10.4+10fbfbf2e for .NET Framework
+        Build started 10/7/2025 1:31:20 PM.
+        
+        Project "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-jl06fn\\cmTC_01087.vcxproj" on node 1 (default targets).
+        PrepareForBuild:
+          Creating directory "cmTC_01087.dir\\Debug\\".
+          Structured output is enabled. The formatting of compiler diagnostics will reflect the error hierarchy. See https://aka.ms/cpp/structured-output for more details.
+          Creating directory "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-jl06fn\\Debug\\".
+          Creating directory "cmTC_01087.dir\\Debug\\cmTC_01087.tlog\\".
+        InitializeBuildStatus:
+          Creating "cmTC_01087.dir\\Debug\\cmTC_01087.tlog\\unsuccessfulbuild" because "AlwaysCreate" was specified.
+          Touching "cmTC_01087.dir\\Debug\\cmTC_01087.tlog\\unsuccessfulbuild".
+        ClCompile:
+          C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC\\14.40.33807\\bin\\HostX64\\x64\\CL.exe /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D "CMAKE_INTDIR=\\"Debug\\"" /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_01087.dir\\Debug\\\\" /Fd"cmTC_01087.dir\\Debug\\vc143.pdb" /external:W1 /Gd /TP /wd4127 /wd4505 /wd4714 /errorReport:queue C:\\Users\\59405\\taco\\build\\return0.cc
+          Microsoft (R) C/C++ Optimizing Compiler Version 19.40.33808 for x64
+          Copyright (C) Microsoft Corporation.  All rights reserved.
+          cl /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D "CMAKE_INTDIR=\\"Debug\\"" /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_01087.dir\\Debug\\\\" /Fd"cmTC_01087.dir\\Debug\\vc143.pdb" /external:W1 /Gd /TP /wd4127 /wd4505 /wd4714 /errorReport:queue C:\\Users\\59405\\taco\\build\\return0.cc
+          return0.cc
+        Link:
+          C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC\\14.40.33807\\bin\\HostX64\\x64\\link.exe /ERRORREPORT:QUEUE /OUT:"C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-jl06fn\\Debug\\cmTC_01087.exe" /INCREMENTAL /ILK:"cmTC_01087.dir\\Debug\\cmTC_01087.ilk" /NOLOGO kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-jl06fn/Debug/cmTC_01087.pdb" /SUBSYSTEM:CONSOLE /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-jl06fn/Debug/cmTC_01087.lib" /MACHINE:X64  /machine:x64 cmTC_01087.dir\\Debug\\return0.obj
+          cmTC_01087.vcxproj -> C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-jl06fn\\Debug\\cmTC_01087.exe
+        FinalizeBuildStatus:
+          Deleting file "cmTC_01087.dir\\Debug\\cmTC_01087.tlog\\unsuccessfulbuild".
+          Touching "cmTC_01087.dir\\Debug\\cmTC_01087.tlog\\cmTC_01087.lastbuildstate".
+        Done Building Project "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-jl06fn\\cmTC_01087.vcxproj" (default targets).
+        
+        Build succeeded.
+            0 Warning(s)
+            0 Error(s)
+        
+        Time Elapsed 00:00:01.35
+        
+      exitCode: 0
+...
+
+---
+events:
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "C:/Program Files/CMake/share/cmake-3.30/Modules/Internal/CheckSourceCompiles.cmake:101 (try_compile)"
+      - "C:/Program Files/CMake/share/cmake-3.30/Modules/Internal/CheckCompilerFlag.cmake:18 (cmake_check_source_compiles)"
+      - "C:/Program Files/CMake/share/cmake-3.30/Modules/CheckCXXCompilerFlag.cmake:34 (cmake_check_compiler_flag)"
+      - "build/_deps/eigen-src/CMakeLists.txt:71 (check_cxx_compiler_flag)"
+      - "build/_deps/eigen-src/CMakeLists.txt:88 (ei_add_cxx_compiler_flag)"
+    checks:
+      - "Performing Test COMPILER_SUPPORT_std=cpp03"
+    directories:
+      source: "C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-7ubl3m"
+      binary: "C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-7ubl3m"
+    cmakeVariables:
+      CMAKE_CXX_FLAGS: "/DWIN32 /D_WINDOWS /EHsc"
+      CMAKE_EXE_LINKER_FLAGS: "/machine:x64"
+      CMAKE_MODULE_PATH: "C:/Users/59405/taco/build/_deps/eigen-src/cmake"
+    buildResult:
+      variable: "COMPILER_SUPPORT_std=cpp03"
+      cached: true
+      stdout: |
+        Change Dir: 'C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-7ubl3m'
+        
+        Run Build Command(s): "C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/MSBuild/Current/Bin/amd64/MSBuild.exe" cmTC_eb2fb.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:n
+        MSBuild version 17.10.4+10fbfbf2e for .NET Framework
+        Build started 10/7/2025 6:37:11 PM.
+        
+        Project "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-7ubl3m\\cmTC_eb2fb.vcxproj" on node 1 (default targets).
+        PrepareForBuild:
+          Creating directory "cmTC_eb2fb.dir\\Debug\\".
+          Structured output is enabled. The formatting of compiler diagnostics will reflect the error hierarchy. See https://aka.ms/cpp/structured-output for more details.
+          Creating directory "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-7ubl3m\\Debug\\".
+          Creating directory "cmTC_eb2fb.dir\\Debug\\cmTC_eb2fb.tlog\\".
+        InitializeBuildStatus:
+          Creating "cmTC_eb2fb.dir\\Debug\\cmTC_eb2fb.tlog\\unsuccessfulbuild" because "AlwaysCreate" was specified.
+          Touching "cmTC_eb2fb.dir\\Debug\\cmTC_eb2fb.tlog\\unsuccessfulbuild".
+        ClCompile:
+          C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC\\14.40.33807\\bin\\HostX64\\x64\\CL.exe /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D COMPILER_SUPPORT_std=cpp03 /D "CMAKE_INTDIR=\\"Debug\\"" /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_eb2fb.dir\\Debug\\\\" /Fd"cmTC_eb2fb.dir\\Debug\\vc143.pdb" /external:W1 /Gd /TP /errorReport:queue  -std=c++03 "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-7ubl3m\\src.cxx"
+          Microsoft (R) C/C++ Optimizing Compiler Version 19.40.33808 for x64
+          Copyright (C) Microsoft Corporation.  All rights reserved.
+          cl /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D COMPILER_SUPPORT_std=cpp03 /D "CMAKE_INTDIR=\\"Debug\\"" /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_eb2fb.dir\\Debug\\\\" /Fd"cmTC_eb2fb.dir\\Debug\\vc143.pdb" /external:W1 /Gd /TP /errorReport:queue  -std=c++03 "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-7ubl3m\\src.cxx"
+        cl : command line  warning D9002: ignoring unknown option '-std=c++03' [C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-7ubl3m\\cmTC_eb2fb.vcxproj]
+          src.cxx
+        Link:
+          C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC\\14.40.33807\\bin\\HostX64\\x64\\link.exe /ERRORREPORT:QUEUE /OUT:"C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-7ubl3m\\Debug\\cmTC_eb2fb.exe" /INCREMENTAL /ILK:"cmTC_eb2fb.dir\\Debug\\cmTC_eb2fb.ilk" /NOLOGO kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-7ubl3m/Debug/cmTC_eb2fb.pdb" /SUBSYSTEM:CONSOLE /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-7ubl3m/Debug/cmTC_eb2fb.lib" /MACHINE:X64  /machine:x64 cmTC_eb2fb.dir\\Debug\\src.obj
+          cmTC_eb2fb.vcxproj -> C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-7ubl3m\\Debug\\cmTC_eb2fb.exe
+        FinalizeBuildStatus:
+          Deleting file "cmTC_eb2fb.dir\\Debug\\cmTC_eb2fb.tlog\\unsuccessfulbuild".
+          Touching "cmTC_eb2fb.dir\\Debug\\cmTC_eb2fb.tlog\\cmTC_eb2fb.lastbuildstate".
+        Done Building Project "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-7ubl3m\\cmTC_eb2fb.vcxproj" (default targets).
+        
+        Build succeeded.
+        
+        "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-7ubl3m\\cmTC_eb2fb.vcxproj" (default target) (1) ->
+        (ClCompile target) -> 
+          cl : command line  warning D9002: ignoring unknown option '-std=c++03' [C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-7ubl3m\\cmTC_eb2fb.vcxproj]
+        
+            1 Warning(s)
+            0 Error(s)
+        
+        Time Elapsed 00:00:00.58
+        
+      exitCode: 0
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "C:/Program Files/CMake/share/cmake-3.30/Modules/CMakeDetermineVSServicePack.cmake:106 (try_compile)"
+      - "build/_deps/eigen-src/cmake/EigenDetermineVSServicePack.cmake:8 (_DetermineVSServicePack_CheckVersionWithTryCompile)"
+      - "build/_deps/eigen-src/cmake/EigenTesting.cmake:460 (EigenDetermineVSServicePack)"
+      - "build/_deps/eigen-src/cmake/EigenTesting.cmake:598 (ei_get_compilerver)"
+      - "build/_deps/eigen-src/cmake/EigenConfigureTesting.cmake:8 (ei_set_build_string)"
+      - "build/_deps/eigen-src/CMakeLists.txt:487 (include)"
+    directories:
+      source: "C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-mnczpf"
+      binary: "C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-mnczpf"
+    cmakeVariables:
+      CMAKE_CXX_FLAGS: "/DWIN32 /D_WINDOWS /EHsc /EHsc /wd4127 /wd4505 /wd4714"
+      CMAKE_EXE_LINKER_FLAGS: "/machine:x64"
+      CMAKE_MODULE_PATH: "C:/Users/59405/taco/build/_deps/eigen-src/cmake"
+    buildResult:
+      variable: "_CompileResult"
+      cached: true
+      stdout: |
+        Change Dir: 'C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-mnczpf'
+        
+        Run Build Command(s): "C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/MSBuild/Current/Bin/amd64/MSBuild.exe" cmTC_d9788.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:n
+        MSBuild version 17.10.4+10fbfbf2e for .NET Framework
+        Build started 10/7/2025 6:37:14 PM.
+        
+        Project "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-mnczpf\\cmTC_d9788.vcxproj" on node 1 (default targets).
+        PrepareForBuild:
+          Creating directory "cmTC_d9788.dir\\Debug\\".
+          Structured output is enabled. The formatting of compiler diagnostics will reflect the error hierarchy. See https://aka.ms/cpp/structured-output for more details.
+          Creating directory "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-mnczpf\\Debug\\".
+          Creating directory "cmTC_d9788.dir\\Debug\\cmTC_d9788.tlog\\".
+        InitializeBuildStatus:
+          Creating "cmTC_d9788.dir\\Debug\\cmTC_d9788.tlog\\unsuccessfulbuild" because "AlwaysCreate" was specified.
+          Touching "cmTC_d9788.dir\\Debug\\cmTC_d9788.tlog\\unsuccessfulbuild".
+        ClCompile:
+          C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC\\14.40.33807\\bin\\HostX64\\x64\\CL.exe /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D "CMAKE_INTDIR=\\"Debug\\"" /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_d9788.dir\\Debug\\\\" /Fd"cmTC_d9788.dir\\Debug\\vc143.pdb" /external:W1 /Gd /TP /wd4127 /wd4505 /wd4714 /errorReport:queue C:\\Users\\59405\\taco\\build\\return0.cc
+          Microsoft (R) C/C++ Optimizing Compiler Version 19.40.33808 for x64
+          Copyright (C) Microsoft Corporation.  All rights reserved.
+          cl /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D "CMAKE_INTDIR=\\"Debug\\"" /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_d9788.dir\\Debug\\\\" /Fd"cmTC_d9788.dir\\Debug\\vc143.pdb" /external:W1 /Gd /TP /wd4127 /wd4505 /wd4714 /errorReport:queue C:\\Users\\59405\\taco\\build\\return0.cc
+          return0.cc
+        Link:
+          C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC\\14.40.33807\\bin\\HostX64\\x64\\link.exe /ERRORREPORT:QUEUE /OUT:"C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-mnczpf\\Debug\\cmTC_d9788.exe" /INCREMENTAL /ILK:"cmTC_d9788.dir\\Debug\\cmTC_d9788.ilk" /NOLOGO kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-mnczpf/Debug/cmTC_d9788.pdb" /SUBSYSTEM:CONSOLE /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-mnczpf/Debug/cmTC_d9788.lib" /MACHINE:X64  /machine:x64 cmTC_d9788.dir\\Debug\\return0.obj
+          cmTC_d9788.vcxproj -> C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-mnczpf\\Debug\\cmTC_d9788.exe
+        FinalizeBuildStatus:
+          Deleting file "cmTC_d9788.dir\\Debug\\cmTC_d9788.tlog\\unsuccessfulbuild".
+          Touching "cmTC_d9788.dir\\Debug\\cmTC_d9788.tlog\\cmTC_d9788.lastbuildstate".
+        Done Building Project "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-mnczpf\\cmTC_d9788.vcxproj" (default targets).
+        
+        Build succeeded.
+            0 Warning(s)
+            0 Error(s)
+        
+        Time Elapsed 00:00:00.44
+        
+      exitCode: 0
+...
+
+---
+events:
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "C:/Program Files/CMake/share/cmake-3.30/Modules/Internal/CheckSourceCompiles.cmake:101 (try_compile)"
+      - "C:/Program Files/CMake/share/cmake-3.30/Modules/Internal/CheckCompilerFlag.cmake:18 (cmake_check_source_compiles)"
+      - "C:/Program Files/CMake/share/cmake-3.30/Modules/CheckCXXCompilerFlag.cmake:34 (cmake_check_compiler_flag)"
+      - "build/_deps/eigen-src/CMakeLists.txt:71 (check_cxx_compiler_flag)"
+      - "build/_deps/eigen-src/CMakeLists.txt:88 (ei_add_cxx_compiler_flag)"
+    checks:
+      - "Performing Test COMPILER_SUPPORT_std=cpp03"
+    directories:
+      source: "C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-bwqcex"
+      binary: "C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-bwqcex"
+    cmakeVariables:
+      CMAKE_CXX_FLAGS: "/DWIN32 /D_WINDOWS /EHsc"
+      CMAKE_EXE_LINKER_FLAGS: "/machine:x64"
+      CMAKE_MODULE_PATH: "C:/Users/59405/taco/build/_deps/eigen-src/cmake"
+    buildResult:
+      variable: "COMPILER_SUPPORT_std=cpp03"
+      cached: true
+      stdout: |
+        Change Dir: 'C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-bwqcex'
+        
+        Run Build Command(s): "C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/MSBuild/Current/Bin/amd64/MSBuild.exe" cmTC_295e6.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:n
+        MSBuild version 17.10.4+10fbfbf2e for .NET Framework
+        Build started 10/8/2025 1:41:24 AM.
+        
+        Project "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-bwqcex\\cmTC_295e6.vcxproj" on node 1 (default targets).
+        PrepareForBuild:
+          Creating directory "cmTC_295e6.dir\\Debug\\".
+          Structured output is enabled. The formatting of compiler diagnostics will reflect the error hierarchy. See https://aka.ms/cpp/structured-output for more details.
+          Creating directory "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-bwqcex\\Debug\\".
+          Creating directory "cmTC_295e6.dir\\Debug\\cmTC_295e6.tlog\\".
+        InitializeBuildStatus:
+          Creating "cmTC_295e6.dir\\Debug\\cmTC_295e6.tlog\\unsuccessfulbuild" because "AlwaysCreate" was specified.
+          Touching "cmTC_295e6.dir\\Debug\\cmTC_295e6.tlog\\unsuccessfulbuild".
+        ClCompile:
+          C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC\\14.40.33807\\bin\\HostX64\\x64\\CL.exe /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D COMPILER_SUPPORT_std=cpp03 /D "CMAKE_INTDIR=\\"Debug\\"" /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_295e6.dir\\Debug\\\\" /Fd"cmTC_295e6.dir\\Debug\\vc143.pdb" /external:W1 /Gd /TP /errorReport:queue  -std=c++03 "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-bwqcex\\src.cxx"
+          Microsoft (R) C/C++ Optimizing Compiler Version 19.40.33808 for x64
+          Copyright (C) Microsoft Corporation.  All rights reserved.
+          cl /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D COMPILER_SUPPORT_std=cpp03 /D "CMAKE_INTDIR=\\"Debug\\"" /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_295e6.dir\\Debug\\\\" /Fd"cmTC_295e6.dir\\Debug\\vc143.pdb" /external:W1 /Gd /TP /errorReport:queue  -std=c++03 "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-bwqcex\\src.cxx"
+        cl : command line  warning D9002: ignoring unknown option '-std=c++03' [C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-bwqcex\\cmTC_295e6.vcxproj]
+          src.cxx
+        Link:
+          C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC\\14.40.33807\\bin\\HostX64\\x64\\link.exe /ERRORREPORT:QUEUE /OUT:"C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-bwqcex\\Debug\\cmTC_295e6.exe" /INCREMENTAL /ILK:"cmTC_295e6.dir\\Debug\\cmTC_295e6.ilk" /NOLOGO kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-bwqcex/Debug/cmTC_295e6.pdb" /SUBSYSTEM:CONSOLE /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-bwqcex/Debug/cmTC_295e6.lib" /MACHINE:X64  /machine:x64 cmTC_295e6.dir\\Debug\\src.obj
+          cmTC_295e6.vcxproj -> C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-bwqcex\\Debug\\cmTC_295e6.exe
+        FinalizeBuildStatus:
+          Deleting file "cmTC_295e6.dir\\Debug\\cmTC_295e6.tlog\\unsuccessfulbuild".
+          Touching "cmTC_295e6.dir\\Debug\\cmTC_295e6.tlog\\cmTC_295e6.lastbuildstate".
+        Done Building Project "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-bwqcex\\cmTC_295e6.vcxproj" (default targets).
+        
+        Build succeeded.
+        
+        "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-bwqcex\\cmTC_295e6.vcxproj" (default target) (1) ->
+        (ClCompile target) -> 
+          cl : command line  warning D9002: ignoring unknown option '-std=c++03' [C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-bwqcex\\cmTC_295e6.vcxproj]
+        
+            1 Warning(s)
+            0 Error(s)
+        
+        Time Elapsed 00:00:00.58
+        
+      exitCode: 0
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "C:/Program Files/CMake/share/cmake-3.30/Modules/CMakeDetermineVSServicePack.cmake:106 (try_compile)"
+      - "build/_deps/eigen-src/cmake/EigenDetermineVSServicePack.cmake:8 (_DetermineVSServicePack_CheckVersionWithTryCompile)"
+      - "build/_deps/eigen-src/cmake/EigenTesting.cmake:460 (EigenDetermineVSServicePack)"
+      - "build/_deps/eigen-src/cmake/EigenTesting.cmake:598 (ei_get_compilerver)"
+      - "build/_deps/eigen-src/cmake/EigenConfigureTesting.cmake:8 (ei_set_build_string)"
+      - "build/_deps/eigen-src/CMakeLists.txt:487 (include)"
+    directories:
+      source: "C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-kiq70m"
+      binary: "C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-kiq70m"
+    cmakeVariables:
+      CMAKE_CXX_FLAGS: "/DWIN32 /D_WINDOWS /EHsc /EHsc /wd4127 /wd4505 /wd4714"
+      CMAKE_EXE_LINKER_FLAGS: "/machine:x64"
+      CMAKE_MODULE_PATH: "C:/Users/59405/taco/build/_deps/eigen-src/cmake"
+    buildResult:
+      variable: "_CompileResult"
+      cached: true
+      stdout: |
+        Change Dir: 'C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-kiq70m'
+        
+        Run Build Command(s): "C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/MSBuild/Current/Bin/amd64/MSBuild.exe" cmTC_d2d61.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:n
+        MSBuild version 17.10.4+10fbfbf2e for .NET Framework
+        Build started 10/8/2025 1:41:30 AM.
+        
+        Project "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-kiq70m\\cmTC_d2d61.vcxproj" on node 1 (default targets).
+        PrepareForBuild:
+          Creating directory "cmTC_d2d61.dir\\Debug\\".
+          Structured output is enabled. The formatting of compiler diagnostics will reflect the error hierarchy. See https://aka.ms/cpp/structured-output for more details.
+          Creating directory "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-kiq70m\\Debug\\".
+          Creating directory "cmTC_d2d61.dir\\Debug\\cmTC_d2d61.tlog\\".
+        InitializeBuildStatus:
+          Creating "cmTC_d2d61.dir\\Debug\\cmTC_d2d61.tlog\\unsuccessfulbuild" because "AlwaysCreate" was specified.
+          Touching "cmTC_d2d61.dir\\Debug\\cmTC_d2d61.tlog\\unsuccessfulbuild".
+        ClCompile:
+          C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC\\14.40.33807\\bin\\HostX64\\x64\\CL.exe /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D "CMAKE_INTDIR=\\"Debug\\"" /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_d2d61.dir\\Debug\\\\" /Fd"cmTC_d2d61.dir\\Debug\\vc143.pdb" /external:W1 /Gd /TP /wd4127 /wd4505 /wd4714 /errorReport:queue C:\\Users\\59405\\taco\\build\\return0.cc
+          Microsoft (R) C/C++ Optimizing Compiler Version 19.40.33808 for x64
+          Copyright (C) Microsoft Corporation.  All rights reserved.
+          cl /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D "CMAKE_INTDIR=\\"Debug\\"" /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_d2d61.dir\\Debug\\\\" /Fd"cmTC_d2d61.dir\\Debug\\vc143.pdb" /external:W1 /Gd /TP /wd4127 /wd4505 /wd4714 /errorReport:queue C:\\Users\\59405\\taco\\build\\return0.cc
+          return0.cc
+        Link:
+          C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC\\14.40.33807\\bin\\HostX64\\x64\\link.exe /ERRORREPORT:QUEUE /OUT:"C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-kiq70m\\Debug\\cmTC_d2d61.exe" /INCREMENTAL /ILK:"cmTC_d2d61.dir\\Debug\\cmTC_d2d61.ilk" /NOLOGO kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-kiq70m/Debug/cmTC_d2d61.pdb" /SUBSYSTEM:CONSOLE /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-kiq70m/Debug/cmTC_d2d61.lib" /MACHINE:X64  /machine:x64 cmTC_d2d61.dir\\Debug\\return0.obj
+          cmTC_d2d61.vcxproj -> C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-kiq70m\\Debug\\cmTC_d2d61.exe
+        FinalizeBuildStatus:
+          Deleting file "cmTC_d2d61.dir\\Debug\\cmTC_d2d61.tlog\\unsuccessfulbuild".
+          Touching "cmTC_d2d61.dir\\Debug\\cmTC_d2d61.tlog\\cmTC_d2d61.lastbuildstate".
+        Done Building Project "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-kiq70m\\cmTC_d2d61.vcxproj" (default targets).
+        
+        Build succeeded.
+            0 Warning(s)
+            0 Error(s)
+        
+        Time Elapsed 00:00:00.41
+        
+      exitCode: 0
+...
+
+---
+events:
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "C:/Program Files/CMake/share/cmake-3.30/Modules/Internal/CheckSourceCompiles.cmake:101 (try_compile)"
+      - "C:/Program Files/CMake/share/cmake-3.30/Modules/Internal/CheckCompilerFlag.cmake:18 (cmake_check_source_compiles)"
+      - "C:/Program Files/CMake/share/cmake-3.30/Modules/CheckCXXCompilerFlag.cmake:34 (cmake_check_compiler_flag)"
+      - "build/_deps/eigen-src/CMakeLists.txt:71 (check_cxx_compiler_flag)"
+      - "build/_deps/eigen-src/CMakeLists.txt:88 (ei_add_cxx_compiler_flag)"
+    checks:
+      - "Performing Test COMPILER_SUPPORT_std=cpp03"
+    directories:
+      source: "C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-90zrck"
+      binary: "C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-90zrck"
+    cmakeVariables:
+      CMAKE_CXX_FLAGS: "/DWIN32 /D_WINDOWS /EHsc"
+      CMAKE_EXE_LINKER_FLAGS: "/machine:x64"
+      CMAKE_MODULE_PATH: "C:/Users/59405/taco/build/_deps/eigen-src/cmake"
+    buildResult:
+      variable: "COMPILER_SUPPORT_std=cpp03"
+      cached: true
+      stdout: |
+        Change Dir: 'C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-90zrck'
+        
+        Run Build Command(s): "C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/MSBuild/Current/Bin/amd64/MSBuild.exe" cmTC_d8633.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:n
+        MSBuild version 17.10.4+10fbfbf2e for .NET Framework
+        Build started 10/8/2025 1:44:56 AM.
+        
+        Project "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-90zrck\\cmTC_d8633.vcxproj" on node 1 (default targets).
+        PrepareForBuild:
+          Creating directory "cmTC_d8633.dir\\Debug\\".
+          Structured output is enabled. The formatting of compiler diagnostics will reflect the error hierarchy. See https://aka.ms/cpp/structured-output for more details.
+          Creating directory "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-90zrck\\Debug\\".
+          Creating directory "cmTC_d8633.dir\\Debug\\cmTC_d8633.tlog\\".
+        InitializeBuildStatus:
+          Creating "cmTC_d8633.dir\\Debug\\cmTC_d8633.tlog\\unsuccessfulbuild" because "AlwaysCreate" was specified.
+          Touching "cmTC_d8633.dir\\Debug\\cmTC_d8633.tlog\\unsuccessfulbuild".
+        ClCompile:
+          C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC\\14.40.33807\\bin\\HostX64\\x64\\CL.exe /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D COMPILER_SUPPORT_std=cpp03 /D "CMAKE_INTDIR=\\"Debug\\"" /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_d8633.dir\\Debug\\\\" /Fd"cmTC_d8633.dir\\Debug\\vc143.pdb" /external:W1 /Gd /TP /errorReport:queue  -std=c++03 "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-90zrck\\src.cxx"
+          Microsoft (R) C/C++ Optimizing Compiler Version 19.40.33808 for x64
+          Copyright (C) Microsoft Corporation.  All rights reserved.
+          cl /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D COMPILER_SUPPORT_std=cpp03 /D "CMAKE_INTDIR=\\"Debug\\"" /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_d8633.dir\\Debug\\\\" /Fd"cmTC_d8633.dir\\Debug\\vc143.pdb" /external:W1 /Gd /TP /errorReport:queue  -std=c++03 "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-90zrck\\src.cxx"
+        cl : command line  warning D9002: ignoring unknown option '-std=c++03' [C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-90zrck\\cmTC_d8633.vcxproj]
+          src.cxx
+        Link:
+          C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC\\14.40.33807\\bin\\HostX64\\x64\\link.exe /ERRORREPORT:QUEUE /OUT:"C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-90zrck\\Debug\\cmTC_d8633.exe" /INCREMENTAL /ILK:"cmTC_d8633.dir\\Debug\\cmTC_d8633.ilk" /NOLOGO kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-90zrck/Debug/cmTC_d8633.pdb" /SUBSYSTEM:CONSOLE /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-90zrck/Debug/cmTC_d8633.lib" /MACHINE:X64  /machine:x64 cmTC_d8633.dir\\Debug\\src.obj
+          cmTC_d8633.vcxproj -> C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-90zrck\\Debug\\cmTC_d8633.exe
+        FinalizeBuildStatus:
+          Deleting file "cmTC_d8633.dir\\Debug\\cmTC_d8633.tlog\\unsuccessfulbuild".
+          Touching "cmTC_d8633.dir\\Debug\\cmTC_d8633.tlog\\cmTC_d8633.lastbuildstate".
+        Done Building Project "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-90zrck\\cmTC_d8633.vcxproj" (default targets).
+        
+        Build succeeded.
+        
+        "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-90zrck\\cmTC_d8633.vcxproj" (default target) (1) ->
+        (ClCompile target) -> 
+          cl : command line  warning D9002: ignoring unknown option '-std=c++03' [C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-90zrck\\cmTC_d8633.vcxproj]
+        
+            1 Warning(s)
+            0 Error(s)
+        
+        Time Elapsed 00:00:00.47
+        
+      exitCode: 0
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "C:/Program Files/CMake/share/cmake-3.30/Modules/CMakeDetermineVSServicePack.cmake:106 (try_compile)"
+      - "build/_deps/eigen-src/cmake/EigenDetermineVSServicePack.cmake:8 (_DetermineVSServicePack_CheckVersionWithTryCompile)"
+      - "build/_deps/eigen-src/cmake/EigenTesting.cmake:460 (EigenDetermineVSServicePack)"
+      - "build/_deps/eigen-src/cmake/EigenTesting.cmake:598 (ei_get_compilerver)"
+      - "build/_deps/eigen-src/cmake/EigenConfigureTesting.cmake:8 (ei_set_build_string)"
+      - "build/_deps/eigen-src/CMakeLists.txt:487 (include)"
+    directories:
+      source: "C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-lply6s"
+      binary: "C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-lply6s"
+    cmakeVariables:
+      CMAKE_CXX_FLAGS: "/DWIN32 /D_WINDOWS /EHsc /EHsc /wd4127 /wd4505 /wd4714"
+      CMAKE_EXE_LINKER_FLAGS: "/machine:x64"
+      CMAKE_MODULE_PATH: "C:/Users/59405/taco/build/_deps/eigen-src/cmake"
+    buildResult:
+      variable: "_CompileResult"
+      cached: true
+      stdout: |
+        Change Dir: 'C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-lply6s'
+        
+        Run Build Command(s): "C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/MSBuild/Current/Bin/amd64/MSBuild.exe" cmTC_b338d.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:n
+        MSBuild version 17.10.4+10fbfbf2e for .NET Framework
+        Build started 10/8/2025 1:44:58 AM.
+        
+        Project "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-lply6s\\cmTC_b338d.vcxproj" on node 1 (default targets).
+        PrepareForBuild:
+          Creating directory "cmTC_b338d.dir\\Debug\\".
+          Structured output is enabled. The formatting of compiler diagnostics will reflect the error hierarchy. See https://aka.ms/cpp/structured-output for more details.
+          Creating directory "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-lply6s\\Debug\\".
+          Creating directory "cmTC_b338d.dir\\Debug\\cmTC_b338d.tlog\\".
+        InitializeBuildStatus:
+          Creating "cmTC_b338d.dir\\Debug\\cmTC_b338d.tlog\\unsuccessfulbuild" because "AlwaysCreate" was specified.
+          Touching "cmTC_b338d.dir\\Debug\\cmTC_b338d.tlog\\unsuccessfulbuild".
+        ClCompile:
+          C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC\\14.40.33807\\bin\\HostX64\\x64\\CL.exe /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D "CMAKE_INTDIR=\\"Debug\\"" /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_b338d.dir\\Debug\\\\" /Fd"cmTC_b338d.dir\\Debug\\vc143.pdb" /external:W1 /Gd /TP /wd4127 /wd4505 /wd4714 /errorReport:queue C:\\Users\\59405\\taco\\build\\return0.cc
+          Microsoft (R) C/C++ Optimizing Compiler Version 19.40.33808 for x64
+          Copyright (C) Microsoft Corporation.  All rights reserved.
+          cl /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D "CMAKE_INTDIR=\\"Debug\\"" /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_b338d.dir\\Debug\\\\" /Fd"cmTC_b338d.dir\\Debug\\vc143.pdb" /external:W1 /Gd /TP /wd4127 /wd4505 /wd4714 /errorReport:queue C:\\Users\\59405\\taco\\build\\return0.cc
+          return0.cc
+        Link:
+          C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC\\14.40.33807\\bin\\HostX64\\x64\\link.exe /ERRORREPORT:QUEUE /OUT:"C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-lply6s\\Debug\\cmTC_b338d.exe" /INCREMENTAL /ILK:"cmTC_b338d.dir\\Debug\\cmTC_b338d.ilk" /NOLOGO kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-lply6s/Debug/cmTC_b338d.pdb" /SUBSYSTEM:CONSOLE /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-lply6s/Debug/cmTC_b338d.lib" /MACHINE:X64  /machine:x64 cmTC_b338d.dir\\Debug\\return0.obj
+          cmTC_b338d.vcxproj -> C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-lply6s\\Debug\\cmTC_b338d.exe
+        FinalizeBuildStatus:
+          Deleting file "cmTC_b338d.dir\\Debug\\cmTC_b338d.tlog\\unsuccessfulbuild".
+          Touching "cmTC_b338d.dir\\Debug\\cmTC_b338d.tlog\\cmTC_b338d.lastbuildstate".
+        Done Building Project "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-lply6s\\cmTC_b338d.vcxproj" (default targets).
+        
+        Build succeeded.
+            0 Warning(s)
+            0 Error(s)
+        
+        Time Elapsed 00:00:00.44
+        
+      exitCode: 0
+...
+
+---
+events:
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "C:/Program Files/CMake/share/cmake-3.30/Modules/Internal/CheckSourceCompiles.cmake:101 (try_compile)"
+      - "C:/Program Files/CMake/share/cmake-3.30/Modules/Internal/CheckCompilerFlag.cmake:18 (cmake_check_source_compiles)"
+      - "C:/Program Files/CMake/share/cmake-3.30/Modules/CheckCXXCompilerFlag.cmake:34 (cmake_check_compiler_flag)"
+      - "build/_deps/eigen-src/CMakeLists.txt:71 (check_cxx_compiler_flag)"
+      - "build/_deps/eigen-src/CMakeLists.txt:88 (ei_add_cxx_compiler_flag)"
+    checks:
+      - "Performing Test COMPILER_SUPPORT_std=cpp03"
+    directories:
+      source: "C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-1nxyd2"
+      binary: "C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-1nxyd2"
+    cmakeVariables:
+      CMAKE_CXX_FLAGS: "/DWIN32 /D_WINDOWS /EHsc"
+      CMAKE_EXE_LINKER_FLAGS: "/machine:x64"
+      CMAKE_MODULE_PATH: "C:/Users/59405/taco/build/_deps/eigen-src/cmake"
+    buildResult:
+      variable: "COMPILER_SUPPORT_std=cpp03"
+      cached: true
+      stdout: |
+        Change Dir: 'C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-1nxyd2'
+        
+        Run Build Command(s): "C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/MSBuild/Current/Bin/amd64/MSBuild.exe" cmTC_e2487.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:n
+        MSBuild version 17.10.4+10fbfbf2e for .NET Framework
+        Build started 10/9/2025 3:57:11 AM.
+        
+        Project "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-1nxyd2\\cmTC_e2487.vcxproj" on node 1 (default targets).
+        PrepareForBuild:
+          Creating directory "cmTC_e2487.dir\\Debug\\".
+          Structured output is enabled. The formatting of compiler diagnostics will reflect the error hierarchy. See https://aka.ms/cpp/structured-output for more details.
+          Creating directory "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-1nxyd2\\Debug\\".
+          Creating directory "cmTC_e2487.dir\\Debug\\cmTC_e2487.tlog\\".
+        InitializeBuildStatus:
+          Creating "cmTC_e2487.dir\\Debug\\cmTC_e2487.tlog\\unsuccessfulbuild" because "AlwaysCreate" was specified.
+          Touching "cmTC_e2487.dir\\Debug\\cmTC_e2487.tlog\\unsuccessfulbuild".
+        ClCompile:
+          C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC\\14.40.33807\\bin\\HostX64\\x64\\CL.exe /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D COMPILER_SUPPORT_std=cpp03 /D "CMAKE_INTDIR=\\"Debug\\"" /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_e2487.dir\\Debug\\\\" /Fd"cmTC_e2487.dir\\Debug\\vc143.pdb" /external:W1 /Gd /TP /errorReport:queue  -std=c++03 "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-1nxyd2\\src.cxx"
+          Microsoft (R) C/C++ Optimizing Compiler Version 19.40.33808 for x64
+          Copyright (C) Microsoft Corporation.  All rights reserved.
+          cl /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D COMPILER_SUPPORT_std=cpp03 /D "CMAKE_INTDIR=\\"Debug\\"" /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_e2487.dir\\Debug\\\\" /Fd"cmTC_e2487.dir\\Debug\\vc143.pdb" /external:W1 /Gd /TP /errorReport:queue  -std=c++03 "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-1nxyd2\\src.cxx"
+        cl : command line  warning D9002: ignoring unknown option '-std=c++03' [C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-1nxyd2\\cmTC_e2487.vcxproj]
+          src.cxx
+        Link:
+          C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC\\14.40.33807\\bin\\HostX64\\x64\\link.exe /ERRORREPORT:QUEUE /OUT:"C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-1nxyd2\\Debug\\cmTC_e2487.exe" /INCREMENTAL /ILK:"cmTC_e2487.dir\\Debug\\cmTC_e2487.ilk" /NOLOGO kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-1nxyd2/Debug/cmTC_e2487.pdb" /SUBSYSTEM:CONSOLE /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-1nxyd2/Debug/cmTC_e2487.lib" /MACHINE:X64  /machine:x64 cmTC_e2487.dir\\Debug\\src.obj
+          cmTC_e2487.vcxproj -> C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-1nxyd2\\Debug\\cmTC_e2487.exe
+        FinalizeBuildStatus:
+          Deleting file "cmTC_e2487.dir\\Debug\\cmTC_e2487.tlog\\unsuccessfulbuild".
+          Touching "cmTC_e2487.dir\\Debug\\cmTC_e2487.tlog\\cmTC_e2487.lastbuildstate".
+        Done Building Project "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-1nxyd2\\cmTC_e2487.vcxproj" (default targets).
+        
+        Build succeeded.
+        
+        "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-1nxyd2\\cmTC_e2487.vcxproj" (default target) (1) ->
+        (ClCompile target) -> 
+          cl : command line  warning D9002: ignoring unknown option '-std=c++03' [C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-1nxyd2\\cmTC_e2487.vcxproj]
+        
+            1 Warning(s)
+            0 Error(s)
+        
+        Time Elapsed 00:00:00.71
+        
+      exitCode: 0
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "C:/Program Files/CMake/share/cmake-3.30/Modules/CMakeDetermineVSServicePack.cmake:106 (try_compile)"
+      - "build/_deps/eigen-src/cmake/EigenDetermineVSServicePack.cmake:8 (_DetermineVSServicePack_CheckVersionWithTryCompile)"
+      - "build/_deps/eigen-src/cmake/EigenTesting.cmake:460 (EigenDetermineVSServicePack)"
+      - "build/_deps/eigen-src/cmake/EigenTesting.cmake:598 (ei_get_compilerver)"
+      - "build/_deps/eigen-src/cmake/EigenConfigureTesting.cmake:8 (ei_set_build_string)"
+      - "build/_deps/eigen-src/CMakeLists.txt:487 (include)"
+    directories:
+      source: "C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-wiroxr"
+      binary: "C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-wiroxr"
+    cmakeVariables:
+      CMAKE_CXX_FLAGS: "/DWIN32 /D_WINDOWS /EHsc /EHsc /wd4127 /wd4505 /wd4714"
+      CMAKE_EXE_LINKER_FLAGS: "/machine:x64"
+      CMAKE_MODULE_PATH: "C:/Users/59405/taco/build/_deps/eigen-src/cmake"
+    buildResult:
+      variable: "_CompileResult"
+      cached: true
+      stdout: |
+        Change Dir: 'C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-wiroxr'
+        
+        Run Build Command(s): "C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/MSBuild/Current/Bin/amd64/MSBuild.exe" cmTC_86828.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:n
+        MSBuild version 17.10.4+10fbfbf2e for .NET Framework
+        Build started 10/9/2025 3:57:17 AM.
+        
+        Project "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-wiroxr\\cmTC_86828.vcxproj" on node 1 (default targets).
+        PrepareForBuild:
+          Creating directory "cmTC_86828.dir\\Debug\\".
+          Structured output is enabled. The formatting of compiler diagnostics will reflect the error hierarchy. See https://aka.ms/cpp/structured-output for more details.
+          Creating directory "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-wiroxr\\Debug\\".
+          Creating directory "cmTC_86828.dir\\Debug\\cmTC_86828.tlog\\".
+        InitializeBuildStatus:
+          Creating "cmTC_86828.dir\\Debug\\cmTC_86828.tlog\\unsuccessfulbuild" because "AlwaysCreate" was specified.
+          Touching "cmTC_86828.dir\\Debug\\cmTC_86828.tlog\\unsuccessfulbuild".
+        ClCompile:
+          C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC\\14.40.33807\\bin\\HostX64\\x64\\CL.exe /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D "CMAKE_INTDIR=\\"Debug\\"" /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_86828.dir\\Debug\\\\" /Fd"cmTC_86828.dir\\Debug\\vc143.pdb" /external:W1 /Gd /TP /wd4127 /wd4505 /wd4714 /errorReport:queue C:\\Users\\59405\\taco\\build\\return0.cc
+          Microsoft (R) C/C++ Optimizing Compiler Version 19.40.33808 for x64
+          Copyright (C) Microsoft Corporation.  All rights reserved.
+          cl /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D "CMAKE_INTDIR=\\"Debug\\"" /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_86828.dir\\Debug\\\\" /Fd"cmTC_86828.dir\\Debug\\vc143.pdb" /external:W1 /Gd /TP /wd4127 /wd4505 /wd4714 /errorReport:queue C:\\Users\\59405\\taco\\build\\return0.cc
+          return0.cc
+        Link:
+          C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC\\14.40.33807\\bin\\HostX64\\x64\\link.exe /ERRORREPORT:QUEUE /OUT:"C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-wiroxr\\Debug\\cmTC_86828.exe" /INCREMENTAL /ILK:"cmTC_86828.dir\\Debug\\cmTC_86828.ilk" /NOLOGO kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-wiroxr/Debug/cmTC_86828.pdb" /SUBSYSTEM:CONSOLE /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-wiroxr/Debug/cmTC_86828.lib" /MACHINE:X64  /machine:x64 cmTC_86828.dir\\Debug\\return0.obj
+          cmTC_86828.vcxproj -> C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-wiroxr\\Debug\\cmTC_86828.exe
+        FinalizeBuildStatus:
+          Deleting file "cmTC_86828.dir\\Debug\\cmTC_86828.tlog\\unsuccessfulbuild".
+          Touching "cmTC_86828.dir\\Debug\\cmTC_86828.tlog\\cmTC_86828.lastbuildstate".
+        Done Building Project "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-wiroxr\\cmTC_86828.vcxproj" (default targets).
+        
+        Build succeeded.
+            0 Warning(s)
+            0 Error(s)
+        
+        Time Elapsed 00:00:00.78
+        
+      exitCode: 0
+...
+
+---
+events:
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "C:/Program Files/CMake/share/cmake-3.30/Modules/Internal/CheckSourceCompiles.cmake:101 (try_compile)"
+      - "C:/Program Files/CMake/share/cmake-3.30/Modules/Internal/CheckCompilerFlag.cmake:18 (cmake_check_source_compiles)"
+      - "C:/Program Files/CMake/share/cmake-3.30/Modules/CheckCXXCompilerFlag.cmake:34 (cmake_check_compiler_flag)"
+      - "build/_deps/eigen-src/CMakeLists.txt:71 (check_cxx_compiler_flag)"
+      - "build/_deps/eigen-src/CMakeLists.txt:88 (ei_add_cxx_compiler_flag)"
+    checks:
+      - "Performing Test COMPILER_SUPPORT_std=cpp03"
+    directories:
+      source: "C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-xelqbc"
+      binary: "C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-xelqbc"
+    cmakeVariables:
+      CMAKE_CXX_FLAGS: "/DWIN32 /D_WINDOWS /EHsc"
+      CMAKE_EXE_LINKER_FLAGS: "/machine:x64"
+      CMAKE_MODULE_PATH: "C:/Users/59405/taco/build/_deps/eigen-src/cmake"
+    buildResult:
+      variable: "COMPILER_SUPPORT_std=cpp03"
+      cached: true
+      stdout: |
+        Change Dir: 'C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-xelqbc'
+        
+        Run Build Command(s): "C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/MSBuild/Current/Bin/amd64/MSBuild.exe" cmTC_c225c.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:n
+        MSBuild version 17.10.4+10fbfbf2e for .NET Framework
+        Build started 10/9/2025 4:14:32 AM.
+        
+        Project "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-xelqbc\\cmTC_c225c.vcxproj" on node 1 (default targets).
+        PrepareForBuild:
+          Creating directory "cmTC_c225c.dir\\Debug\\".
+          Structured output is enabled. The formatting of compiler diagnostics will reflect the error hierarchy. See https://aka.ms/cpp/structured-output for more details.
+          Creating directory "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-xelqbc\\Debug\\".
+          Creating directory "cmTC_c225c.dir\\Debug\\cmTC_c225c.tlog\\".
+        InitializeBuildStatus:
+          Creating "cmTC_c225c.dir\\Debug\\cmTC_c225c.tlog\\unsuccessfulbuild" because "AlwaysCreate" was specified.
+          Touching "cmTC_c225c.dir\\Debug\\cmTC_c225c.tlog\\unsuccessfulbuild".
+        ClCompile:
+          C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC\\14.40.33807\\bin\\HostX64\\x64\\CL.exe /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D COMPILER_SUPPORT_std=cpp03 /D "CMAKE_INTDIR=\\"Debug\\"" /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_c225c.dir\\Debug\\\\" /Fd"cmTC_c225c.dir\\Debug\\vc143.pdb" /external:W1 /Gd /TP /errorReport:queue  -std=c++03 "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-xelqbc\\src.cxx"
+          Microsoft (R) C/C++ Optimizing Compiler Version 19.40.33808 for x64
+          Copyright (C) Microsoft Corporation.  All rights reserved.
+          cl /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D COMPILER_SUPPORT_std=cpp03 /D "CMAKE_INTDIR=\\"Debug\\"" /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_c225c.dir\\Debug\\\\" /Fd"cmTC_c225c.dir\\Debug\\vc143.pdb" /external:W1 /Gd /TP /errorReport:queue  -std=c++03 "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-xelqbc\\src.cxx"
+        cl : command line  warning D9002: ignoring unknown option '-std=c++03' [C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-xelqbc\\cmTC_c225c.vcxproj]
+          src.cxx
+        Link:
+          C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC\\14.40.33807\\bin\\HostX64\\x64\\link.exe /ERRORREPORT:QUEUE /OUT:"C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-xelqbc\\Debug\\cmTC_c225c.exe" /INCREMENTAL /ILK:"cmTC_c225c.dir\\Debug\\cmTC_c225c.ilk" /NOLOGO kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-xelqbc/Debug/cmTC_c225c.pdb" /SUBSYSTEM:CONSOLE /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-xelqbc/Debug/cmTC_c225c.lib" /MACHINE:X64  /machine:x64 cmTC_c225c.dir\\Debug\\src.obj
+          cmTC_c225c.vcxproj -> C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-xelqbc\\Debug\\cmTC_c225c.exe
+        FinalizeBuildStatus:
+          Deleting file "cmTC_c225c.dir\\Debug\\cmTC_c225c.tlog\\unsuccessfulbuild".
+          Touching "cmTC_c225c.dir\\Debug\\cmTC_c225c.tlog\\cmTC_c225c.lastbuildstate".
+        Done Building Project "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-xelqbc\\cmTC_c225c.vcxproj" (default targets).
+        
+        Build succeeded.
+        
+        "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-xelqbc\\cmTC_c225c.vcxproj" (default target) (1) ->
+        (ClCompile target) -> 
+          cl : command line  warning D9002: ignoring unknown option '-std=c++03' [C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-xelqbc\\cmTC_c225c.vcxproj]
+        
+            1 Warning(s)
+            0 Error(s)
+        
+        Time Elapsed 00:00:00.65
+        
+      exitCode: 0
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "C:/Program Files/CMake/share/cmake-3.30/Modules/CMakeDetermineVSServicePack.cmake:106 (try_compile)"
+      - "build/_deps/eigen-src/cmake/EigenDetermineVSServicePack.cmake:8 (_DetermineVSServicePack_CheckVersionWithTryCompile)"
+      - "build/_deps/eigen-src/cmake/EigenTesting.cmake:460 (EigenDetermineVSServicePack)"
+      - "build/_deps/eigen-src/cmake/EigenTesting.cmake:598 (ei_get_compilerver)"
+      - "build/_deps/eigen-src/cmake/EigenConfigureTesting.cmake:8 (ei_set_build_string)"
+      - "build/_deps/eigen-src/CMakeLists.txt:487 (include)"
+    directories:
+      source: "C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-rebiou"
+      binary: "C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-rebiou"
+    cmakeVariables:
+      CMAKE_CXX_FLAGS: "/DWIN32 /D_WINDOWS /EHsc /EHsc /wd4127 /wd4505 /wd4714"
+      CMAKE_EXE_LINKER_FLAGS: "/machine:x64"
+      CMAKE_MODULE_PATH: "C:/Users/59405/taco/build/_deps/eigen-src/cmake"
+    buildResult:
+      variable: "_CompileResult"
+      cached: true
+      stdout: |
+        Change Dir: 'C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-rebiou'
+        
+        Run Build Command(s): "C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/MSBuild/Current/Bin/amd64/MSBuild.exe" cmTC_c8862.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:n
+        MSBuild version 17.10.4+10fbfbf2e for .NET Framework
+        Build started 10/9/2025 4:14:40 AM.
+        
+        Project "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-rebiou\\cmTC_c8862.vcxproj" on node 1 (default targets).
+        PrepareForBuild:
+          Creating directory "cmTC_c8862.dir\\Debug\\".
+          Structured output is enabled. The formatting of compiler diagnostics will reflect the error hierarchy. See https://aka.ms/cpp/structured-output for more details.
+          Creating directory "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-rebiou\\Debug\\".
+          Creating directory "cmTC_c8862.dir\\Debug\\cmTC_c8862.tlog\\".
+        InitializeBuildStatus:
+          Creating "cmTC_c8862.dir\\Debug\\cmTC_c8862.tlog\\unsuccessfulbuild" because "AlwaysCreate" was specified.
+          Touching "cmTC_c8862.dir\\Debug\\cmTC_c8862.tlog\\unsuccessfulbuild".
+        ClCompile:
+          C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC\\14.40.33807\\bin\\HostX64\\x64\\CL.exe /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D "CMAKE_INTDIR=\\"Debug\\"" /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_c8862.dir\\Debug\\\\" /Fd"cmTC_c8862.dir\\Debug\\vc143.pdb" /external:W1 /Gd /TP /wd4127 /wd4505 /wd4714 /errorReport:queue C:\\Users\\59405\\taco\\build\\return0.cc
+          Microsoft (R) C/C++ Optimizing Compiler Version 19.40.33808 for x64
+          Copyright (C) Microsoft Corporation.  All rights reserved.
+          cl /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D "CMAKE_INTDIR=\\"Debug\\"" /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_c8862.dir\\Debug\\\\" /Fd"cmTC_c8862.dir\\Debug\\vc143.pdb" /external:W1 /Gd /TP /wd4127 /wd4505 /wd4714 /errorReport:queue C:\\Users\\59405\\taco\\build\\return0.cc
+          return0.cc
+        Link:
+          C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC\\14.40.33807\\bin\\HostX64\\x64\\link.exe /ERRORREPORT:QUEUE /OUT:"C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-rebiou\\Debug\\cmTC_c8862.exe" /INCREMENTAL /ILK:"cmTC_c8862.dir\\Debug\\cmTC_c8862.ilk" /NOLOGO kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-rebiou/Debug/cmTC_c8862.pdb" /SUBSYSTEM:CONSOLE /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-rebiou/Debug/cmTC_c8862.lib" /MACHINE:X64  /machine:x64 cmTC_c8862.dir\\Debug\\return0.obj
+          cmTC_c8862.vcxproj -> C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-rebiou\\Debug\\cmTC_c8862.exe
+        FinalizeBuildStatus:
+          Deleting file "cmTC_c8862.dir\\Debug\\cmTC_c8862.tlog\\unsuccessfulbuild".
+          Touching "cmTC_c8862.dir\\Debug\\cmTC_c8862.tlog\\cmTC_c8862.lastbuildstate".
+        Done Building Project "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-rebiou\\cmTC_c8862.vcxproj" (default targets).
+        
+        Build succeeded.
+            0 Warning(s)
+            0 Error(s)
+        
+        Time Elapsed 00:00:00.53
+        
+      exitCode: 0
+...
+
+---
+events:
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "C:/Program Files/CMake/share/cmake-3.30/Modules/Internal/CheckSourceCompiles.cmake:101 (try_compile)"
+      - "C:/Program Files/CMake/share/cmake-3.30/Modules/Internal/CheckCompilerFlag.cmake:18 (cmake_check_source_compiles)"
+      - "C:/Program Files/CMake/share/cmake-3.30/Modules/CheckCXXCompilerFlag.cmake:34 (cmake_check_compiler_flag)"
+      - "build/_deps/eigen-src/CMakeLists.txt:71 (check_cxx_compiler_flag)"
+      - "build/_deps/eigen-src/CMakeLists.txt:88 (ei_add_cxx_compiler_flag)"
+    checks:
+      - "Performing Test COMPILER_SUPPORT_std=cpp03"
+    directories:
+      source: "C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-uatbdd"
+      binary: "C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-uatbdd"
+    cmakeVariables:
+      CMAKE_CXX_FLAGS: "/DWIN32 /D_WINDOWS /EHsc"
+      CMAKE_EXE_LINKER_FLAGS: "/machine:x64"
+      CMAKE_MODULE_PATH: "C:/Users/59405/taco/build/_deps/eigen-src/cmake"
+    buildResult:
+      variable: "COMPILER_SUPPORT_std=cpp03"
+      cached: true
+      stdout: |
+        Change Dir: 'C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-uatbdd'
+        
+        Run Build Command(s): "C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/MSBuild/Current/Bin/amd64/MSBuild.exe" cmTC_3322b.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:n
+        MSBuild version 17.10.4+10fbfbf2e for .NET Framework
+        Build started 10/10/2025 12:06:20 AM.
+        
+        Project "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-uatbdd\\cmTC_3322b.vcxproj" on node 1 (default targets).
+        PrepareForBuild:
+          Creating directory "cmTC_3322b.dir\\Debug\\".
+          Structured output is enabled. The formatting of compiler diagnostics will reflect the error hierarchy. See https://aka.ms/cpp/structured-output for more details.
+          Creating directory "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-uatbdd\\Debug\\".
+          Creating directory "cmTC_3322b.dir\\Debug\\cmTC_3322b.tlog\\".
+        InitializeBuildStatus:
+          Creating "cmTC_3322b.dir\\Debug\\cmTC_3322b.tlog\\unsuccessfulbuild" because "AlwaysCreate" was specified.
+          Touching "cmTC_3322b.dir\\Debug\\cmTC_3322b.tlog\\unsuccessfulbuild".
+        ClCompile:
+          C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC\\14.40.33807\\bin\\HostX64\\x64\\CL.exe /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D COMPILER_SUPPORT_std=cpp03 /D "CMAKE_INTDIR=\\"Debug\\"" /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_3322b.dir\\Debug\\\\" /Fd"cmTC_3322b.dir\\Debug\\vc143.pdb" /external:W1 /Gd /TP /errorReport:queue  -std=c++03 "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-uatbdd\\src.cxx"
+          Microsoft (R) C/C++ Optimizing Compiler Version 19.40.33808 for x64
+          Copyright (C) Microsoft Corporation.  All rights reserved.
+          cl /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D COMPILER_SUPPORT_std=cpp03 /D "CMAKE_INTDIR=\\"Debug\\"" /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_3322b.dir\\Debug\\\\" /Fd"cmTC_3322b.dir\\Debug\\vc143.pdb" /external:W1 /Gd /TP /errorReport:queue  -std=c++03 "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-uatbdd\\src.cxx"
+        cl : command line  warning D9002: ignoring unknown option '-std=c++03' [C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-uatbdd\\cmTC_3322b.vcxproj]
+          src.cxx
+        Link:
+          C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC\\14.40.33807\\bin\\HostX64\\x64\\link.exe /ERRORREPORT:QUEUE /OUT:"C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-uatbdd\\Debug\\cmTC_3322b.exe" /INCREMENTAL /ILK:"cmTC_3322b.dir\\Debug\\cmTC_3322b.ilk" /NOLOGO kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-uatbdd/Debug/cmTC_3322b.pdb" /SUBSYSTEM:CONSOLE /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-uatbdd/Debug/cmTC_3322b.lib" /MACHINE:X64  /machine:x64 cmTC_3322b.dir\\Debug\\src.obj
+          cmTC_3322b.vcxproj -> C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-uatbdd\\Debug\\cmTC_3322b.exe
+        FinalizeBuildStatus:
+          Deleting file "cmTC_3322b.dir\\Debug\\cmTC_3322b.tlog\\unsuccessfulbuild".
+          Touching "cmTC_3322b.dir\\Debug\\cmTC_3322b.tlog\\cmTC_3322b.lastbuildstate".
+        Done Building Project "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-uatbdd\\cmTC_3322b.vcxproj" (default targets).
+        
+        Build succeeded.
+        
+        "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-uatbdd\\cmTC_3322b.vcxproj" (default target) (1) ->
+        (ClCompile target) -> 
+          cl : command line  warning D9002: ignoring unknown option '-std=c++03' [C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-uatbdd\\cmTC_3322b.vcxproj]
+        
+            1 Warning(s)
+            0 Error(s)
+        
+        Time Elapsed 00:00:00.67
+        
+      exitCode: 0
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "C:/Program Files/CMake/share/cmake-3.30/Modules/CMakeDetermineVSServicePack.cmake:106 (try_compile)"
+      - "build/_deps/eigen-src/cmake/EigenDetermineVSServicePack.cmake:8 (_DetermineVSServicePack_CheckVersionWithTryCompile)"
+      - "build/_deps/eigen-src/cmake/EigenTesting.cmake:460 (EigenDetermineVSServicePack)"
+      - "build/_deps/eigen-src/cmake/EigenTesting.cmake:598 (ei_get_compilerver)"
+      - "build/_deps/eigen-src/cmake/EigenConfigureTesting.cmake:8 (ei_set_build_string)"
+      - "build/_deps/eigen-src/CMakeLists.txt:487 (include)"
+    directories:
+      source: "C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-5ltp1g"
+      binary: "C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-5ltp1g"
+    cmakeVariables:
+      CMAKE_CXX_FLAGS: "/DWIN32 /D_WINDOWS /EHsc /EHsc /wd4127 /wd4505 /wd4714"
+      CMAKE_EXE_LINKER_FLAGS: "/machine:x64"
+      CMAKE_MODULE_PATH: "C:/Users/59405/taco/build/_deps/eigen-src/cmake"
+    buildResult:
+      variable: "_CompileResult"
+      cached: true
+      stdout: |
+        Change Dir: 'C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-5ltp1g'
+        
+        Run Build Command(s): "C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/MSBuild/Current/Bin/amd64/MSBuild.exe" cmTC_dc51c.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:n
+        MSBuild version 17.10.4+10fbfbf2e for .NET Framework
+        Build started 10/10/2025 12:06:26 AM.
+        
+        Project "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-5ltp1g\\cmTC_dc51c.vcxproj" on node 1 (default targets).
+        PrepareForBuild:
+          Creating directory "cmTC_dc51c.dir\\Debug\\".
+          Structured output is enabled. The formatting of compiler diagnostics will reflect the error hierarchy. See https://aka.ms/cpp/structured-output for more details.
+          Creating directory "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-5ltp1g\\Debug\\".
+          Creating directory "cmTC_dc51c.dir\\Debug\\cmTC_dc51c.tlog\\".
+        InitializeBuildStatus:
+          Creating "cmTC_dc51c.dir\\Debug\\cmTC_dc51c.tlog\\unsuccessfulbuild" because "AlwaysCreate" was specified.
+          Touching "cmTC_dc51c.dir\\Debug\\cmTC_dc51c.tlog\\unsuccessfulbuild".
+        ClCompile:
+          C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC\\14.40.33807\\bin\\HostX64\\x64\\CL.exe /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D "CMAKE_INTDIR=\\"Debug\\"" /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_dc51c.dir\\Debug\\\\" /Fd"cmTC_dc51c.dir\\Debug\\vc143.pdb" /external:W1 /Gd /TP /wd4127 /wd4505 /wd4714 /errorReport:queue C:\\Users\\59405\\taco\\build\\return0.cc
+          Microsoft (R) C/C++ Optimizing Compiler Version 19.40.33808 for x64
+          Copyright (C) Microsoft Corporation.  All rights reserved.
+          cl /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D "CMAKE_INTDIR=\\"Debug\\"" /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_dc51c.dir\\Debug\\\\" /Fd"cmTC_dc51c.dir\\Debug\\vc143.pdb" /external:W1 /Gd /TP /wd4127 /wd4505 /wd4714 /errorReport:queue C:\\Users\\59405\\taco\\build\\return0.cc
+          return0.cc
+        Link:
+          C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC\\14.40.33807\\bin\\HostX64\\x64\\link.exe /ERRORREPORT:QUEUE /OUT:"C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-5ltp1g\\Debug\\cmTC_dc51c.exe" /INCREMENTAL /ILK:"cmTC_dc51c.dir\\Debug\\cmTC_dc51c.ilk" /NOLOGO kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-5ltp1g/Debug/cmTC_dc51c.pdb" /SUBSYSTEM:CONSOLE /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-5ltp1g/Debug/cmTC_dc51c.lib" /MACHINE:X64  /machine:x64 cmTC_dc51c.dir\\Debug\\return0.obj
+          cmTC_dc51c.vcxproj -> C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-5ltp1g\\Debug\\cmTC_dc51c.exe
+        FinalizeBuildStatus:
+          Deleting file "cmTC_dc51c.dir\\Debug\\cmTC_dc51c.tlog\\unsuccessfulbuild".
+          Touching "cmTC_dc51c.dir\\Debug\\cmTC_dc51c.tlog\\cmTC_dc51c.lastbuildstate".
+        Done Building Project "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-5ltp1g\\cmTC_dc51c.vcxproj" (default targets).
+        
+        Build succeeded.
+            0 Warning(s)
+            0 Error(s)
+        
+        Time Elapsed 00:00:01.04
+        
+      exitCode: 0
+...
+
+---
+events:
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "C:/Program Files/CMake/share/cmake-3.30/Modules/Internal/CheckSourceCompiles.cmake:101 (try_compile)"
+      - "C:/Program Files/CMake/share/cmake-3.30/Modules/Internal/CheckCompilerFlag.cmake:18 (cmake_check_source_compiles)"
+      - "C:/Program Files/CMake/share/cmake-3.30/Modules/CheckCXXCompilerFlag.cmake:34 (cmake_check_compiler_flag)"
+      - "build/_deps/eigen-src/CMakeLists.txt:71 (check_cxx_compiler_flag)"
+      - "build/_deps/eigen-src/CMakeLists.txt:88 (ei_add_cxx_compiler_flag)"
+    checks:
+      - "Performing Test COMPILER_SUPPORT_std=cpp03"
+    directories:
+      source: "C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-c6nkz3"
+      binary: "C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-c6nkz3"
+    cmakeVariables:
+      CMAKE_CXX_FLAGS: "/DWIN32 /D_WINDOWS /EHsc"
+      CMAKE_EXE_LINKER_FLAGS: "/machine:x64"
+      CMAKE_MODULE_PATH: "C:/Users/59405/taco/build/_deps/eigen-src/cmake"
+    buildResult:
+      variable: "COMPILER_SUPPORT_std=cpp03"
+      cached: true
+      stdout: |
+        Change Dir: 'C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-c6nkz3'
+        
+        Run Build Command(s): "C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/MSBuild/Current/Bin/amd64/MSBuild.exe" cmTC_44d96.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:n
+        MSBuild version 17.10.4+10fbfbf2e for .NET Framework
+        Build started 10/10/2025 4:16:57 AM.
+        
+        Project "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-c6nkz3\\cmTC_44d96.vcxproj" on node 1 (default targets).
+        PrepareForBuild:
+          Creating directory "cmTC_44d96.dir\\Debug\\".
+          Structured output is enabled. The formatting of compiler diagnostics will reflect the error hierarchy. See https://aka.ms/cpp/structured-output for more details.
+          Creating directory "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-c6nkz3\\Debug\\".
+          Creating directory "cmTC_44d96.dir\\Debug\\cmTC_44d96.tlog\\".
+        InitializeBuildStatus:
+          Creating "cmTC_44d96.dir\\Debug\\cmTC_44d96.tlog\\unsuccessfulbuild" because "AlwaysCreate" was specified.
+          Touching "cmTC_44d96.dir\\Debug\\cmTC_44d96.tlog\\unsuccessfulbuild".
+        ClCompile:
+          C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC\\14.40.33807\\bin\\HostX64\\x64\\CL.exe /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D COMPILER_SUPPORT_std=cpp03 /D "CMAKE_INTDIR=\\"Debug\\"" /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_44d96.dir\\Debug\\\\" /Fd"cmTC_44d96.dir\\Debug\\vc143.pdb" /external:W1 /Gd /TP /errorReport:queue  -std=c++03 "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-c6nkz3\\src.cxx"
+          Microsoft (R) C/C++ Optimizing Compiler Version 19.40.33808 for x64
+          Copyright (C) Microsoft Corporation.  All rights reserved.
+          cl /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D COMPILER_SUPPORT_std=cpp03 /D "CMAKE_INTDIR=\\"Debug\\"" /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_44d96.dir\\Debug\\\\" /Fd"cmTC_44d96.dir\\Debug\\vc143.pdb" /external:W1 /Gd /TP /errorReport:queue  -std=c++03 "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-c6nkz3\\src.cxx"
+        cl : command line  warning D9002: ignoring unknown option '-std=c++03' [C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-c6nkz3\\cmTC_44d96.vcxproj]
+          src.cxx
+        Link:
+          C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC\\14.40.33807\\bin\\HostX64\\x64\\link.exe /ERRORREPORT:QUEUE /OUT:"C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-c6nkz3\\Debug\\cmTC_44d96.exe" /INCREMENTAL /ILK:"cmTC_44d96.dir\\Debug\\cmTC_44d96.ilk" /NOLOGO kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-c6nkz3/Debug/cmTC_44d96.pdb" /SUBSYSTEM:CONSOLE /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-c6nkz3/Debug/cmTC_44d96.lib" /MACHINE:X64  /machine:x64 cmTC_44d96.dir\\Debug\\src.obj
+          cmTC_44d96.vcxproj -> C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-c6nkz3\\Debug\\cmTC_44d96.exe
+        FinalizeBuildStatus:
+          Deleting file "cmTC_44d96.dir\\Debug\\cmTC_44d96.tlog\\unsuccessfulbuild".
+          Touching "cmTC_44d96.dir\\Debug\\cmTC_44d96.tlog\\cmTC_44d96.lastbuildstate".
+        Done Building Project "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-c6nkz3\\cmTC_44d96.vcxproj" (default targets).
+        
+        Build succeeded.
+        
+        "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-c6nkz3\\cmTC_44d96.vcxproj" (default target) (1) ->
+        (ClCompile target) -> 
+          cl : command line  warning D9002: ignoring unknown option '-std=c++03' [C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-c6nkz3\\cmTC_44d96.vcxproj]
+        
+            1 Warning(s)
+            0 Error(s)
+        
+        Time Elapsed 00:00:00.88
+        
+      exitCode: 0
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "C:/Program Files/CMake/share/cmake-3.30/Modules/CMakeDetermineVSServicePack.cmake:106 (try_compile)"
+      - "build/_deps/eigen-src/cmake/EigenDetermineVSServicePack.cmake:8 (_DetermineVSServicePack_CheckVersionWithTryCompile)"
+      - "build/_deps/eigen-src/cmake/EigenTesting.cmake:460 (EigenDetermineVSServicePack)"
+      - "build/_deps/eigen-src/cmake/EigenTesting.cmake:598 (ei_get_compilerver)"
+      - "build/_deps/eigen-src/cmake/EigenConfigureTesting.cmake:8 (ei_set_build_string)"
+      - "build/_deps/eigen-src/CMakeLists.txt:487 (include)"
+    directories:
+      source: "C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-g5zqmw"
+      binary: "C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-g5zqmw"
+    cmakeVariables:
+      CMAKE_CXX_FLAGS: "/DWIN32 /D_WINDOWS /EHsc /EHsc /wd4127 /wd4505 /wd4714"
+      CMAKE_EXE_LINKER_FLAGS: "/machine:x64"
+      CMAKE_MODULE_PATH: "C:/Users/59405/taco/build/_deps/eigen-src/cmake"
+    buildResult:
+      variable: "_CompileResult"
+      cached: true
+      stdout: |
+        Change Dir: 'C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-g5zqmw'
+        
+        Run Build Command(s): "C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/MSBuild/Current/Bin/amd64/MSBuild.exe" cmTC_0fde7.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:n
+        MSBuild version 17.10.4+10fbfbf2e for .NET Framework
+        Build started 10/10/2025 4:17:04 AM.
+        
+        Project "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-g5zqmw\\cmTC_0fde7.vcxproj" on node 1 (default targets).
+        PrepareForBuild:
+          Creating directory "cmTC_0fde7.dir\\Debug\\".
+          Structured output is enabled. The formatting of compiler diagnostics will reflect the error hierarchy. See https://aka.ms/cpp/structured-output for more details.
+          Creating directory "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-g5zqmw\\Debug\\".
+          Creating directory "cmTC_0fde7.dir\\Debug\\cmTC_0fde7.tlog\\".
+        InitializeBuildStatus:
+          Creating "cmTC_0fde7.dir\\Debug\\cmTC_0fde7.tlog\\unsuccessfulbuild" because "AlwaysCreate" was specified.
+          Touching "cmTC_0fde7.dir\\Debug\\cmTC_0fde7.tlog\\unsuccessfulbuild".
+        ClCompile:
+          C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC\\14.40.33807\\bin\\HostX64\\x64\\CL.exe /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D "CMAKE_INTDIR=\\"Debug\\"" /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_0fde7.dir\\Debug\\\\" /Fd"cmTC_0fde7.dir\\Debug\\vc143.pdb" /external:W1 /Gd /TP /wd4127 /wd4505 /wd4714 /errorReport:queue C:\\Users\\59405\\taco\\build\\return0.cc
+          Microsoft (R) C/C++ Optimizing Compiler Version 19.40.33808 for x64
+          Copyright (C) Microsoft Corporation.  All rights reserved.
+          cl /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D "CMAKE_INTDIR=\\"Debug\\"" /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_0fde7.dir\\Debug\\\\" /Fd"cmTC_0fde7.dir\\Debug\\vc143.pdb" /external:W1 /Gd /TP /wd4127 /wd4505 /wd4714 /errorReport:queue C:\\Users\\59405\\taco\\build\\return0.cc
+          return0.cc
+        Link:
+          C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC\\14.40.33807\\bin\\HostX64\\x64\\link.exe /ERRORREPORT:QUEUE /OUT:"C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-g5zqmw\\Debug\\cmTC_0fde7.exe" /INCREMENTAL /ILK:"cmTC_0fde7.dir\\Debug\\cmTC_0fde7.ilk" /NOLOGO kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-g5zqmw/Debug/cmTC_0fde7.pdb" /SUBSYSTEM:CONSOLE /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-g5zqmw/Debug/cmTC_0fde7.lib" /MACHINE:X64  /machine:x64 cmTC_0fde7.dir\\Debug\\return0.obj
+          cmTC_0fde7.vcxproj -> C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-g5zqmw\\Debug\\cmTC_0fde7.exe
+        FinalizeBuildStatus:
+          Deleting file "cmTC_0fde7.dir\\Debug\\cmTC_0fde7.tlog\\unsuccessfulbuild".
+          Touching "cmTC_0fde7.dir\\Debug\\cmTC_0fde7.tlog\\cmTC_0fde7.lastbuildstate".
+        Done Building Project "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-g5zqmw\\cmTC_0fde7.vcxproj" (default targets).
+        
+        Build succeeded.
+            0 Warning(s)
+            0 Error(s)
+        
+        Time Elapsed 00:00:00.50
+        
+      exitCode: 0
+...
+
+---
+events:
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "C:/Program Files/CMake/share/cmake-3.30/Modules/Internal/CheckSourceCompiles.cmake:101 (try_compile)"
+      - "C:/Program Files/CMake/share/cmake-3.30/Modules/Internal/CheckCompilerFlag.cmake:18 (cmake_check_source_compiles)"
+      - "C:/Program Files/CMake/share/cmake-3.30/Modules/CheckCXXCompilerFlag.cmake:34 (cmake_check_compiler_flag)"
+      - "build/_deps/eigen-src/CMakeLists.txt:71 (check_cxx_compiler_flag)"
+      - "build/_deps/eigen-src/CMakeLists.txt:88 (ei_add_cxx_compiler_flag)"
+    checks:
+      - "Performing Test COMPILER_SUPPORT_std=cpp03"
+    directories:
+      source: "C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-yqflq2"
+      binary: "C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-yqflq2"
+    cmakeVariables:
+      CMAKE_CXX_FLAGS: "/DWIN32 /D_WINDOWS /EHsc"
+      CMAKE_EXE_LINKER_FLAGS: "/machine:x64"
+      CMAKE_MODULE_PATH: "C:/Users/59405/taco/build/_deps/eigen-src/cmake"
+    buildResult:
+      variable: "COMPILER_SUPPORT_std=cpp03"
+      cached: true
+      stdout: |
+        Change Dir: 'C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-yqflq2'
+        
+        Run Build Command(s): "C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/MSBuild/Current/Bin/amd64/MSBuild.exe" cmTC_a46b6.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:n
+        MSBuild version 17.10.4+10fbfbf2e for .NET Framework
+        Build started 10/10/2025 4:28:45 AM.
+        
+        Project "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-yqflq2\\cmTC_a46b6.vcxproj" on node 1 (default targets).
+        PrepareForBuild:
+          Creating directory "cmTC_a46b6.dir\\Debug\\".
+          Structured output is enabled. The formatting of compiler diagnostics will reflect the error hierarchy. See https://aka.ms/cpp/structured-output for more details.
+          Creating directory "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-yqflq2\\Debug\\".
+          Creating directory "cmTC_a46b6.dir\\Debug\\cmTC_a46b6.tlog\\".
+        InitializeBuildStatus:
+          Creating "cmTC_a46b6.dir\\Debug\\cmTC_a46b6.tlog\\unsuccessfulbuild" because "AlwaysCreate" was specified.
+          Touching "cmTC_a46b6.dir\\Debug\\cmTC_a46b6.tlog\\unsuccessfulbuild".
+        ClCompile:
+          C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC\\14.40.33807\\bin\\HostX64\\x64\\CL.exe /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D COMPILER_SUPPORT_std=cpp03 /D "CMAKE_INTDIR=\\"Debug\\"" /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_a46b6.dir\\Debug\\\\" /Fd"cmTC_a46b6.dir\\Debug\\vc143.pdb" /external:W1 /Gd /TP /errorReport:queue  -std=c++03 "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-yqflq2\\src.cxx"
+          Microsoft (R) C/C++ Optimizing Compiler Version 19.40.33808 for x64
+          Copyright (C) Microsoft Corporation.  All rights reserved.
+          cl /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D COMPILER_SUPPORT_std=cpp03 /D "CMAKE_INTDIR=\\"Debug\\"" /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_a46b6.dir\\Debug\\\\" /Fd"cmTC_a46b6.dir\\Debug\\vc143.pdb" /external:W1 /Gd /TP /errorReport:queue  -std=c++03 "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-yqflq2\\src.cxx"
+        cl : command line  warning D9002: ignoring unknown option '-std=c++03' [C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-yqflq2\\cmTC_a46b6.vcxproj]
+          src.cxx
+        Link:
+          C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC\\14.40.33807\\bin\\HostX64\\x64\\link.exe /ERRORREPORT:QUEUE /OUT:"C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-yqflq2\\Debug\\cmTC_a46b6.exe" /INCREMENTAL /ILK:"cmTC_a46b6.dir\\Debug\\cmTC_a46b6.ilk" /NOLOGO kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-yqflq2/Debug/cmTC_a46b6.pdb" /SUBSYSTEM:CONSOLE /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-yqflq2/Debug/cmTC_a46b6.lib" /MACHINE:X64  /machine:x64 cmTC_a46b6.dir\\Debug\\src.obj
+          cmTC_a46b6.vcxproj -> C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-yqflq2\\Debug\\cmTC_a46b6.exe
+        FinalizeBuildStatus:
+          Deleting file "cmTC_a46b6.dir\\Debug\\cmTC_a46b6.tlog\\unsuccessfulbuild".
+          Touching "cmTC_a46b6.dir\\Debug\\cmTC_a46b6.tlog\\cmTC_a46b6.lastbuildstate".
+        Done Building Project "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-yqflq2\\cmTC_a46b6.vcxproj" (default targets).
+        
+        Build succeeded.
+        
+        "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-yqflq2\\cmTC_a46b6.vcxproj" (default target) (1) ->
+        (ClCompile target) -> 
+          cl : command line  warning D9002: ignoring unknown option '-std=c++03' [C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-yqflq2\\cmTC_a46b6.vcxproj]
+        
+            1 Warning(s)
+            0 Error(s)
+        
+        Time Elapsed 00:00:00.50
+        
+      exitCode: 0
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "C:/Program Files/CMake/share/cmake-3.30/Modules/CMakeDetermineVSServicePack.cmake:106 (try_compile)"
+      - "build/_deps/eigen-src/cmake/EigenDetermineVSServicePack.cmake:8 (_DetermineVSServicePack_CheckVersionWithTryCompile)"
+      - "build/_deps/eigen-src/cmake/EigenTesting.cmake:460 (EigenDetermineVSServicePack)"
+      - "build/_deps/eigen-src/cmake/EigenTesting.cmake:598 (ei_get_compilerver)"
+      - "build/_deps/eigen-src/cmake/EigenConfigureTesting.cmake:8 (ei_set_build_string)"
+      - "build/_deps/eigen-src/CMakeLists.txt:487 (include)"
+    directories:
+      source: "C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-kq7olx"
+      binary: "C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-kq7olx"
+    cmakeVariables:
+      CMAKE_CXX_FLAGS: "/DWIN32 /D_WINDOWS /EHsc /EHsc /wd4127 /wd4505 /wd4714"
+      CMAKE_EXE_LINKER_FLAGS: "/machine:x64"
+      CMAKE_MODULE_PATH: "C:/Users/59405/taco/build/_deps/eigen-src/cmake"
+    buildResult:
+      variable: "_CompileResult"
+      cached: true
+      stdout: |
+        Change Dir: 'C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-kq7olx'
+        
+        Run Build Command(s): "C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/MSBuild/Current/Bin/amd64/MSBuild.exe" cmTC_798a9.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:n
+        MSBuild version 17.10.4+10fbfbf2e for .NET Framework
+        Build started 10/10/2025 4:28:47 AM.
+        
+        Project "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-kq7olx\\cmTC_798a9.vcxproj" on node 1 (default targets).
+        PrepareForBuild:
+          Creating directory "cmTC_798a9.dir\\Debug\\".
+          Structured output is enabled. The formatting of compiler diagnostics will reflect the error hierarchy. See https://aka.ms/cpp/structured-output for more details.
+          Creating directory "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-kq7olx\\Debug\\".
+          Creating directory "cmTC_798a9.dir\\Debug\\cmTC_798a9.tlog\\".
+        InitializeBuildStatus:
+          Creating "cmTC_798a9.dir\\Debug\\cmTC_798a9.tlog\\unsuccessfulbuild" because "AlwaysCreate" was specified.
+          Touching "cmTC_798a9.dir\\Debug\\cmTC_798a9.tlog\\unsuccessfulbuild".
+        ClCompile:
+          C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC\\14.40.33807\\bin\\HostX64\\x64\\CL.exe /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D "CMAKE_INTDIR=\\"Debug\\"" /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_798a9.dir\\Debug\\\\" /Fd"cmTC_798a9.dir\\Debug\\vc143.pdb" /external:W1 /Gd /TP /wd4127 /wd4505 /wd4714 /errorReport:queue C:\\Users\\59405\\taco\\build\\return0.cc
+          Microsoft (R) C/C++ Optimizing Compiler Version 19.40.33808 for x64
+          Copyright (C) Microsoft Corporation.  All rights reserved.
+          cl /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D "CMAKE_INTDIR=\\"Debug\\"" /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_798a9.dir\\Debug\\\\" /Fd"cmTC_798a9.dir\\Debug\\vc143.pdb" /external:W1 /Gd /TP /wd4127 /wd4505 /wd4714 /errorReport:queue C:\\Users\\59405\\taco\\build\\return0.cc
+          return0.cc
+        Link:
+          C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC\\14.40.33807\\bin\\HostX64\\x64\\link.exe /ERRORREPORT:QUEUE /OUT:"C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-kq7olx\\Debug\\cmTC_798a9.exe" /INCREMENTAL /ILK:"cmTC_798a9.dir\\Debug\\cmTC_798a9.ilk" /NOLOGO kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-kq7olx/Debug/cmTC_798a9.pdb" /SUBSYSTEM:CONSOLE /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-kq7olx/Debug/cmTC_798a9.lib" /MACHINE:X64  /machine:x64 cmTC_798a9.dir\\Debug\\return0.obj
+          cmTC_798a9.vcxproj -> C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-kq7olx\\Debug\\cmTC_798a9.exe
+        FinalizeBuildStatus:
+          Deleting file "cmTC_798a9.dir\\Debug\\cmTC_798a9.tlog\\unsuccessfulbuild".
+          Touching "cmTC_798a9.dir\\Debug\\cmTC_798a9.tlog\\cmTC_798a9.lastbuildstate".
+        Done Building Project "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-kq7olx\\cmTC_798a9.vcxproj" (default targets).
+        
+        Build succeeded.
+            0 Warning(s)
+            0 Error(s)
+        
+        Time Elapsed 00:00:00.50
+        
+      exitCode: 0
+...
+
+---
+events:
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "C:/Program Files/CMake/share/cmake-3.30/Modules/Internal/CheckSourceCompiles.cmake:101 (try_compile)"
+      - "C:/Program Files/CMake/share/cmake-3.30/Modules/Internal/CheckCompilerFlag.cmake:18 (cmake_check_source_compiles)"
+      - "C:/Program Files/CMake/share/cmake-3.30/Modules/CheckCXXCompilerFlag.cmake:34 (cmake_check_compiler_flag)"
+      - "build/_deps/eigen-src/CMakeLists.txt:71 (check_cxx_compiler_flag)"
+      - "build/_deps/eigen-src/CMakeLists.txt:88 (ei_add_cxx_compiler_flag)"
+    checks:
+      - "Performing Test COMPILER_SUPPORT_std=cpp03"
+    directories:
+      source: "C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-q45lfc"
+      binary: "C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-q45lfc"
+    cmakeVariables:
+      CMAKE_CXX_FLAGS: "/DWIN32 /D_WINDOWS /EHsc"
+      CMAKE_EXE_LINKER_FLAGS: "/machine:x64"
+      CMAKE_MODULE_PATH: "C:/Users/59405/taco/build/_deps/eigen-src/cmake"
+    buildResult:
+      variable: "COMPILER_SUPPORT_std=cpp03"
+      cached: true
+      stdout: |
+        Change Dir: 'C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-q45lfc'
+        
+        Run Build Command(s): "C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/MSBuild/Current/Bin/amd64/MSBuild.exe" cmTC_49e47.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:n
+        MSBuild version 17.10.4+10fbfbf2e for .NET Framework
+        Build started 10/10/2025 11:10:17 AM.
+        
+        Project "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-q45lfc\\cmTC_49e47.vcxproj" on node 1 (default targets).
+        PrepareForBuild:
+          Creating directory "cmTC_49e47.dir\\Debug\\".
+          Structured output is enabled. The formatting of compiler diagnostics will reflect the error hierarchy. See https://aka.ms/cpp/structured-output for more details.
+          Creating directory "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-q45lfc\\Debug\\".
+          Creating directory "cmTC_49e47.dir\\Debug\\cmTC_49e47.tlog\\".
+        InitializeBuildStatus:
+          Creating "cmTC_49e47.dir\\Debug\\cmTC_49e47.tlog\\unsuccessfulbuild" because "AlwaysCreate" was specified.
+          Touching "cmTC_49e47.dir\\Debug\\cmTC_49e47.tlog\\unsuccessfulbuild".
+        ClCompile:
+          C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC\\14.40.33807\\bin\\HostX64\\x64\\CL.exe /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D COMPILER_SUPPORT_std=cpp03 /D "CMAKE_INTDIR=\\"Debug\\"" /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_49e47.dir\\Debug\\\\" /Fd"cmTC_49e47.dir\\Debug\\vc143.pdb" /external:W1 /Gd /TP /errorReport:queue  -std=c++03 "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-q45lfc\\src.cxx"
+          Microsoft (R) C/C++ Optimizing Compiler Version 19.40.33808 for x64
+          Copyright (C) Microsoft Corporation.  All rights reserved.
+          cl /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D COMPILER_SUPPORT_std=cpp03 /D "CMAKE_INTDIR=\\"Debug\\"" /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_49e47.dir\\Debug\\\\" /Fd"cmTC_49e47.dir\\Debug\\vc143.pdb" /external:W1 /Gd /TP /errorReport:queue  -std=c++03 "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-q45lfc\\src.cxx"
+        cl : command line  warning D9002: ignoring unknown option '-std=c++03' [C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-q45lfc\\cmTC_49e47.vcxproj]
+          src.cxx
+        Link:
+          C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC\\14.40.33807\\bin\\HostX64\\x64\\link.exe /ERRORREPORT:QUEUE /OUT:"C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-q45lfc\\Debug\\cmTC_49e47.exe" /INCREMENTAL /ILK:"cmTC_49e47.dir\\Debug\\cmTC_49e47.ilk" /NOLOGO kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-q45lfc/Debug/cmTC_49e47.pdb" /SUBSYSTEM:CONSOLE /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-q45lfc/Debug/cmTC_49e47.lib" /MACHINE:X64  /machine:x64 cmTC_49e47.dir\\Debug\\src.obj
+          cmTC_49e47.vcxproj -> C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-q45lfc\\Debug\\cmTC_49e47.exe
+        FinalizeBuildStatus:
+          Deleting file "cmTC_49e47.dir\\Debug\\cmTC_49e47.tlog\\unsuccessfulbuild".
+          Touching "cmTC_49e47.dir\\Debug\\cmTC_49e47.tlog\\cmTC_49e47.lastbuildstate".
+        Done Building Project "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-q45lfc\\cmTC_49e47.vcxproj" (default targets).
+        
+        Build succeeded.
+        
+        "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-q45lfc\\cmTC_49e47.vcxproj" (default target) (1) ->
+        (ClCompile target) -> 
+          cl : command line  warning D9002: ignoring unknown option '-std=c++03' [C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-q45lfc\\cmTC_49e47.vcxproj]
+        
+            1 Warning(s)
+            0 Error(s)
+        
+        Time Elapsed 00:00:00.62
+        
+      exitCode: 0
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "C:/Program Files/CMake/share/cmake-3.30/Modules/CMakeDetermineVSServicePack.cmake:106 (try_compile)"
+      - "build/_deps/eigen-src/cmake/EigenDetermineVSServicePack.cmake:8 (_DetermineVSServicePack_CheckVersionWithTryCompile)"
+      - "build/_deps/eigen-src/cmake/EigenTesting.cmake:460 (EigenDetermineVSServicePack)"
+      - "build/_deps/eigen-src/cmake/EigenTesting.cmake:598 (ei_get_compilerver)"
+      - "build/_deps/eigen-src/cmake/EigenConfigureTesting.cmake:8 (ei_set_build_string)"
+      - "build/_deps/eigen-src/CMakeLists.txt:487 (include)"
+    directories:
+      source: "C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-cn44ky"
+      binary: "C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-cn44ky"
+    cmakeVariables:
+      CMAKE_CXX_FLAGS: "/DWIN32 /D_WINDOWS /EHsc /EHsc /wd4127 /wd4505 /wd4714"
+      CMAKE_EXE_LINKER_FLAGS: "/machine:x64"
+      CMAKE_MODULE_PATH: "C:/Users/59405/taco/build/_deps/eigen-src/cmake"
+    buildResult:
+      variable: "_CompileResult"
+      cached: true
+      stdout: |
+        Change Dir: 'C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-cn44ky'
+        
+        Run Build Command(s): "C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/MSBuild/Current/Bin/amd64/MSBuild.exe" cmTC_b64ba.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:n
+        MSBuild version 17.10.4+10fbfbf2e for .NET Framework
+        Build started 10/10/2025 11:10:22 AM.
+        
+        Project "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-cn44ky\\cmTC_b64ba.vcxproj" on node 1 (default targets).
+        PrepareForBuild:
+          Creating directory "cmTC_b64ba.dir\\Debug\\".
+          Structured output is enabled. The formatting of compiler diagnostics will reflect the error hierarchy. See https://aka.ms/cpp/structured-output for more details.
+          Creating directory "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-cn44ky\\Debug\\".
+          Creating directory "cmTC_b64ba.dir\\Debug\\cmTC_b64ba.tlog\\".
+        InitializeBuildStatus:
+          Creating "cmTC_b64ba.dir\\Debug\\cmTC_b64ba.tlog\\unsuccessfulbuild" because "AlwaysCreate" was specified.
+          Touching "cmTC_b64ba.dir\\Debug\\cmTC_b64ba.tlog\\unsuccessfulbuild".
+        ClCompile:
+          C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC\\14.40.33807\\bin\\HostX64\\x64\\CL.exe /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D "CMAKE_INTDIR=\\"Debug\\"" /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_b64ba.dir\\Debug\\\\" /Fd"cmTC_b64ba.dir\\Debug\\vc143.pdb" /external:W1 /Gd /TP /wd4127 /wd4505 /wd4714 /errorReport:queue C:\\Users\\59405\\taco\\build\\return0.cc
+          Microsoft (R) C/C++ Optimizing Compiler Version 19.40.33808 for x64
+          Copyright (C) Microsoft Corporation.  All rights reserved.
+          cl /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D "CMAKE_INTDIR=\\"Debug\\"" /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_b64ba.dir\\Debug\\\\" /Fd"cmTC_b64ba.dir\\Debug\\vc143.pdb" /external:W1 /Gd /TP /wd4127 /wd4505 /wd4714 /errorReport:queue C:\\Users\\59405\\taco\\build\\return0.cc
+          return0.cc
+        Link:
+          C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC\\14.40.33807\\bin\\HostX64\\x64\\link.exe /ERRORREPORT:QUEUE /OUT:"C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-cn44ky\\Debug\\cmTC_b64ba.exe" /INCREMENTAL /ILK:"cmTC_b64ba.dir\\Debug\\cmTC_b64ba.ilk" /NOLOGO kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-cn44ky/Debug/cmTC_b64ba.pdb" /SUBSYSTEM:CONSOLE /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-cn44ky/Debug/cmTC_b64ba.lib" /MACHINE:X64  /machine:x64 cmTC_b64ba.dir\\Debug\\return0.obj
+          cmTC_b64ba.vcxproj -> C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-cn44ky\\Debug\\cmTC_b64ba.exe
+        FinalizeBuildStatus:
+          Deleting file "cmTC_b64ba.dir\\Debug\\cmTC_b64ba.tlog\\unsuccessfulbuild".
+          Touching "cmTC_b64ba.dir\\Debug\\cmTC_b64ba.tlog\\cmTC_b64ba.lastbuildstate".
+        Done Building Project "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-cn44ky\\cmTC_b64ba.vcxproj" (default targets).
+        
+        Build succeeded.
+            0 Warning(s)
+            0 Error(s)
+        
+        Time Elapsed 00:00:00.84
+        
+      exitCode: 0
+...
+
+---
+events:
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "C:/Program Files/CMake/share/cmake-3.30/Modules/Internal/CheckSourceCompiles.cmake:101 (try_compile)"
+      - "C:/Program Files/CMake/share/cmake-3.30/Modules/Internal/CheckCompilerFlag.cmake:18 (cmake_check_source_compiles)"
+      - "C:/Program Files/CMake/share/cmake-3.30/Modules/CheckCXXCompilerFlag.cmake:34 (cmake_check_compiler_flag)"
+      - "build/_deps/eigen-src/CMakeLists.txt:71 (check_cxx_compiler_flag)"
+      - "build/_deps/eigen-src/CMakeLists.txt:88 (ei_add_cxx_compiler_flag)"
+    checks:
+      - "Performing Test COMPILER_SUPPORT_std=cpp03"
+    directories:
+      source: "C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-9iqmih"
+      binary: "C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-9iqmih"
+    cmakeVariables:
+      CMAKE_CXX_FLAGS: "/DWIN32 /D_WINDOWS /EHsc"
+      CMAKE_EXE_LINKER_FLAGS: "/machine:x64"
+      CMAKE_MODULE_PATH: "C:/Users/59405/taco/build/_deps/eigen-src/cmake"
+    buildResult:
+      variable: "COMPILER_SUPPORT_std=cpp03"
+      cached: true
+      stdout: |
+        Change Dir: 'C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-9iqmih'
+        
+        Run Build Command(s): "C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/MSBuild/Current/Bin/amd64/MSBuild.exe" cmTC_6e99c.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:n
+        MSBuild version 17.10.4+10fbfbf2e for .NET Framework
+        Build started 10/10/2025 12:08:20 PM.
+        
+        Project "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-9iqmih\\cmTC_6e99c.vcxproj" on node 1 (default targets).
+        PrepareForBuild:
+          Creating directory "cmTC_6e99c.dir\\Debug\\".
+          Structured output is enabled. The formatting of compiler diagnostics will reflect the error hierarchy. See https://aka.ms/cpp/structured-output for more details.
+          Creating directory "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-9iqmih\\Debug\\".
+          Creating directory "cmTC_6e99c.dir\\Debug\\cmTC_6e99c.tlog\\".
+        InitializeBuildStatus:
+          Creating "cmTC_6e99c.dir\\Debug\\cmTC_6e99c.tlog\\unsuccessfulbuild" because "AlwaysCreate" was specified.
+          Touching "cmTC_6e99c.dir\\Debug\\cmTC_6e99c.tlog\\unsuccessfulbuild".
+        ClCompile:
+          C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC\\14.40.33807\\bin\\HostX64\\x64\\CL.exe /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D COMPILER_SUPPORT_std=cpp03 /D "CMAKE_INTDIR=\\"Debug\\"" /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_6e99c.dir\\Debug\\\\" /Fd"cmTC_6e99c.dir\\Debug\\vc143.pdb" /external:W1 /Gd /TP /errorReport:queue  -std=c++03 "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-9iqmih\\src.cxx"
+          Microsoft (R) C/C++ Optimizing Compiler Version 19.40.33808 for x64
+          Copyright (C) Microsoft Corporation.  All rights reserved.
+          cl /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D COMPILER_SUPPORT_std=cpp03 /D "CMAKE_INTDIR=\\"Debug\\"" /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_6e99c.dir\\Debug\\\\" /Fd"cmTC_6e99c.dir\\Debug\\vc143.pdb" /external:W1 /Gd /TP /errorReport:queue  -std=c++03 "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-9iqmih\\src.cxx"
+        cl : command line  warning D9002: ignoring unknown option '-std=c++03' [C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-9iqmih\\cmTC_6e99c.vcxproj]
+          src.cxx
+        Link:
+          C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC\\14.40.33807\\bin\\HostX64\\x64\\link.exe /ERRORREPORT:QUEUE /OUT:"C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-9iqmih\\Debug\\cmTC_6e99c.exe" /INCREMENTAL /ILK:"cmTC_6e99c.dir\\Debug\\cmTC_6e99c.ilk" /NOLOGO kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-9iqmih/Debug/cmTC_6e99c.pdb" /SUBSYSTEM:CONSOLE /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-9iqmih/Debug/cmTC_6e99c.lib" /MACHINE:X64  /machine:x64 cmTC_6e99c.dir\\Debug\\src.obj
+          cmTC_6e99c.vcxproj -> C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-9iqmih\\Debug\\cmTC_6e99c.exe
+        FinalizeBuildStatus:
+          Deleting file "cmTC_6e99c.dir\\Debug\\cmTC_6e99c.tlog\\unsuccessfulbuild".
+          Touching "cmTC_6e99c.dir\\Debug\\cmTC_6e99c.tlog\\cmTC_6e99c.lastbuildstate".
+        Done Building Project "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-9iqmih\\cmTC_6e99c.vcxproj" (default targets).
+        
+        Build succeeded.
+        
+        "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-9iqmih\\cmTC_6e99c.vcxproj" (default target) (1) ->
+        (ClCompile target) -> 
+          cl : command line  warning D9002: ignoring unknown option '-std=c++03' [C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-9iqmih\\cmTC_6e99c.vcxproj]
+        
+            1 Warning(s)
+            0 Error(s)
+        
+        Time Elapsed 00:00:00.61
+        
+      exitCode: 0
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "C:/Program Files/CMake/share/cmake-3.30/Modules/CMakeDetermineVSServicePack.cmake:106 (try_compile)"
+      - "build/_deps/eigen-src/cmake/EigenDetermineVSServicePack.cmake:8 (_DetermineVSServicePack_CheckVersionWithTryCompile)"
+      - "build/_deps/eigen-src/cmake/EigenTesting.cmake:460 (EigenDetermineVSServicePack)"
+      - "build/_deps/eigen-src/cmake/EigenTesting.cmake:598 (ei_get_compilerver)"
+      - "build/_deps/eigen-src/cmake/EigenConfigureTesting.cmake:8 (ei_set_build_string)"
+      - "build/_deps/eigen-src/CMakeLists.txt:487 (include)"
+    directories:
+      source: "C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-tidzts"
+      binary: "C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-tidzts"
+    cmakeVariables:
+      CMAKE_CXX_FLAGS: "/DWIN32 /D_WINDOWS /EHsc /EHsc /wd4127 /wd4505 /wd4714"
+      CMAKE_EXE_LINKER_FLAGS: "/machine:x64"
+      CMAKE_MODULE_PATH: "C:/Users/59405/taco/build/_deps/eigen-src/cmake"
+    buildResult:
+      variable: "_CompileResult"
+      cached: true
+      stdout: |
+        Change Dir: 'C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-tidzts'
+        
+        Run Build Command(s): "C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/MSBuild/Current/Bin/amd64/MSBuild.exe" cmTC_50a6a.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:n
+        MSBuild version 17.10.4+10fbfbf2e for .NET Framework
+        Build started 10/10/2025 12:08:22 PM.
+        
+        Project "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-tidzts\\cmTC_50a6a.vcxproj" on node 1 (default targets).
+        PrepareForBuild:
+          Creating directory "cmTC_50a6a.dir\\Debug\\".
+          Structured output is enabled. The formatting of compiler diagnostics will reflect the error hierarchy. See https://aka.ms/cpp/structured-output for more details.
+          Creating directory "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-tidzts\\Debug\\".
+          Creating directory "cmTC_50a6a.dir\\Debug\\cmTC_50a6a.tlog\\".
+        InitializeBuildStatus:
+          Creating "cmTC_50a6a.dir\\Debug\\cmTC_50a6a.tlog\\unsuccessfulbuild" because "AlwaysCreate" was specified.
+          Touching "cmTC_50a6a.dir\\Debug\\cmTC_50a6a.tlog\\unsuccessfulbuild".
+        ClCompile:
+          C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC\\14.40.33807\\bin\\HostX64\\x64\\CL.exe /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D "CMAKE_INTDIR=\\"Debug\\"" /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_50a6a.dir\\Debug\\\\" /Fd"cmTC_50a6a.dir\\Debug\\vc143.pdb" /external:W1 /Gd /TP /wd4127 /wd4505 /wd4714 /errorReport:queue C:\\Users\\59405\\taco\\build\\return0.cc
+          Microsoft (R) C/C++ Optimizing Compiler Version 19.40.33808 for x64
+          Copyright (C) Microsoft Corporation.  All rights reserved.
+          cl /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D "CMAKE_INTDIR=\\"Debug\\"" /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_50a6a.dir\\Debug\\\\" /Fd"cmTC_50a6a.dir\\Debug\\vc143.pdb" /external:W1 /Gd /TP /wd4127 /wd4505 /wd4714 /errorReport:queue C:\\Users\\59405\\taco\\build\\return0.cc
+          return0.cc
+        Link:
+          C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC\\14.40.33807\\bin\\HostX64\\x64\\link.exe /ERRORREPORT:QUEUE /OUT:"C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-tidzts\\Debug\\cmTC_50a6a.exe" /INCREMENTAL /ILK:"cmTC_50a6a.dir\\Debug\\cmTC_50a6a.ilk" /NOLOGO kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-tidzts/Debug/cmTC_50a6a.pdb" /SUBSYSTEM:CONSOLE /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-tidzts/Debug/cmTC_50a6a.lib" /MACHINE:X64  /machine:x64 cmTC_50a6a.dir\\Debug\\return0.obj
+          cmTC_50a6a.vcxproj -> C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-tidzts\\Debug\\cmTC_50a6a.exe
+        FinalizeBuildStatus:
+          Deleting file "cmTC_50a6a.dir\\Debug\\cmTC_50a6a.tlog\\unsuccessfulbuild".
+          Touching "cmTC_50a6a.dir\\Debug\\cmTC_50a6a.tlog\\cmTC_50a6a.lastbuildstate".
+        Done Building Project "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-tidzts\\cmTC_50a6a.vcxproj" (default targets).
+        
+        Build succeeded.
+            0 Warning(s)
+            0 Error(s)
+        
+        Time Elapsed 00:00:00.44
+        
+      exitCode: 0
+...
+
+---
+events:
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "C:/Program Files/CMake/share/cmake-3.30/Modules/Internal/CheckSourceCompiles.cmake:101 (try_compile)"
+      - "C:/Program Files/CMake/share/cmake-3.30/Modules/Internal/CheckCompilerFlag.cmake:18 (cmake_check_source_compiles)"
+      - "C:/Program Files/CMake/share/cmake-3.30/Modules/CheckCXXCompilerFlag.cmake:34 (cmake_check_compiler_flag)"
+      - "build/_deps/eigen-src/CMakeLists.txt:71 (check_cxx_compiler_flag)"
+      - "build/_deps/eigen-src/CMakeLists.txt:88 (ei_add_cxx_compiler_flag)"
+    checks:
+      - "Performing Test COMPILER_SUPPORT_std=cpp03"
+    directories:
+      source: "C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-ghkz29"
+      binary: "C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-ghkz29"
+    cmakeVariables:
+      CMAKE_CXX_FLAGS: "/DWIN32 /D_WINDOWS /EHsc"
+      CMAKE_EXE_LINKER_FLAGS: "/machine:x64"
+      CMAKE_MODULE_PATH: "C:/Users/59405/taco/build/_deps/eigen-src/cmake"
+    buildResult:
+      variable: "COMPILER_SUPPORT_std=cpp03"
+      cached: true
+      stdout: |
+        Change Dir: 'C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-ghkz29'
+        
+        Run Build Command(s): "C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/MSBuild/Current/Bin/amd64/MSBuild.exe" cmTC_cc878.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:n
+        MSBuild version 17.10.4+10fbfbf2e for .NET Framework
+        Build started 10/16/2025 4:08:02 PM.
+        
+        Project "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-ghkz29\\cmTC_cc878.vcxproj" on node 1 (default targets).
+        PrepareForBuild:
+          Creating directory "cmTC_cc878.dir\\Debug\\".
+          Structured output is enabled. The formatting of compiler diagnostics will reflect the error hierarchy. See https://aka.ms/cpp/structured-output for more details.
+          Creating directory "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-ghkz29\\Debug\\".
+          Creating directory "cmTC_cc878.dir\\Debug\\cmTC_cc878.tlog\\".
+        InitializeBuildStatus:
+          Creating "cmTC_cc878.dir\\Debug\\cmTC_cc878.tlog\\unsuccessfulbuild" because "AlwaysCreate" was specified.
+          Touching "cmTC_cc878.dir\\Debug\\cmTC_cc878.tlog\\unsuccessfulbuild".
+        ClCompile:
+          C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC\\14.40.33807\\bin\\HostX64\\x64\\CL.exe /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D COMPILER_SUPPORT_std=cpp03 /D "CMAKE_INTDIR=\\"Debug\\"" /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_cc878.dir\\Debug\\\\" /Fd"cmTC_cc878.dir\\Debug\\vc143.pdb" /external:W1 /Gd /TP /errorReport:queue  -std=c++03 "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-ghkz29\\src.cxx"
+          Microsoft (R) C/C++ Optimizing Compiler Version 19.40.33808 for x64
+          Copyright (C) Microsoft Corporation.  All rights reserved.
+          cl /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D COMPILER_SUPPORT_std=cpp03 /D "CMAKE_INTDIR=\\"Debug\\"" /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_cc878.dir\\Debug\\\\" /Fd"cmTC_cc878.dir\\Debug\\vc143.pdb" /external:W1 /Gd /TP /errorReport:queue  -std=c++03 "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-ghkz29\\src.cxx"
+        cl : command line  warning D9002: ignoring unknown option '-std=c++03' [C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-ghkz29\\cmTC_cc878.vcxproj]
+          src.cxx
+        Link:
+          C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC\\14.40.33807\\bin\\HostX64\\x64\\link.exe /ERRORREPORT:QUEUE /OUT:"C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-ghkz29\\Debug\\cmTC_cc878.exe" /INCREMENTAL /ILK:"cmTC_cc878.dir\\Debug\\cmTC_cc878.ilk" /NOLOGO kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-ghkz29/Debug/cmTC_cc878.pdb" /SUBSYSTEM:CONSOLE /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-ghkz29/Debug/cmTC_cc878.lib" /MACHINE:X64  /machine:x64 cmTC_cc878.dir\\Debug\\src.obj
+          cmTC_cc878.vcxproj -> C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-ghkz29\\Debug\\cmTC_cc878.exe
+        FinalizeBuildStatus:
+          Deleting file "cmTC_cc878.dir\\Debug\\cmTC_cc878.tlog\\unsuccessfulbuild".
+          Touching "cmTC_cc878.dir\\Debug\\cmTC_cc878.tlog\\cmTC_cc878.lastbuildstate".
+        Done Building Project "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-ghkz29\\cmTC_cc878.vcxproj" (default targets).
+        
+        Build succeeded.
+        
+        "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-ghkz29\\cmTC_cc878.vcxproj" (default target) (1) ->
+        (ClCompile target) -> 
+          cl : command line  warning D9002: ignoring unknown option '-std=c++03' [C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-ghkz29\\cmTC_cc878.vcxproj]
+        
+            1 Warning(s)
+            0 Error(s)
+        
+        Time Elapsed 00:00:01.36
+        
+      exitCode: 0
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "C:/Program Files/CMake/share/cmake-3.30/Modules/CMakeDetermineVSServicePack.cmake:106 (try_compile)"
+      - "build/_deps/eigen-src/cmake/EigenDetermineVSServicePack.cmake:8 (_DetermineVSServicePack_CheckVersionWithTryCompile)"
+      - "build/_deps/eigen-src/cmake/EigenTesting.cmake:460 (EigenDetermineVSServicePack)"
+      - "build/_deps/eigen-src/cmake/EigenTesting.cmake:598 (ei_get_compilerver)"
+      - "build/_deps/eigen-src/cmake/EigenConfigureTesting.cmake:8 (ei_set_build_string)"
+      - "build/_deps/eigen-src/CMakeLists.txt:487 (include)"
+    directories:
+      source: "C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-hivaxi"
+      binary: "C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-hivaxi"
+    cmakeVariables:
+      CMAKE_CXX_FLAGS: "/DWIN32 /D_WINDOWS /EHsc /EHsc /wd4127 /wd4505 /wd4714"
+      CMAKE_EXE_LINKER_FLAGS: "/machine:x64"
+      CMAKE_MODULE_PATH: "C:/Users/59405/taco/build/_deps/eigen-src/cmake"
+    buildResult:
+      variable: "_CompileResult"
+      cached: true
+      stdout: |
+        Change Dir: 'C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-hivaxi'
+        
+        Run Build Command(s): "C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/MSBuild/Current/Bin/amd64/MSBuild.exe" cmTC_05355.vcxproj /p:Configuration=Debug /p:Platform=x64 /p:VisualStudioVersion=17.0 /v:n
+        MSBuild version 17.10.4+10fbfbf2e for .NET Framework
+        Build started 10/16/2025 4:08:09 PM.
+        
+        Project "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-hivaxi\\cmTC_05355.vcxproj" on node 1 (default targets).
+        PrepareForBuild:
+          Creating directory "cmTC_05355.dir\\Debug\\".
+          Structured output is enabled. The formatting of compiler diagnostics will reflect the error hierarchy. See https://aka.ms/cpp/structured-output for more details.
+          Creating directory "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-hivaxi\\Debug\\".
+          Creating directory "cmTC_05355.dir\\Debug\\cmTC_05355.tlog\\".
+        InitializeBuildStatus:
+          Creating "cmTC_05355.dir\\Debug\\cmTC_05355.tlog\\unsuccessfulbuild" because "AlwaysCreate" was specified.
+          Touching "cmTC_05355.dir\\Debug\\cmTC_05355.tlog\\unsuccessfulbuild".
+        ClCompile:
+          C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC\\14.40.33807\\bin\\HostX64\\x64\\CL.exe /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D "CMAKE_INTDIR=\\"Debug\\"" /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_05355.dir\\Debug\\\\" /Fd"cmTC_05355.dir\\Debug\\vc143.pdb" /external:W1 /Gd /TP /wd4127 /wd4505 /wd4714 /errorReport:queue C:\\Users\\59405\\taco\\build\\return0.cc
+          Microsoft (R) C/C++ Optimizing Compiler Version 19.40.33808 for x64
+          Copyright (C) Microsoft Corporation.  All rights reserved.
+          cl /c /Zi /W1 /WX- /diagnostics:column /Od /Ob0 /D _MBCS /D WIN32 /D _WINDOWS /D "CMAKE_INTDIR=\\"Debug\\"" /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo"cmTC_05355.dir\\Debug\\\\" /Fd"cmTC_05355.dir\\Debug\\vc143.pdb" /external:W1 /Gd /TP /wd4127 /wd4505 /wd4714 /errorReport:queue C:\\Users\\59405\\taco\\build\\return0.cc
+          return0.cc
+        Link:
+          C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC\\14.40.33807\\bin\\HostX64\\x64\\link.exe /ERRORREPORT:QUEUE /OUT:"C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-hivaxi\\Debug\\cmTC_05355.exe" /INCREMENTAL /ILK:"cmTC_05355.dir\\Debug\\cmTC_05355.ilk" /NOLOGO kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib /MANIFEST /MANIFESTUAC:"level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG /PDB:"C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-hivaxi/Debug/cmTC_05355.pdb" /SUBSYSTEM:CONSOLE /TLBID:1 /DYNAMICBASE /NXCOMPAT /IMPLIB:"C:/Users/59405/taco/build/CMakeFiles/CMakeScratch/TryCompile-hivaxi/Debug/cmTC_05355.lib" /MACHINE:X64  /machine:x64 cmTC_05355.dir\\Debug\\return0.obj
+          cmTC_05355.vcxproj -> C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-hivaxi\\Debug\\cmTC_05355.exe
+        FinalizeBuildStatus:
+          Deleting file "cmTC_05355.dir\\Debug\\cmTC_05355.tlog\\unsuccessfulbuild".
+          Touching "cmTC_05355.dir\\Debug\\cmTC_05355.tlog\\cmTC_05355.lastbuildstate".
+        Done Building Project "C:\\Users\\59405\\taco\\build\\CMakeFiles\\CMakeScratch\\TryCompile-hivaxi\\cmTC_05355.vcxproj" (default targets).
+        
+        Build succeeded.
+            0 Warning(s)
+            0 Error(s)
+        
+        Time Elapsed 00:00:01.12
+        
+      exitCode: 0
+...

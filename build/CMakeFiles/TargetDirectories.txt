@@ -1,6 +1,12 @@
 C:/Users/59405/taco/build/CMakeFiles/taco_tcl.dir
 C:/Users/59405/taco/build/CMakeFiles/tcl2_demo.dir
+C:/Users/59405/taco/build/CMakeFiles/generator_demo.dir
+C:/Users/59405/taco/build/CMakeFiles/spin_boson.dir
+C:/Users/59405/taco/build/CMakeFiles/tcl4_driver.dir
 C:/Users/59405/taco/build/CMakeFiles/integrator_tests.dir
+C:/Users/59405/taco/build/CMakeFiles/gamma_tests.dir
+C:/Users/59405/taco/build/CMakeFiles/spin_boson_tests.dir
+C:/Users/59405/taco/build/CMakeFiles/tcl4_tests.dir
 C:/Users/59405/taco/build/CMakeFiles/INSTALL.dir
 C:/Users/59405/taco/build/CMakeFiles/ALL_BUILD.dir
 C:/Users/59405/taco/build/CMakeFiles/ZERO_CHECK.dir

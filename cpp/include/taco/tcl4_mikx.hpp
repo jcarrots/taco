@@ -20,4 +20,3 @@ MikxTensors build_mikx(const Tcl4Map& map,
                        std::size_t time_index);
 
 } // namespace taco::tcl4
-

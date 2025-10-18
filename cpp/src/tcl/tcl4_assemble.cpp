@@ -5,8 +5,9 @@
 namespace taco::tcl4 {
 
 namespace {
-inline std::size_t flat2(std::size_t N, int a, int b) {
-    return static_cast<std::size_t>(a) * N + static_cast<std::size_t>(b);
+// Column-major pair flatten: idx(row,col) = row + col*N
+inline std::size_t flat2(std::size_t N, int row, int col) {
+    return static_cast<std::size_t>(row) + static_cast<std::size_t>(col) * N;
 }
 
 inline std::size_t flat6(std::size_t N, int j,int k,int p,int q,int r,int s) {
@@ -53,6 +54,9 @@ Eigen::MatrixXcd assemble_liouvillian(const MikxTensors& tensors,
     const auto& X = tensors.X;
 
     // Outer indices follow MATLAB NAKZWAN_v9.m: T(n,i,m,j)
+    #ifdef _OPENMP
+    #pragma omp parallel for collapse(2) schedule(static)
+    #endif
     for (int n = 0; n < static_cast<int>(N); ++n) {
         for (int i = 0; i < static_cast<int>(N); ++i) {
             for (int m = 0; m < static_cast<int>(N); ++m) {

@@ -64,4 +64,30 @@ void build_FCR_6d_final(const Tcl4Map& map,
                         std::vector<std::complex<double>>& C_out,
                         std::vector<std::complex<double>>& R_out);
 
+// Rebuild full 6‑index F/C/R tensors for all time indices.
+// Outputs are time-major: series[t] is a flat N^6 vector (row‑major over j,k,p,q,r,s).
+void build_FCR_6d_series(const Tcl4Map& map,
+                         const TripleKernelSeries& kernels,
+                         std::vector<std::vector<std::complex<double>>>& F_series,
+                         std::vector<std::vector<std::complex<double>>>& C_series,
+                         std::vector<std::vector<std::complex<double>>>& R_series);
+
+// Composition of TCL2 + TCL4 is intentionally left to application layer
+// (e.g., examples/tcl4_driver.cpp) to keep modules orthogonal.
+
+// ---------------- High-level TCL4 wrappers ----------------
+
+// Build the TCL4 correction GW (generator) at a single time index using system's eigen-basis couplings.
+Eigen::MatrixXcd build_TCL4_generator(const sys::System& system,
+                                      const Eigen::MatrixXcd& gamma_series,
+                                      double dt,
+                                      std::size_t time_index,
+                                      FCRMethod method = FCRMethod::Convolution);
+
+// Build the TCL4 correction GW for all time indices [0..Nt-1]. Returns a vector of length Nt.
+std::vector<Eigen::MatrixXcd> build_correction_series(const sys::System& system,
+                                                      const Eigen::MatrixXcd& gamma_series,
+                                                      double dt,
+                                                      FCRMethod method = FCRMethod::Convolution);
+
 } // namespace taco::tcl4

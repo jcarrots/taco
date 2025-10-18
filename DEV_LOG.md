@@ -77,6 +77,33 @@ Details:
   - Migration:
     - No API breaks; existing matrix-series path remains for multi-channel generalization.
 
+Date: 2025-10-16
+Summary: Match MATLAB spectrum→correlation transform (use forward FFT)
+Details:
+  - Rationale:
+    - Align `bcf_fft_fun` with MATLAB (`C = fft(S) * (dω/π)`) for exact agreement in `bcf_fft_ohmic_simple.m` tests.
+  - Files:
+    - Core: cpp/include/taco/correlation_fft.hpp (switched to forward FFT; clarified comment)
+  - Notes:
+    - Builds symmetric KMS spectrum S(ω) (DC/+ω/Nyquist/−ω) and scales by `dω/π`.
+  - Migration:
+    - None; existing callers unaffected.
+
+Date: 2025-10-16
+Summary: Add TCL4 driver and test
+Details:
+  - Rationale:
+    - Provide an end‑to‑end TCL4 demo and a validation test comparing Direct vs Convolution F/C/R.
+  - Files:
+    - Driver: examples/tcl4_driver.cpp; CMake target `tcl4_driver`
+    - Test: tests/tcl4_tests.cpp; CMake target `tcl4_tests`
+    - Docs: docs/STRUCTURE.md, DEV_GUIDE.md (updated)
+  - Notes:
+    - Driver builds Γ via FFT, computes triple kernels, MIKX, assembles GW, and prints norms.
+    - Test sweeps N and (dt,T), prints max relative errors for F, C, R.
+  - Migration:
+    - None.
+
 Date: 2025-10-10
 Summary: Implement TCL4 M/I/K/X assembly (Phase 2) with explicit contractions
 Details:

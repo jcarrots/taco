@@ -8,11 +8,14 @@ taco/
 ├─ examples/
 │  ├─ tcl2_demo.cpp           # legacy fixed-parameter TCL2 demo
 │  ├─ generator_demo.cpp      # shows how to use tcl2::build_tcl2_components
-│  └─ spin_boson.cpp          # configurable spin-boson simulator (CLI)
+│  ├─ spin_boson.cpp          # configurable spin-boson simulator (CLI)
+│  ├─ tcl4_driver.cpp         # TCL4 pipeline driver (FFT Γ, F/C/R, MIKX, assemble)
+│  └─ spin_boson_tcl4.cpp     # spin-boson TCL4 composition demo (L2 + α²·GW propagation)
 ├─ tests/
 │  ├─ integrator_tests.cpp    # quadrature / convolution tests
 │  ├─ gamma_tests.cpp         # Γ(ω,t) integrator accuracy check
-│  └─ spin_boson_tests.cpp    # dumps ρ(t) + Liouvillian for regression analysis
+│  ├─ spin_boson_tests.cpp    # dumps ρ(t) + Liouvillian for regression analysis
+│  └─ tcl4_tests.cpp          # compares Direct vs Convolution F/C/R builders
 ├─ cpp/
 │  ├─ include/taco/
 │  │  ├─ bath.hpp             # correlation-function interface (abstract)
@@ -26,7 +29,7 @@ taco/
 │  │  ├─ generator.hpp        # TCL2 superoperator builders (unitary + dissipator)
 │  │  ├─ tcl2.hpp             # stateful TCL2 generator API
 │  │  ├─ tcl4_kernels.hpp     # TCL4 kernel builders (F, C, R)
-    │  │  ├─ tcl4_mikx.hpp        # TCL4 M/I/K/X tensor builder
+   │  │  ├─ tcl4_mikx.hpp        # TCL4 M/I/K/X tensor builder
 │  │  ├─ tcl4_assemble.hpp    # TCL4 Liouvillian assembly (work in progress)
 │  │  └─ spin_boson.hpp       # spin-boson parameters + model wrapper
 │  └─ src/
@@ -43,6 +46,7 @@ taco/
 │   └─ spin_boson.yaml        # (duplicated above for clarity)
 └─ docs/
     └─ STRUCTURE.md           # this file
+    └─ PARALLEL_PLAN.md       # CPU/GPU/Hybrid plan (Exec, phases, backends)
 ```
 
 Key binaries after a Release build live under `build/Release/`:
@@ -54,6 +58,9 @@ tcl2_demo.exe           # legacy demo
 integrator_tests.exe    # quadrature/convolution tests
 gamma_tests.exe         # Γ integrator tests
 spin_boson_tests.exe    # spin-boson regression dump
+tcl4_driver.exe         # TCL4 end-to-end driver (Γ FFT → F/C/R → MIKX → assemble)
+tcl4_tests.exe          # Direct vs Convolution consistency check
+spin_boson_tcl4.exe     # Spin-boson TCL4 propagation (L2 + α²·GW)
 ```
 
 Generated artifacts
