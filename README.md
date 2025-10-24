@@ -5,12 +5,8 @@ A fast parallel and scalable time-convolutionless (TCL) runtime with C++ backend
 ## Features
 - CPU (OpenMP/MPI) and GPU (CUDA) backends
 - TCL2 generator (stateful) + Liouvillian builders
-- TCL4 kernels and assembly:
-  - Unique‑frequency Γ(ω,t) series (bucket‑major)
-  - F/C/R builders with FFT‑based causal convolution for scalar Γ (default)
-  - M/I/K/X assembly (MIKX) and Liouvillian assembly (NAKZWAN)
-  - Helpers to rebuild Γ (N×N) and F/C/R (N^6) at selected times
-- Higher‑order TCL (TCL6/TCL2n) planning in docs; symbolic road‑map
+- TCL4 kernels and assembly in seconds
+- Higher‑order TCL (TCL6/TCL2n) planning in docs; symbolic road‑map.
 
 ## Install
 pip install taco-qme
