@@ -1,6 +1,6 @@
 # TACO — TCL-Accelerated Compute Orchestrator 🌮
 This is TCL = **Time-Convolutionless** master-equation solvers.
-A fast parallel and scalable time-convolutionless (TCL) runtime with C++ backend for open-quantum-system dynamics. TACO features two parallel choices (CPU only, hybrid CPU+GPU) across nodes, and can work in distributed system. 
+A fast parallel and scalable time-convolutionless (TCL) runtime with C++ backend for open-quantum-system dynamics. TACO features two parallel choices (CPU only, GPU, hybrid) in shared or distributed system. 
 
 ## Features
 - CPU (OpenMP/MPI) and GPU (CUDA) backends
