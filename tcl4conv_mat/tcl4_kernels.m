@@ -46,7 +46,7 @@ function [F, C, R] = tcl4_kernels(G1, G2, Omega, dt, op2)
     B_C   = conj(G2);                                   % Γ2^*
     A_C   = prefix_int_left(B_C .* phase_plus, dt);     % ∫ Γ2^*(s) e^{+iΩ s} ds
     term1c = time_matmul(G1 .* phase_minus, A_C);
-    term2c = volterra_conv_matmul(G1 .* phase_minus, B_C, dt);
+    term2c = conv_matmul(G1 .* phase_minus, B_C, dt);
     C      = term1c - term2c;
 
     % ---------- R(t) ----------
@@ -97,8 +97,8 @@ function Y = time_matmul(A, B)
     Y  = permute(Yp, [3 1 2]); % -> N×n×p
 end
 
-function Y = volterra_conv_matmul(F, G, dt)
-    % Volterra convolution with matrix multiplication in the inner dim:
+function Y = conv_matmul(F, G, dt)
+    % convolution with matrix multiplication in the inner dim:
     %   Y(t) = ∫_0^t F(t-s) @ G(s) ds
     % Shapes: F (N,n,m), G (N,m,p) -> Y (N,n,p)
     N = size(F,1);
