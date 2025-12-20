@@ -1,4 +1,0 @@
-# Target labels
- BuildOfficial
-# Source files and their labels
-C:/Users/59405/taco/build/_deps/eigen-src/test/stl_iterators.cpp
