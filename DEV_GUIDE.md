@@ -7,6 +7,7 @@ Prereqs
 -------
 - CMake 3.20+
 - A C++17 compiler (MSVC 2022 on Windows; Clang/GCC on Linux/macOS)
+- Python 3.x (optional, for the pybind11 extension)
 
 Quick Build
 -----------
@@ -15,6 +16,18 @@ Quick Build
 - Build Release: `cmake --build build --config Release -j 8`
 - Run demo (Win): `build\Release\tcl2_demo.exe`
 
+CMake Options
+-------------
+- `TACO_BUILD_PYTHON` (default ON): build the pybind11 extension module.
+  - If CMake cannot find Python, pass `-DPython_EXECUTABLE=...` (and, on Windows, `-DPython_INCLUDE_DIR=...`, `-DPython_LIBRARY=...`).
+- `TACO_BUILD_GAMMA_TESTS` (default ON): build `gamma_tests` (and only then look for Boost).
+
+Python Extension
+----------------
+- Configure: `cmake -S . -B build -DTACO_BUILD_PYTHON=ON -DPython_EXECUTABLE=...`
+- Build: `cmake --build build --config Release --target _taco_native`
+- Import test: `python -c "import sys; sys.path.insert(0,'python'); import taco; print(taco.version())"`
+
 VS Code
 -------
 - Terminal -> Run Task (build/run Debug/Release)
@@ -22,10 +35,7 @@ VS Code
 
 FFT Backend
 -----------
-- Preferred: pocketfft (BSD, header‑only)
-  - vcpkg: `vcpkg install pocketfft:x64-windows` (configure with vcpkg toolchain)
-  - Vendored: add `third_party/pocketfft/pocketfft_hdronly.h` (auto‑detected)
-- Fallback: in‑house radix‑2 FFT (power‑of‑two). Correlation/conv helpers zero‑pad automatically.
+- Built-in radix-2 FFT only (pocketfft disabled). Correlation/conv helpers zero-pad automatically.
 
 Correlation FFT API
 -------------------

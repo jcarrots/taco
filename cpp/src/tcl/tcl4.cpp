@@ -5,6 +5,8 @@
 #include <cmath>
 
 #include "taco/tcl4_kernels.hpp"
+#include "taco/tcl4_mikx.hpp"
+#include "taco/tcl4_assemble.hpp"
 
 namespace taco::tcl4 {
 

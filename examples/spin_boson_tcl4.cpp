@@ -13,6 +13,7 @@
 #include "taco/system.hpp"
 #include "taco/correlation_fft.hpp"
 #include "taco/gamma.hpp"
+#include "taco/generator.hpp"
 #include "taco/tcl4.hpp"
 #include "taco/tcl4_mikx.hpp"
 #include "taco/tcl4_assemble.hpp"

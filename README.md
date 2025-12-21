@@ -1,9 +1,9 @@
 # TACO — TCL-Accelerated Compute Orchestrator 🌮
 This is TCL = **Time-Convolutionless** master-equation solvers.
-A fast parallel and scalable time-convolutionless (TCL) runtime with C++ backend for open-quantum-system dynamics. TACO features three parallel choices (CPU only, GPU, hybrid) in shared or distributed memory system. 
+A fast parallel and scalable time-convolutionless (TCL) runtime with C++ backend for open-quantum-system dynamics. TACO backends: serial, omp, cuda, mpi_omp, mpi_cuda.
 
 ## Features
-- CPU (OpenMP/MPI) and GPU (CUDA) backends
+- Backends: serial, omp, cuda, mpi_omp, mpi_cuda
 - TCL2 generator (stateful) + Liouvillian builders
 - TCL4 kernels and assembly in seconds
 - Higher‑order TCL (TCL6/TCL2n) planning in docs; symbolic road‑map.
@@ -15,8 +15,22 @@ pip install taco-qme
 ```python
 import taco as tc
 L = tc.kernels.tcl4.build_liouvillian(H, C_ops, bath, order=4)
-rt = tc.runtime.Engine(backend="gpu")  # "cpu" | "gpu" | "mpi"
+rt = tc.runtime.Engine(backend="cuda")  # "serial" | "omp" | "cuda" | "mpi_omp" | "mpi_cuda"
 ρt = rt.propagate(L, ρ0, tspan, dt_adapt=True)
+
+```
+
+## Build from source (C++)
+- Configure: `cmake -S . -B build`
+- Build (Release): `cmake --build build --config Release`
+- Enable Python extension: `-DTACO_BUILD_PYTHON=ON` (add `-DPython_EXECUTABLE=...` if needed)
+- Disable gamma tests: `-DTACO_BUILD_GAMMA_TESTS=OFF`
+
+## Python extension
+- Configure: `cmake -S . -B build -DTACO_BUILD_PYTHON=ON -DPython_EXECUTABLE=...`
+- Build: `cmake --build build --config Release --target _taco_native`
+- Import test: `python -c "import sys; sys.path.insert(0,'python'); import taco; print(taco.version())"`
+- Windows output: `_taco_native.pyd` lands under `python/taco/Release` or `python/taco/Debug`
 
 ## TCL4 Demo & Test
 - Demo driver: `tcl4_driver` builds Γ via FFT and runs TCL4 assembly
