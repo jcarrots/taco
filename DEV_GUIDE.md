@@ -47,6 +47,7 @@ Header: `taco/correlation_fft.hpp`
 Modules Overview
 ----------------
 - `taco/ops.hpp` — Pauli operators, ladder/basis ops, state builders, trace/purity helpers, vec/unvec, superoperators, norms.
+- `taco/rk4_dense.hpp` - dense-matrix RK4 utilities (serial/omp) for r' = L r.
 - `taco/system.hpp` — diagonalize the Hamiltonian, compute Bohr frequencies, group transitions into frequency buckets, and slice jump operators spectrally.
 - `taco/gamma.hpp` — trapezoid/Simpson integrators for Γ(ω,t); streaming accumulator; multi-ω prefix/final helpers and ω deduplication.
 - `taco/bath_tabulated.hpp` — tabulated correlation function with linear interpolation; FFT-based builders; Ohmic factory.
@@ -126,6 +127,12 @@ Propagation Helpers
 Header: `taco/propagate.hpp`
 - Steppers: `propagate_rk4`, `propagate_expm` (small N)
 - Utilities: `hermitize_and_normalize`, `build_liouvillian_at`, `precompute_expm`, `apply_precomputed_expm`
+
+Dense RK4 Helpers
+-----------------
+Header: `taco/rk4_dense.hpp`
+- Fixed-step RK4 for dense L: `rk4_dense_step_serial`, `rk4_dense_step_omp`
+- Propagators: `propagate_rk4_dense_serial`, `propagate_rk4_dense_omp`
 
 - Spin-Boson Simulator
 ----------------------

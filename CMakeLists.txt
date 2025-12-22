@@ -29,6 +29,7 @@ add_library(taco_tcl STATIC
   cpp/src/tcl/tcl2_generator.cpp
   cpp/src/tcl/generator.cpp
   cpp/src/core/correlation.cpp
+  cpp/src/core/rk4_dense.cpp
   cpp/src/core/version.cpp
 )
 target_include_directories(taco_tcl PUBLIC

@@ -25,6 +25,7 @@ taco/
 │  │  ├─ gamma.hpp            # Γ(ω,t) integrators + streaming accumulator
 │  │  ├─ ops.hpp              # operators, states, trace/norm utilities
 │  │  ├─ propagate.hpp        # fixed-step propagators (RK4/expm)
+│  │  ├─ rk4_dense.hpp        # dense-matrix RK4 utilities (serial/omp)
 │  │  ├─ system.hpp           # eigensystem + frequency buckets + spectral slices
 │  │  ├─ generator.hpp        # TCL2 superoperator builders (unitary + dissipator)
 │  │  ├─ tcl2.hpp             # stateful TCL2 generator API
