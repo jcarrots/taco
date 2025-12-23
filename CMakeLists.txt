@@ -108,6 +108,9 @@ add_executable(integrator_tests tests/integrator_tests.cpp)
  target_include_directories(integrator_tests PRIVATE cpp/src)
  target_include_directories(integrator_tests PRIVATE cpp/include)
 
+add_executable(rk4_dense_tests tests/rk4_dense_tests.cpp)
+ target_link_libraries(rk4_dense_tests PRIVATE taco_tcl)
+ target_include_directories(rk4_dense_tests PRIVATE cpp/include)
 
 add_executable(spin_boson_tests tests/spin_boson_tests.cpp)
  target_link_libraries(spin_boson_tests PRIVATE taco_tcl)
@@ -116,6 +119,10 @@ add_executable(spin_boson_tests tests/spin_boson_tests.cpp)
 add_executable(tcl4_tests tests/tcl4_tests.cpp)
  target_link_libraries(tcl4_tests PRIVATE taco_tcl)
  target_include_directories(tcl4_tests PRIVATE cpp/include)
+
+add_executable(tcl4_mikx_tests tests/tcl4_mikx_tests.cpp)
+ target_link_libraries(tcl4_mikx_tests PRIVATE taco_tcl)
+ target_include_directories(tcl4_mikx_tests PRIVATE cpp/include)
 
 if (TACO_BUILD_GAMMA_TESTS)
   add_executable(gamma_tests tests/gamma_tests.cpp)

@@ -16,6 +16,15 @@ Quick Build
 - Build Release: `cmake --build build --config Release -j 8`
 - Run demo (Win): `build\Release\tcl2_demo.exe`
 
+GCC (MSYS2)
+-----------
+- Install toolchain in the "MSYS2 MinGW 64-bit" shell:
+  - `pacman -S --needed mingw-w64-x86_64-gcc mingw-w64-x86_64-cmake mingw-w64-x86_64-ninja`
+- Add `C:\msys64\mingw64\bin` to PATH and reopen your terminal.
+- Configure/build:
+  - `cmake -S . -B build-gcc -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++`
+  - `cmake --build build-gcc`
+
 CMake Options
 -------------
 - `TACO_BUILD_PYTHON` (default ON): build the pybind11 extension module.
@@ -133,6 +142,22 @@ Dense RK4 Helpers
 Header: `taco/rk4_dense.hpp`
 - Fixed-step RK4 for dense L: `rk4_dense_step_serial`, `rk4_dense_step_omp`
 - Propagators: `propagate_rk4_dense_serial`, `propagate_rk4_dense_omp`
+- Time-dependent L: pass endpoint series `L_series` (size steps + 1). For best RK4 accuracy, pass `L_half_series` (size steps) for midpoints.
+Example (endpoints + midpoints):
+```cpp
+const std::size_t steps = static_cast<std::size_t>((tf - t0) / dt);
+std::vector<Eigen::MatrixXcd> L_series(steps + 1);
+std::vector<Eigen::MatrixXcd> L_half_series(steps);
+
+for (std::size_t i = 0; i < steps; ++i) {
+    L_series[i] = build_L_at(t0 + i * dt);
+    L_half_series[i] = build_L_at(t0 + (i + 0.5) * dt);
+}
+L_series[steps] = build_L_at(t0 + steps * dt);
+
+Eigen::VectorXcd r = initial_state_vec; // size N^2
+taco::tcl::propagate_rk4_dense_serial(L_series, L_half_series, r, t0, dt);
+```
 
 - Spin-Boson Simulator
 ----------------------
@@ -182,7 +207,7 @@ Choosing dt, N, m
 
 TCL4 MIKX Notes
 ----------------
-- API: `MikxTensors build_mikx(const Tcl4Map& map, const TripleKernelSeries& kernels, std::size_t time_index)`
+- API: `MikxTensors build_mikx_serial(const Tcl4Map& map, const TripleKernelSeries& kernels, std::size_t time_index)`
 - Inputs: `kernels.F/C/R[f1][f2][f3]` is an `Eigen::VectorXcd` time series; `time_index` selects the sample.
 - Outputs:
   - `M`, `I`, `K`: `N^2×N^2` matrices with row `(j,k)` and col `(p,q)` flattened using column‑major pair mapping to match `vec`/`unvec`:
@@ -228,7 +253,7 @@ High‑Level TCL4 Wrappers
 ------------------------
 - Build `GW` at a single time: `build_TCL4_generator(system, gamma_series, dt, time_index, method)`.
 - Build `GW` for all times: `build_correction_series(system, gamma_series, dt, method)`.
-- These call `compute_triple_kernels` internally (frequency space) and then `build_mikx` + `assemble_liouvillian` with `system.A_eig`.
+- These call `compute_triple_kernels` internally (frequency space) and then `build_mikx_serial` + `assemble_liouvillian` with `system.A_eig`.
 
 Frequency Buckets Symmetry
 --------------------------

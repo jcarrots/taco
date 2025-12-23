@@ -47,7 +47,7 @@ This document captures the steps required to translate the MATLAB TCL4 workflow 
 
 Status: Implemented
 
-- Implemented `taco::tcl4::build_mikx(map, kernels, time_index)` to mirror MATLAB `MIKX.m` contractions.
+- Implemented `taco::tcl4::build_mikx_serial(map, kernels, time_index)` to mirror MATLAB `MIKX.m` contractions.
 - Inputs: `TripleKernelSeries kernels` where `F/C/R[f1][f2][f3]` is an `Eigen::VectorXcd` time series; `time_index` selects the sample.
 - Outputs:
 - `M`, `I`, `K`: `Eigen::MatrixXcd` of size `N^2 × N^2` with row `(j,k)` and col `(p,q)` flattened using column‑major mapping to match vec/unvec: `idx = row + col*N` (so `(j,k)` → `j + k*N`, `(p,q)` → `p + q*N`).

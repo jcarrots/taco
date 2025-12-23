@@ -12,6 +12,14 @@ namespace {
 using Matrix = Eigen::MatrixXcd;
 using Vector = Eigen::VectorXcd;
 
+#if defined(_OPENMP)
+#  if !defined(_MSC_VER) && (_OPENMP >= 201307)
+#    define TACO_OMP_FOR_SIMD _Pragma("omp for simd schedule(static)")
+#  else
+#    define TACO_OMP_FOR_SIMD _Pragma("omp for schedule(static)")
+#  endif
+#endif
+
 void ensure_dims(const Matrix& L, const Vector& r) {
     if (L.rows() != L.cols()) {
         throw std::invalid_argument("rk4_dense: L must be square");
@@ -45,7 +53,7 @@ void resize_vec_omp(Vector& v, Eigen::Index n) {
 void vec_copy_omp(const Vector& x, Vector& y) {
     const Eigen::Index D = x.size();
     resize_vec_omp(y, D);
-    #pragma omp for simd schedule(static)
+    TACO_OMP_FOR_SIMD
     for (Eigen::Index i = 0; i < D; ++i) {
         y(i) = x(i);
     }
@@ -53,7 +61,7 @@ void vec_copy_omp(const Vector& x, Vector& y) {
 
 void vec_axpy_omp(double alpha, const Vector& x, Vector& y) {
     const Eigen::Index D = x.size();
-    #pragma omp for simd schedule(static)
+    TACO_OMP_FOR_SIMD
     for (Eigen::Index i = 0; i < D; ++i) {
         y(i) += alpha * x(i);
     }
@@ -187,7 +195,7 @@ void rk4_update_omp(const Matrix& L0,
         vec_axpy_omp(dt, ws.k3, ws.tmp);
         matvec_omp(L1, ws.tmp, ws.k4);
 
-        #pragma omp for simd schedule(static)
+        TACO_OMP_FOR_SIMD
         for (Eigen::Index i = 0; i < r.size(); ++i) {
             r(i) += (dt / 6.0) * (ws.k1(i) + 2.0 * ws.k2(i) + 2.0 * ws.k3(i) + ws.k4(i));
         }
@@ -243,7 +251,7 @@ void propagate_rk4_dense_serial(const std::vector<Matrix>& L_series,
                                 std::size_t sample_every) {
     if (!(dt > 0.0)) throw std::invalid_argument("propagate_rk4_dense_serial: dt must be > 0");
     if (sample_every == 0) throw std::invalid_argument("propagate_rk4_dense_serial: sample_every must be > 0");
-    if (L_series.size() < 2) throw std::invalid_argument("propagate_rk4_dense_serial: L_series must have at least 2 matrices");
+    if (L_series.size() < 2) throw std::invalid_argument("propagate_rk4_dense_serial: L_series must have at least 2 matrices (endpoints)");
 
     const Eigen::Index n = L_series.front().rows();
     ensure_square_and_size(L_series.front(), n, "L_series");
@@ -280,9 +288,9 @@ void propagate_rk4_dense_serial(const std::vector<Matrix>& L_series,
                                 std::size_t sample_every) {
     if (!(dt > 0.0)) throw std::invalid_argument("propagate_rk4_dense_serial: dt must be > 0");
     if (sample_every == 0) throw std::invalid_argument("propagate_rk4_dense_serial: sample_every must be > 0");
-    if (L_series.size() < 2) throw std::invalid_argument("propagate_rk4_dense_serial: L_series must have at least 2 matrices");
+    if (L_series.size() < 2) throw std::invalid_argument("propagate_rk4_dense_serial: L_series must have at least 2 matrices (endpoints)");
     if (L_half_series.size() != L_series.size() - 1) {
-        throw std::invalid_argument("propagate_rk4_dense_serial: L_half_series must match L_series size - 1");
+        throw std::invalid_argument("propagate_rk4_dense_serial: L_half_series must match L_series size - 1 (midpoints)");
     }
 
     const Eigen::Index n = L_series.front().rows();
@@ -344,7 +352,7 @@ void propagate_rk4_dense_omp(const std::vector<Matrix>& L_series,
                              std::size_t sample_every) {
     if (!(dt > 0.0)) throw std::invalid_argument("propagate_rk4_dense_omp: dt must be > 0");
     if (sample_every == 0) throw std::invalid_argument("propagate_rk4_dense_omp: sample_every must be > 0");
-    if (L_series.size() < 2) throw std::invalid_argument("propagate_rk4_dense_omp: L_series must have at least 2 matrices");
+    if (L_series.size() < 2) throw std::invalid_argument("propagate_rk4_dense_omp: L_series must have at least 2 matrices (endpoints)");
 
     const Eigen::Index n = L_series.front().rows();
     ensure_square_and_size(L_series.front(), n, "L_series");
@@ -381,9 +389,9 @@ void propagate_rk4_dense_omp(const std::vector<Matrix>& L_series,
                              std::size_t sample_every) {
     if (!(dt > 0.0)) throw std::invalid_argument("propagate_rk4_dense_omp: dt must be > 0");
     if (sample_every == 0) throw std::invalid_argument("propagate_rk4_dense_omp: sample_every must be > 0");
-    if (L_series.size() < 2) throw std::invalid_argument("propagate_rk4_dense_omp: L_series must have at least 2 matrices");
+    if (L_series.size() < 2) throw std::invalid_argument("propagate_rk4_dense_omp: L_series must have at least 2 matrices (endpoints)");
     if (L_half_series.size() != L_series.size() - 1) {
-        throw std::invalid_argument("propagate_rk4_dense_omp: L_half_series must match L_series size - 1");
+        throw std::invalid_argument("propagate_rk4_dense_omp: L_half_series must match L_series size - 1 (midpoints)");
     }
 
     const Eigen::Index n = L_series.front().rows();

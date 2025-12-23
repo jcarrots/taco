@@ -249,7 +249,7 @@ Eigen::MatrixXcd build_TCL4_generator(const sys::System& system,
     }
     auto kernels = compute_triple_kernels(system, gamma_series, dt, /*nmax*/2, method);
     Tcl4Map map = build_map(system, /*time_grid*/{});
-    auto mikx = build_mikx(map, kernels, time_index);
+    auto mikx = build_mikx_serial(map, kernels, time_index);
     return assemble_liouvillian(mikx, system.A_eig);
 }
 
@@ -263,7 +263,7 @@ std::vector<Eigen::MatrixXcd> build_correction_series(const sys::System& system,
     auto kernels = compute_triple_kernels(system, gamma_series, dt, /*nmax*/2, method);
     Tcl4Map map = build_map(system, /*time_grid*/{});
     for (std::size_t t = 0; t < Nt; ++t) {
-        auto mikx = build_mikx(map, kernels, t);
+        auto mikx = build_mikx_serial(map, kernels, t);
         out.emplace_back(assemble_liouvillian(mikx, system.A_eig));
     }
     return out;

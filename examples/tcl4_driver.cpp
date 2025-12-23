@@ -118,7 +118,7 @@ int main(int argc, char** argv) {
     std::cout << "Selected time index tidx=" << tidx << " (t=" << t_sel << ")\n";
 
     // --- Build M/I/K/X tensors and assemble Liouvillian correction ---
-    auto mikx = tcl4::build_mikx(map, kernels, tidx);
+    auto mikx = tcl4::build_mikx_serial(map, kernels, tidx);
     Eigen::MatrixXcd GW = tcl4::assemble_liouvillian(mikx, std::vector<Matrix>{A_eig});
 
     // --- Report diagnostics ---

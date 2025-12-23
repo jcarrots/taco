@@ -28,22 +28,22 @@ inline std::size_t freq_idx_checked(const Eigen::MatrixXi& pair_to_freq,
 {
     int idx = pair_to_freq(a, b);
     if (idx < 0) {
-        throw std::runtime_error("tcl4::build_mikx: pair_to_freq contains -1 for a required pair");
+        throw std::runtime_error("tcl4::build_mikx_serial: pair_to_freq contains -1 for a required pair");
     }
     return static_cast<std::size_t>(idx);
 }
 
 } // namespace
 
-MikxTensors build_mikx(const Tcl4Map& map,
-                       const TripleKernelSeries& kernels,
-                       std::size_t time_index)
+MikxTensors build_mikx_serial(const Tcl4Map& map,
+                              const TripleKernelSeries& kernels,
+                              std::size_t time_index)
 {
     MikxTensors tensors;
     tensors.N = map.N;
 
     if (map.N <= 0) {
-        throw std::invalid_argument("build_mikx: map.N must be > 0");
+        throw std::invalid_argument("build_mikx_serial: map.N must be > 0");
     }
 
     const std::size_t N = static_cast<std::size_t>(map.N);
@@ -53,7 +53,7 @@ MikxTensors build_mikx(const Tcl4Map& map,
     if (!kernels.F.empty() && !kernels.F.front().empty() && !kernels.F.front().front().empty()) {
         const auto& v = kernels.F.front().front().front();
         if (time_index >= static_cast<std::size_t>(v.size())) {
-            throw std::out_of_range("build_mikx: time_index out of range for kernel series");
+            throw std::out_of_range("build_mikx_serial: time_index out of range for kernel series");
         }
     }
 
