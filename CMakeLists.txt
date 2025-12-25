@@ -139,4 +139,21 @@ if (TACO_BUILD_GAMMA_TESTS)
   endif()
 endif()
 
+# Optional HDF5-based comparison tool for MATLAB exports.
+find_package(HDF5 COMPONENTS C QUIET)
+if (HDF5_FOUND)
+  add_executable(tcl4_h5_compare tests/tcl4_h5_compare.cpp)
+  target_link_libraries(tcl4_h5_compare PRIVATE taco_tcl)
+  target_include_directories(tcl4_h5_compare PRIVATE ${HDF5_INCLUDE_DIRS})
+  if (TARGET HDF5::C)
+    target_link_libraries(tcl4_h5_compare PRIVATE HDF5::C)
+  elseif (TARGET HDF5::HDF5)
+    target_link_libraries(tcl4_h5_compare PRIVATE HDF5::HDF5)
+  else()
+    target_link_libraries(tcl4_h5_compare PRIVATE ${HDF5_LIBRARIES})
+  endif()
+else()
+  message(STATUS "HDF5 not found; skipping tcl4_h5_compare")
+endif()
+
 
