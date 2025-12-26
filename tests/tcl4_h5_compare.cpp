@@ -320,30 +320,68 @@ int main(int argc, char** argv) {
         if (A_dims.size() != 2) throw std::runtime_error("system/A is not 2D");
         Eigen::MatrixXcd A_eig = to_matrix_colmajor(Ac, A_dims[0], A_dims[1]);
 
+        std::vector<double> map_omegas;
+        std::vector<long long> map_ij;
+        bool have_map = false;
+        if (dataset_exists(h5.id, "/map/omegas") && dataset_exists(h5.id, "/map/ij")) {
+            std::vector<hsize_t> dims_om;
+            map_omegas = read_array<double>(h5.id, "/map/omegas", H5T_NATIVE_DOUBLE, &dims_om);
+            std::vector<hsize_t> dims_ij;
+            map_ij = read_array<long long>(h5.id, "/map/ij", H5T_NATIVE_LLONG, &dims_ij);
+            have_map = !map_omegas.empty() && !map_ij.empty();
+        }
+
         taco::sys::System system;
         system.eig = taco::sys::Eigensystem(H);
         system.bf = taco::sys::BohrFrequencies(system.eig.eps);
-        system.fidx = taco::sys::build_frequency_buckets(system.bf, 1e-9);
+        if (have_map) {
+            const std::size_t N = static_cast<std::size_t>(H.rows());
+            const std::size_t nf = map_omegas.size();
+            if (map_ij.size() != N * N) {
+                throw std::runtime_error("map/ij length does not match N^2");
+            }
+            long long min_ij = *std::min_element(map_ij.begin(), map_ij.end());
+            long long max_ij = *std::max_element(map_ij.begin(), map_ij.end());
+            long long base = 0;
+            if (min_ij == 1 && max_ij == static_cast<long long>(nf)) {
+                base = 1;
+            } else if (min_ij == 0 && max_ij == static_cast<long long>(nf) - 1) {
+                base = 0;
+            } else {
+                throw std::runtime_error("map/ij values must be 0..nf-1 or 1..nf");
+            }
+
+            taco::sys::FrequencyIndex fidx;
+            fidx.tol = 1e-9;
+            fidx.buckets.resize(nf);
+            for (std::size_t b = 0; b < nf; ++b) {
+                fidx.buckets[b].omega = map_omegas[b];
+            }
+            for (std::size_t j = 0; j < N; ++j) {
+                for (std::size_t k = 0; k < N; ++k) {
+                    const std::size_t idx = j + N * k;
+                    const long long b = map_ij[idx] - base;
+                    if (b < 0 || b >= static_cast<long long>(nf)) {
+                        throw std::runtime_error("map/ij bucket index out of range");
+                    }
+                    fidx.buckets[static_cast<std::size_t>(b)].pairs.emplace_back(static_cast<int>(j),
+                                                                                 static_cast<int>(k));
+                }
+            }
+            system.fidx = std::move(fidx);
+        } else {
+            system.fidx = taco::sys::build_frequency_buckets(system.bf, 1e-9);
+        }
         system.A_eig = {A_eig};
         system.A_lab = {system.eig.to_lab(A_eig)};
         system.A_eig_parts = taco::sys::decompose_operators_by_frequency(system.A_eig, system.bf, system.fidx);
 
         std::vector<double> omegas;
-        omegas.reserve(system.fidx.buckets.size());
-        for (const auto& b : system.fidx.buckets) omegas.push_back(b.omega);
-
-        if (dataset_exists(h5.id, "/map/omegas")) {
-            std::vector<hsize_t> dims_om;
-            auto om = read_array<double>(h5.id, "/map/omegas", H5T_NATIVE_DOUBLE, &dims_om);
-            if (om.size() == omegas.size()) {
-                double max_dw = 0.0;
-                for (std::size_t i = 0; i < om.size(); ++i) {
-                    max_dw = std::max(max_dw, std::abs(om[i] - omegas[i]));
-                }
-                if (max_dw > 1e-8) {
-                    std::cerr << "Warning: map/omegas differs from System buckets (max |dw|=" << max_dw << ")\n";
-                }
-            }
+        if (have_map) {
+            omegas = map_omegas;
+        } else {
+            omegas.reserve(system.fidx.buckets.size());
+            for (const auto& b : system.fidx.buckets) omegas.push_back(b.omega);
         }
 
         auto gamma_series = taco::gamma::compute_trapz_prefix_multi_matrix(Cc, dt, omegas);

@@ -120,7 +120,7 @@ add_executable(tcl4_tests tests/tcl4_tests.cpp)
  target_link_libraries(tcl4_tests PRIVATE taco_tcl)
  target_include_directories(tcl4_tests PRIVATE cpp/include)
 
-add_executable(tcl4_mikx_tests tests/tcl4_mikx_tests.cpp)
+add_executable(tcl4_mikx_tests cpp/tests/tcl4_mikx_tests.cpp)
  target_link_libraries(tcl4_mikx_tests PRIVATE taco_tcl)
  target_include_directories(tcl4_mikx_tests PRIVATE cpp/include)
 
