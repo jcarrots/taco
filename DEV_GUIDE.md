@@ -259,3 +259,15 @@ Frequency Buckets Symmetry
 --------------------------
 - `taco::tcl4::Tcl4Map` includes `mirror_index[b]` such that `omegas[mirror_index[b]] ≈ -omegas[b]` (and self for `ω≈0`).
 - Use this to implement operations that require flipping frequency sign (e.g., frequency‑domain “transpose” across +/−ω) without reordering buckets.
+
+TCL4 HDF5 Compare (MATLAB Benchmarks)
+-------------------------------------
+- Compare against MATLAB-exported HDF5: `tests/tcl4_h5_compare.cpp`.
+- Build: `cmake --build build --config Release --target tcl4_h5_compare`
+- List datasets: `build/Release/tcl4_h5_compare.exe --file=tests/tcl_test.h5 --list`
+- Gt is the benchmark reference; make it match before GW.
+  - Example (MATLAB layout, omega series):
+    - `build/Release/tcl4_h5_compare.exe --file=tests/tcl_test.h5 --compare-gt --gt-mode=omega --matlab --gamma-rule=rect --tidx=1 --one-based --print-gt`
+  - Filter to omega=0: add `--gt-omega=0 --omega-tol=1e-9`
+  - If the file includes an extra leading sample, use `--gt-offset=1`
+- After Gt matches, compare GW with the same file and time indices.
