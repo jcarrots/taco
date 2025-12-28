@@ -21,10 +21,11 @@ taco/
 │  │  ├─ bath.hpp             # correlation-function interface (abstract)
 │  │  ├─ bath_tabulated.hpp   # tabulated correlation implementation
 │  │  ├─ bath_models.hpp      # Ohmic Drude model + helpers (J→C→Γ)
-│  │  ├─ correlation_fft.hpp  # FFT-based C(t) builder (pocketfft/fallback)
+│  │  ├─ correlation_fft.hpp  # FFT-based C(t) builder (built-in radix-2)
 │  │  ├─ gamma.hpp            # Γ(ω,t) integrators + streaming accumulator
 │  │  ├─ ops.hpp              # operators, states, trace/norm utilities
 │  │  ├─ propagate.hpp        # fixed-step propagators (RK4/expm)
+│  │  ├─ rk4_dense.hpp        # dense-matrix RK4 utilities (serial/omp)
 │  │  ├─ system.hpp           # eigensystem + frequency buckets + spectral slices
 │  │  ├─ generator.hpp        # TCL2 superoperator builders (unitary + dissipator)
 │  │  ├─ tcl2.hpp             # stateful TCL2 generator API
@@ -46,7 +47,7 @@ taco/
 │   └─ spin_boson.yaml        # (duplicated above for clarity)
 └─ docs/
     └─ STRUCTURE.md           # this file
-    └─ PARALLEL_PLAN.md       # CPU/GPU/Hybrid plan (Exec, phases, backends)
+    └─ PARALLEL_PLAN.md       # serial/omp/cuda/mpi_omp/mpi_cuda plan (Exec, phases, backends)
 ```
 
 Key binaries after a Release build live under `build/Release/`:

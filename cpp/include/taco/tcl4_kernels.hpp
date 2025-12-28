@@ -13,6 +13,11 @@ enum class FCRMethod {
     Direct
 };
 
+// Convolution FFT padding factor (Nfft = next_pow2(max(2N-1, factor*N))).
+// Use 0 to keep the default (factor derived from 2N-1).
+void set_fcr_fft_pad_factor(std::size_t factor);
+std::size_t get_fcr_fft_pad_factor();
+
 enum class SpectralOp {
     Identity,
     Transpose,

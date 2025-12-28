@@ -46,8 +46,8 @@ Eigen::MatrixXcd build_gamma_matrix_at(const Tcl4Map& map,
                                        const Eigen::MatrixXcd& gamma_series,
                                        std::size_t time_index);
 
-// Flattening helper consistent with MIKX (row‑major over j,k,p,q,r,s)
-// flat6(N,j,k,p,q,r,s) = (((((j*N + k)*N + p)*N + q)*N + r)*N + s)
+// Flattening helper consistent with MIKX (column‑major over j,k,p,q,r,s)
+// flat6(N,j,k,p,q,r,s) = j + N*(k + N*(p + N*(q + N*(r + N*s))))
 
 // Rebuild full 6‑index F/C/R tensors at a given time as flat N^6 vectors.
 void build_FCR_6d_at(const Tcl4Map& map,
@@ -65,7 +65,7 @@ void build_FCR_6d_final(const Tcl4Map& map,
                         std::vector<std::complex<double>>& R_out);
 
 // Rebuild full 6‑index F/C/R tensors for all time indices.
-// Outputs are time-major: series[t] is a flat N^6 vector (row‑major over j,k,p,q,r,s).
+// Outputs are time-major: series[t] is a flat N^6 vector (column‑major over j,k,p,q,r,s).
 void build_FCR_6d_series(const Tcl4Map& map,
                          const TripleKernelSeries& kernels,
                          std::vector<std::vector<std::complex<double>>>& F_series,

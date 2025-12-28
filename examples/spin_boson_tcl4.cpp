@@ -13,6 +13,7 @@
 #include "taco/system.hpp"
 #include "taco/correlation_fft.hpp"
 #include "taco/gamma.hpp"
+#include "taco/generator.hpp"
 #include "taco/tcl4.hpp"
 #include "taco/tcl4_mikx.hpp"
 #include "taco/tcl4_assemble.hpp"
@@ -148,7 +149,7 @@ int main(int argc, char** argv) {
         Eigen::MatrixXcd L2 = comps2.total();
 
         // TCL4 correction at time index
-        auto mikx = tcl4::build_mikx(map, kernels, tidx);
+        auto mikx = tcl4::build_mikx_serial(map, kernels, tidx);
         Eigen::MatrixXcd GW = tcl4::assemble_liouvillian(mikx, std::vector<Matrix>{A_eig});
         Eigen::MatrixXcd Ltotal = L2 + (S.alpha * S.alpha) * GW;
 

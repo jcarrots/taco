@@ -10,11 +10,14 @@ namespace {
 inline std::size_t flat6(std::size_t N,
                          int j,int k,int p,int q,int r,int s)
 {
-    // Row-major index for 6D tensor of size N in each dim
-    std::size_t NN = static_cast<std::size_t>(N);
-    return (((((static_cast<std::size_t>(j) * NN + static_cast<std::size_t>(k)) * NN
-                + static_cast<std::size_t>(p)) * NN + static_cast<std::size_t>(q)) * NN
-              + static_cast<std::size_t>(r)) * NN + static_cast<std::size_t>(s));
+    // Column-major index for 6D tensor of size N in each dim (first index varies fastest)
+    const std::size_t NN = static_cast<std::size_t>(N);
+    return static_cast<std::size_t>(j) +
+           NN * (static_cast<std::size_t>(k) +
+           NN * (static_cast<std::size_t>(p) +
+           NN * (static_cast<std::size_t>(q) +
+           NN * (static_cast<std::size_t>(r) +
+           NN * static_cast<std::size_t>(s)))));
 }
 
 // Column-major pair flattening: idx(row,col) = row + col*N
@@ -28,22 +31,22 @@ inline std::size_t freq_idx_checked(const Eigen::MatrixXi& pair_to_freq,
 {
     int idx = pair_to_freq(a, b);
     if (idx < 0) {
-        throw std::runtime_error("tcl4::build_mikx: pair_to_freq contains -1 for a required pair");
+        throw std::runtime_error("tcl4::build_mikx_serial: pair_to_freq contains -1 for a required pair");
     }
     return static_cast<std::size_t>(idx);
 }
 
 } // namespace
 
-MikxTensors build_mikx(const Tcl4Map& map,
-                       const TripleKernelSeries& kernels,
-                       std::size_t time_index)
+MikxTensors build_mikx_serial(const Tcl4Map& map,
+                              const TripleKernelSeries& kernels,
+                              std::size_t time_index)
 {
     MikxTensors tensors;
     tensors.N = map.N;
 
     if (map.N <= 0) {
-        throw std::invalid_argument("build_mikx: map.N must be > 0");
+        throw std::invalid_argument("build_mikx_serial: map.N must be > 0");
     }
 
     const std::size_t N = static_cast<std::size_t>(map.N);
@@ -53,7 +56,7 @@ MikxTensors build_mikx(const Tcl4Map& map,
     if (!kernels.F.empty() && !kernels.F.front().empty() && !kernels.F.front().front().empty()) {
         const auto& v = kernels.F.front().front().front();
         if (time_index >= static_cast<std::size_t>(v.size())) {
-            throw std::out_of_range("build_mikx: time_index out of range for kernel series");
+            throw std::out_of_range("build_mikx_serial: time_index out of range for kernel series");
         }
     }
 
@@ -90,9 +93,9 @@ MikxTensors build_mikx(const Tcl4Map& map,
                     const auto f_qj = freq_idx_checked(map.pair_to_freq, q, j);
 
                     // M = M1 - M2
-                    // M1(j,k,p,q) = A(j,k,j,q,p,j) -> F[f(j,k)][f(j,q)][f(p,j)]
+                    // M1(j,k,p,q) = A(j,q,j,k,p,j) -> F[f(j,q)][f(j,k)][f(p,j)]
                     // M2(j,k,p,q) = B(j,q,p,q,q,k) -> R[f(j,q)][f(p,q)][f(q,k)]
-                    std::complex<double> M1 = F[f_jk][f_jq][f_pj](static_cast<Eigen::Index>(time_index));
+                    std::complex<double> M1 = F[f_jq][f_jk][f_pj](static_cast<Eigen::Index>(time_index));
                     std::complex<double> M2 = R[f_jq][f_pq][f_qk](static_cast<Eigen::Index>(time_index));
                     tensors.M(row, col) = M1 - M2;
 

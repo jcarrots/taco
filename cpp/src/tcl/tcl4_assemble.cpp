@@ -12,9 +12,12 @@ inline std::size_t flat2(std::size_t N, int row, int col) {
 
 inline std::size_t flat6(std::size_t N, int j,int k,int p,int q,int r,int s) {
     const std::size_t NN = N;
-    return (((((static_cast<std::size_t>(j) * NN + static_cast<std::size_t>(k)) * NN
-                + static_cast<std::size_t>(p)) * NN + static_cast<std::size_t>(q)) * NN
-              + static_cast<std::size_t>(r)) * NN + static_cast<std::size_t>(s));
+    return static_cast<std::size_t>(j) +
+           NN * (static_cast<std::size_t>(k) +
+           NN * (static_cast<std::size_t>(p) +
+           NN * (static_cast<std::size_t>(q) +
+           NN * (static_cast<std::size_t>(r) +
+           NN * static_cast<std::size_t>(s)))));
 }
 } // namespace
 

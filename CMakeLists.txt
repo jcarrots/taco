@@ -10,6 +10,8 @@ include(FetchContent)
 
 # Optional: OpenMP for CPU parallelization
 option(TACO_WITH_OPENMP "Enable OpenMP parallelization" ON)
+option(TACO_BUILD_PYTHON "Build Python extension module" ON)
+option(TACO_BUILD_GAMMA_TESTS "Build gamma_tests executable" ON)
 
 # Fetch Eigen (header-only)
 FetchContent_Declare(
@@ -25,8 +27,10 @@ add_library(taco_tcl STATIC
   cpp/src/tcl/tcl4_assemble.cpp
   cpp/src/tcl/tcl4.cpp
   cpp/src/tcl/tcl2_generator.cpp
-  cpp/src/core/correlation.cpp
   cpp/src/tcl/generator.cpp
+  cpp/src/core/correlation.cpp
+  cpp/src/core/rk4_dense.cpp
+  cpp/src/core/version.cpp
 )
 target_include_directories(taco_tcl PUBLIC
   cpp/include
@@ -56,16 +60,29 @@ else()
   target_compile_options(taco_tcl PRIVATE -Wall -Wextra -Wpedantic)
 endif()
 
-# FFT backend: prefer pocketfft (BSD); fall back to built-in radix-2
-find_package(pocketfft CONFIG QUIET)
-if (TARGET pocketfft::pocketfft)
-  target_link_libraries(taco_tcl PRIVATE pocketfft::pocketfft)
-  target_compile_definitions(taco_tcl PRIVATE TACO_USE_POCKETFFT=1)
-elseif (EXISTS "${CMAKE_SOURCE_DIR}/third_party/pocketfft/pocketfft_hdronly.h")
-  target_include_directories(taco_tcl PRIVATE ${CMAKE_SOURCE_DIR}/third_party/pocketfft)
-  target_compile_definitions(taco_tcl PRIVATE TACO_USE_POCKETFFT=1)
-else()
-  message(STATUS "pocketfft not found; using built-in radix-2 FFT")
+# FFT backend: built-in radix-2 FFT (pocketfft disabled)
+
+if (TACO_BUILD_PYTHON)
+  find_package(Python COMPONENTS Interpreter Development REQUIRED)
+
+  FetchContent_Declare(
+    pybind11
+    GIT_REPOSITORY https://github.com/pybind/pybind11.git
+    GIT_TAG        v2.13.6
+  )
+  FetchContent_MakeAvailable(pybind11)
+
+  pybind11_add_module(_taco_native
+    cpp/python/_taco_native.cpp
+  )
+  target_link_libraries(_taco_native PRIVATE taco_tcl)
+
+  set_target_properties(taco_tcl PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
+  set_target_properties(_taco_native PROPERTIES
+    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/python/taco"
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/python/taco"
+  )
 endif()
 
 add_executable(tcl2_demo examples/tcl2_demo.cpp)
@@ -91,9 +108,9 @@ add_executable(integrator_tests tests/integrator_tests.cpp)
  target_include_directories(integrator_tests PRIVATE cpp/src)
  target_include_directories(integrator_tests PRIVATE cpp/include)
 
-
-add_executable(gamma_tests tests/gamma_tests.cpp)
- target_link_libraries(gamma_tests PRIVATE taco_tcl)
+add_executable(rk4_dense_tests tests/rk4_dense_tests.cpp)
+ target_link_libraries(rk4_dense_tests PRIVATE taco_tcl)
+ target_include_directories(rk4_dense_tests PRIVATE cpp/include)
 
 add_executable(spin_boson_tests tests/spin_boson_tests.cpp)
  target_link_libraries(spin_boson_tests PRIVATE taco_tcl)
@@ -103,12 +120,40 @@ add_executable(tcl4_tests tests/tcl4_tests.cpp)
  target_link_libraries(tcl4_tests PRIVATE taco_tcl)
  target_include_directories(tcl4_tests PRIVATE cpp/include)
 
-# Optional: Boost (header-only) for Ei in S(omega) analytic checks
-find_package(Boost QUIET)
-if (Boost_FOUND)
-  target_include_directories(gamma_tests PRIVATE ${Boost_INCLUDE_DIRS})
-  target_compile_definitions(gamma_tests PRIVATE HAS_BOOST_MATH=1)
-  message(STATUS "Boost found: enabling Ei-based S(omega) checks in gamma_tests")
-else()
-  message(STATUS "Boost not found: skipping Ei-based S(omega) checks in gamma_tests")
+add_executable(tcl4_mikx_tests cpp/tests/tcl4_mikx_tests.cpp)
+ target_link_libraries(tcl4_mikx_tests PRIVATE taco_tcl)
+ target_include_directories(tcl4_mikx_tests PRIVATE cpp/include)
+
+if (TACO_BUILD_GAMMA_TESTS)
+  add_executable(gamma_tests tests/gamma_tests.cpp)
+  target_link_libraries(gamma_tests PRIVATE taco_tcl)
+
+  # Optional: Boost (header-only) for Ei in S(omega) analytic checks
+  find_package(Boost QUIET)
+  if (Boost_FOUND)
+    target_include_directories(gamma_tests PRIVATE ${Boost_INCLUDE_DIRS})
+    target_compile_definitions(gamma_tests PRIVATE HAS_BOOST_MATH=1)
+    message(STATUS "Boost found: enabling Ei-based S(omega) checks in gamma_tests")
+  else()
+    message(STATUS "Boost not found: skipping Ei-based S(omega) checks in gamma_tests")
+  endif()
 endif()
+
+# Optional HDF5-based comparison tool for MATLAB exports.
+find_package(HDF5 COMPONENTS C QUIET)
+if (HDF5_FOUND)
+  add_executable(tcl4_h5_compare tests/tcl4_h5_compare.cpp)
+  target_link_libraries(tcl4_h5_compare PRIVATE taco_tcl)
+  target_include_directories(tcl4_h5_compare PRIVATE ${HDF5_INCLUDE_DIRS})
+  if (TARGET HDF5::C)
+    target_link_libraries(tcl4_h5_compare PRIVATE HDF5::C)
+  elseif (TARGET HDF5::HDF5)
+    target_link_libraries(tcl4_h5_compare PRIVATE HDF5::HDF5)
+  else()
+    target_link_libraries(tcl4_h5_compare PRIVATE ${HDF5_LIBRARIES})
+  endif()
+else()
+  message(STATUS "HDF5 not found; skipping tcl4_h5_compare")
+endif()
+
+

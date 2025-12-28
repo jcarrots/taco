@@ -1,11 +1,12 @@
 Backend scaffolding
 ===================
 
-This folder will host implementation files for parallel backends.
+This folder will host implementation files for execution backends.
 
-- cpu/: CPU parallel code paths (OpenMP/TBB) for TCL4 triple kernels and assembly.
-- gpu/: GPU implementations (cuFFT/cuBLAS/hipFFT/rocBLAS) for scalar F/C/R kernels.
-- hybrid/: Streaming/overlap utilities to pipeline GPU compute with CPU assembly.
+- serial/: single-thread CPU reference path.
+- omp/: shared-memory CPU parallelism (OpenMP/TBB).
+- cuda/: single-node GPU kernels (cuFFT/cuBLAS/hipFFT/rocBLAS).
+- mpi_omp/: distributed CPU (MPI + OpenMP).
+- mpi_cuda/: distributed GPU (MPI + CUDA).
 
-No code here yet — this is a placeholder to stage work without impacting the core.
-
+No code here yet - this is a placeholder to stage work without impacting the core.
