@@ -93,9 +93,9 @@ MikxTensors build_mikx_serial(const Tcl4Map& map,
                     const auto f_qj = freq_idx_checked(map.pair_to_freq, q, j);
 
                     // M = M1 - M2
-                    // M1(j,k,p,q) = A(j,k,j,q,p,j) -> F[f(j,k)][f(j,q)][f(p,j)]
+                    // M1(j,k,p,q) = A(j,q,j,k,p,j) -> F[f(j,q)][f(j,k)][f(p,j)]
                     // M2(j,k,p,q) = B(j,q,p,q,q,k) -> R[f(j,q)][f(p,q)][f(q,k)]
-                    std::complex<double> M1 = F[f_jk][f_jq][f_pj](static_cast<Eigen::Index>(time_index));
+                    std::complex<double> M1 = F[f_jq][f_jk][f_pj](static_cast<Eigen::Index>(time_index));
                     std::complex<double> M2 = R[f_jq][f_pq][f_qk](static_cast<Eigen::Index>(time_index));
                     tensors.M(row, col) = M1 - M2;
 

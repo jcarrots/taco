@@ -263,33 +263,27 @@ Frequency Buckets Symmetry
 TCL4 HDF5 Compare (MATLAB Benchmarks)
 -------------------------------------
 - Compare against MATLAB-exported HDF5: `tests/tcl4_h5_compare.cpp`.
-- Build: `cmake --build build --config Release --target tcl4_h5_compare`
-- List datasets: `build/Release/tcl4_h5_compare.exe --file=tests/tcl_test.h5 --list`
-  - Gt is the benchmark reference; compare in matrix mode using map/ij.
-    - Example (MATLAB column-major flatten, omega mapping):
-      - `build/Release/tcl4_h5_compare.exe --file=tests/tcl_test.h5 --compare-gt --gt-flat=col --gt-time=row --gt-map=omega --gamma-rule=rect`
-    - If the file was built using map/ij, use `--gt-map=ij`.
-    - If the file omegas are sorted (e.g., `[-1,0,1]`), use `--gt-omega-order=sorted`.
-    - If the file is row-major, use `--gt-flat=row`.
-    - If time is stored in columns (dataset dims `[flat_len, Nt]`), use `--gt-time=col` (default is row).
-  - If the file includes an extra leading sample, use `--gt-offset=1`.
-  - After Gt matches, compare GW (column-major flatten):
-    - `build/Release/tcl4_h5_compare.exe --file=tests/tcl_test.h5 --compare-gw --gw-flat=col --tidx=1 --one-based`
-    - Use `--gw-time=col` if GW time is stored in columns.
-  - Print MIKX tensors (M/I/K/X) for a specific time index:
-    - Computed kernels (from C(t)): `build/Release/tcl4_h5_compare.exe --file=tests/tcl_test.h5 --print-mikx --tidx=100`
-    - From file kernels (to match MATLAB exports): `build/Release/tcl4_h5_compare.exe --file=tests/tcl_test.h5 --print-mikx --mikx-source=file --fcr-time=first --fcr-order=col --fcr-omega-order=sorted --fcr-axes=0,1,2 --tidx=100`
-  - To compare kernels (F/C/R) against MATLAB exports:
-    - `build/Release/tcl4_h5_compare.exe --file=tests/tcl_test.h5 --compare-fcr --fcr-time=first --fcr-order=col --fcr-omega-order=sorted --fcr-axes=0,1,2 --tidx=0,1,10`
-  - Add `--print-fcr --fcr=f` (or `--fcr=c`, `--fcr=r`) to dump a single kernel slice at the requested time.
-  - Use `--fcr-omega=0` or `--fcr-ijk=i,j,k` to compare a single (i,j,k) triple.
-  - If the file orders omegas differently (e.g., sorted `[-1,0,1]`), use `--fcr-omega-order=sorted`.
-  - If file kernels are shifted in time, use `--fcr-offset=1` (or another offset).
-  - If the omega axes are permuted in the file, use `--fcr-axes=0,1,2` to map file axes to computed axes.
-  - If MATLAB wrote `Nt x nf x nf x nf` but the file reports `nf x nf x nf x Nt`, use `--fcr-time=first`.
-  - If the file data is row-major (C-style), use `--fcr-order=row` (default is column-major/MATLAB).
-  - To match MATLAB FFT padding (e.g., 8N), use `--fcr-fft-pad=8`.
+- Build: `cmake --build build-vcpkg-x64 --config Release --target tcl4_h5_compare`
+- List datasets: `build-vcpkg-x64/Release/tcl4_h5_compare.exe --file=tests/tcl_test.h5 --list`
+  - Recommended benchmark order:
+    - BCF (C(t)): the file is the reference input (`/bath/C`) used to build Gt and kernels; use `--list` to confirm `/params/*`, `/time/t`, and `/bath/C` shapes.
+    - Gt: benchmark reference (matrix mode over (j,k) using omegas from Bohr frequencies + `/map/ij`).
+      - `build-vcpkg-x64/Release/tcl4_h5_compare.exe --file=tests/tcl_test.h5 --compare-gt --gamma-rule=rect`
+      - Use `--gt-offset=1` if the file includes an extra leading sample.
+    - MIKX: inspect M/I/K/X at a specific time index.
+      - Computed (from `/bath/C` -> Gt -> F/C/R -> MIKX): `build-vcpkg-x64/Release/tcl4_h5_compare.exe --file=tests/tcl_test.h5 --print-mikx --tidx=100`
+      - Optional: compare F/C/R against MATLAB exports (debug step before GW):
+        - `build-vcpkg-x64/Release/tcl4_h5_compare.exe --file=tests/tcl_test.h5 --compare-fcr --tidx=0,1,10`
+        - Add `--print-fcr` to dump the full `F` slice at those time indices.
+        - Use `--fcr-offset=1` (or another offset) if file kernels are shifted in time.
+        - Use `--fcr-fft-pad=8` to match MATLAB convolution FFT padding (e.g., 8N).
+    - GW: end-to-end generator compare (Liouvillian assembled from computed MIKX).
+      - `build-vcpkg-x64/Release/tcl4_h5_compare.exe --file=tests/tcl_test.h5 --compare-gw --tidx=0,1,10,100,1000,last`
+    - Final TCL tensors (MATLAB-only postprocessing): the file may also include `/out/RedT_flat` and `/out/TCL_flat` (your MATLAB `RedT` and `TCL4T` exports).
+      - Inspect the raw matrices (4x4, printed in (row,col) order):
+        - `build-vcpkg-x64/Release/tcl4_h5_compare.exe --file=tests/tcl_test.h5 --print-redt --tidx=0,100,last`
+        - `build-vcpkg-x64/Release/tcl4_h5_compare.exe --file=tests/tcl_test.h5 --print-tcl --tidx=0,100,last`
 - To compare direct vs convolution methods (self-check, no HDF5 kernels needed):
-  - `build/Release/tcl4_h5_compare.exe --file=tests/tcl_test.h5 --compare-fcr-methods --fcr-nt=1024 --fcr-omega=0 --tidx=0,1,10`
+  - Build/run: `cmake --build build-vcpkg-x64 --config Release --target tcl4_tests` then `build-vcpkg-x64/Release/tcl4_tests.exe`
 
 
