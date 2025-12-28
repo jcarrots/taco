@@ -12,6 +12,8 @@ namespace {
 using Matrix = Eigen::MatrixXcd;
 using cd     = std::complex<double>;
 
+std::size_t g_fcr_fft_pad_factor = 0;
+
 // -------------------- Scalar helpers --------------------
 
 Eigen::VectorXcd prefix_int_left_vec(const Eigen::Ref<const Eigen::VectorXcd>& y,
@@ -36,7 +38,14 @@ Eigen::VectorXcd causal_conv_fft(const Eigen::Ref<const Eigen::VectorXcd>& f,
     if (N == 0) return out;
 
     const std::size_t L = 2 * N - 1;
-    std::size_t Nfft = bcf::next_pow2(L);
+    std::size_t Nfft = 0;
+    if (g_fcr_fft_pad_factor > 0) {
+        std::size_t target = g_fcr_fft_pad_factor * N;
+        if (target < L) target = L;
+        Nfft = bcf::next_pow2(target);
+    } else {
+        Nfft = bcf::next_pow2(L);
+    }
     if (Nfft < 2) Nfft = 2;
 
     std::vector<cd> F(Nfft, cd{0.0, 0.0});
@@ -131,6 +140,14 @@ Eigen::VectorXcd compute_R_series_convolution_vec(const Eigen::Ref<const Eigen::
 }
 
 } // namespace
+
+void set_fcr_fft_pad_factor(std::size_t factor) {
+    g_fcr_fft_pad_factor = factor;
+}
+
+std::size_t get_fcr_fft_pad_factor() {
+    return g_fcr_fft_pad_factor;
+}
 
 // --------------------- Scalar-series (1x1) direct builders ------------------
 Eigen::VectorXcd compute_F_series_direct(const Eigen::Ref<const Eigen::VectorXcd>& g1,

@@ -105,9 +105,12 @@ static void test_build_mikx_serial() {
     };
     auto flat6 = [&](int j, int k, int p, int q, int r, int s) {
         const std::size_t NN = static_cast<std::size_t>(N);
-        return (((((static_cast<std::size_t>(j) * NN + static_cast<std::size_t>(k)) * NN
-                    + static_cast<std::size_t>(p)) * NN + static_cast<std::size_t>(q)) * NN
-                  + static_cast<std::size_t>(r)) * NN + static_cast<std::size_t>(s));
+        return static_cast<std::size_t>(j) +
+               NN * (static_cast<std::size_t>(k) +
+               NN * (static_cast<std::size_t>(p) +
+               NN * (static_cast<std::size_t>(q) +
+               NN * (static_cast<std::size_t>(r) +
+               NN * static_cast<std::size_t>(s)))));
     };
 
     const double tol = 1e-12;

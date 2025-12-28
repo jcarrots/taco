@@ -1,8 +1,8 @@
 #include <Eigen/Dense>
 
 #include <algorithm>
-#include <complex>
 #include <cctype>
+#include <complex>
 #include <cmath>
 #include <iomanip>
 #include <iostream>
@@ -11,16 +11,16 @@
 #include <string>
 #include <vector>
 
-#include "taco/gamma.hpp"
 #include "taco/system.hpp"
 #include "taco/tcl4.hpp"
 #include "taco/tcl4_assemble.hpp"
 #include "taco/tcl4_mikx.hpp"
-#include "taco/correlation_fft.hpp"
 
 #include "hdf5.h"
 
 namespace {
+
+using cd = std::complex<double>;
 
 struct H5File {
     hid_t id{-1};
@@ -77,16 +77,6 @@ std::vector<hsize_t> squeeze_dims(const std::vector<hsize_t>& dims) {
     return out;
 }
 
-std::vector<std::size_t> squeezed_index_map(const std::vector<hsize_t>& dims) {
-    std::vector<std::size_t> map;
-    map.reserve(dims.size());
-    for (std::size_t i = 0; i < dims.size(); ++i) {
-        if (dims[i] != 1 || dims.size() == 1) map.push_back(i);
-    }
-    if (map.empty()) map.push_back(0);
-    return map;
-}
-
 std::size_t numel(const std::vector<hsize_t>& dims) {
     std::size_t n = 1;
     for (hsize_t d : dims) n *= static_cast<std::size_t>(d);
@@ -110,41 +100,20 @@ std::vector<T> read_array(hid_t file_id, const std::string& path, hid_t native_t
     return data;
 }
 
-template <typename T>
-std::vector<T> read_array_prefix_dim(hid_t file_id, const std::string& path, hid_t native_type,
-                                     std::size_t max_count, std::size_t dim,
-                                     std::vector<hsize_t>* dims_out) {
-    H5Dataset dset(H5Dopen2(file_id, path.c_str(), H5P_DEFAULT));
-    if (dset.id < 0) throw std::runtime_error("Failed to open dataset: " + path);
-    auto dims = get_dims(dset.id);
-    if (dims.empty()) throw std::runtime_error("Dataset has no dimensions: " + path);
-    if (dim >= dims.size()) throw std::runtime_error("Prefix dim out of range: " + path);
-    const hsize_t useN = static_cast<hsize_t>(std::min<std::size_t>(max_count, dims[dim]));
-    std::vector<hsize_t> count = dims;
-    count[dim] = useN;
-    std::vector<hsize_t> start(dims.size(), 0);
-    const std::size_t count_total = numel(count);
-    std::vector<T> data(count_total);
-    H5Space space(H5Dget_space(dset.id));
-    if (space.id < 0) throw std::runtime_error("Failed to get dataspace");
-    if (H5Sselect_hyperslab(space.id, H5S_SELECT_SET, start.data(), nullptr, count.data(), nullptr) < 0) {
-        throw std::runtime_error("Failed to select hyperslab: " + path);
-    }
-    H5Space memspace(H5Screate_simple(static_cast<int>(count.size()), count.data(), nullptr));
-    if (memspace.id < 0) throw std::runtime_error("Failed to create memspace");
-    if (count_total > 0) {
-        if (H5Dread(dset.id, native_type, memspace.id, space.id, H5P_DEFAULT, data.data()) < 0) {
-            throw std::runtime_error("Failed to read dataset: " + path);
-        }
-    }
-    if (dims_out) *dims_out = count;
-    return data;
-}
-
-template <typename T>
-std::vector<T> read_array_prefix(hid_t file_id, const std::string& path, hid_t native_type,
-                                 std::size_t max_first, std::vector<hsize_t>* dims_out) {
-    return read_array_prefix_dim<T>(file_id, path, native_type, max_first, 0, dims_out);
+std::vector<cd> read_complex_array(hid_t file_id,
+                                   const std::string& base,
+                                   std::vector<hsize_t>* dims_out) {
+    std::vector<hsize_t> dims_re;
+    std::vector<hsize_t> dims_im;
+    auto re = read_array<double>(file_id, base + "/re", H5T_NATIVE_DOUBLE, &dims_re);
+    auto im = read_array<double>(file_id, base + "/im", H5T_NATIVE_DOUBLE, &dims_im);
+    if (dims_re != dims_im) throw std::runtime_error("Complex dims mismatch at: " + base);
+    if (re.size() != im.size()) throw std::runtime_error("Complex size mismatch at: " + base);
+    std::vector<cd> out;
+    out.reserve(re.size());
+    for (std::size_t i = 0; i < re.size(); ++i) out.emplace_back(re[i], im[i]);
+    if (dims_out) *dims_out = dims_re;
+    return out;
 }
 
 double read_scalar_double(hid_t file_id, const std::string& path) {
@@ -154,76 +123,25 @@ double read_scalar_double(hid_t file_id, const std::string& path) {
     return data[0];
 }
 
-std::vector<std::complex<double>> read_complex_array(hid_t file_id,
-                                                     const std::string& base,
-                                                     std::vector<hsize_t>* dims_out) {
-    std::vector<hsize_t> dims_re;
-    std::vector<hsize_t> dims_im;
-    auto re = read_array<double>(file_id, base + "/re", H5T_NATIVE_DOUBLE, &dims_re);
-    auto im = read_array<double>(file_id, base + "/im", H5T_NATIVE_DOUBLE, &dims_im);
-    if (dims_re != dims_im) throw std::runtime_error("Complex dims mismatch at: " + base);
-    if (re.size() != im.size()) throw std::runtime_error("Complex size mismatch at: " + base);
-    std::vector<std::complex<double>> out;
-    out.reserve(re.size());
-    for (std::size_t i = 0; i < re.size(); ++i) out.emplace_back(re[i], im[i]);
-    if (dims_out) *dims_out = dims_re;
-    return out;
-}
-
-std::vector<std::complex<double>> read_complex_array_prefix(hid_t file_id,
-                                                            const std::string& base,
-                                                            std::size_t max_first,
-                                                            std::vector<hsize_t>* dims_out) {
-    std::vector<hsize_t> dims_re;
-    std::vector<hsize_t> dims_im;
-    auto re = read_array_prefix<double>(file_id, base + "/re", H5T_NATIVE_DOUBLE, max_first, &dims_re);
-    auto im = read_array_prefix<double>(file_id, base + "/im", H5T_NATIVE_DOUBLE, max_first, &dims_im);
-    if (dims_re != dims_im) throw std::runtime_error("Complex dims mismatch at: " + base);
-    if (re.size() != im.size()) throw std::runtime_error("Complex size mismatch at: " + base);
-    std::vector<std::complex<double>> out;
-    out.reserve(re.size());
-    for (std::size_t i = 0; i < re.size(); ++i) out.emplace_back(re[i], im[i]);
-    if (dims_out) *dims_out = dims_re;
-    return out;
-}
-
-std::vector<std::complex<double>> read_complex_array_prefix_dim(hid_t file_id,
-                                                                const std::string& base,
-                                                                std::size_t max_count,
-                                                                std::size_t dim,
-                                                                std::vector<hsize_t>* dims_out) {
-    std::vector<hsize_t> dims_re;
-    std::vector<hsize_t> dims_im;
-    auto re = read_array_prefix_dim<double>(file_id, base + "/re", H5T_NATIVE_DOUBLE, max_count, dim, &dims_re);
-    auto im = read_array_prefix_dim<double>(file_id, base + "/im", H5T_NATIVE_DOUBLE, max_count, dim, &dims_im);
-    if (dims_re != dims_im) throw std::runtime_error("Complex dims mismatch at: " + base);
-    if (re.size() != im.size()) throw std::runtime_error("Complex size mismatch at: " + base);
-    std::vector<std::complex<double>> out;
-    out.reserve(re.size());
-    for (std::size_t i = 0; i < re.size(); ++i) out.emplace_back(re[i], im[i]);
-    if (dims_out) *dims_out = dims_re;
-    return out;
-}
-
-Eigen::MatrixXcd to_matrix_colmajor(const std::vector<std::complex<double>>& data,
-                                    std::size_t rows,
-                                    std::size_t cols) {
-    if (data.size() != rows * cols) {
-        throw std::runtime_error("Matrix size mismatch");
+std::string dims_to_string(const std::vector<hsize_t>& dims) {
+    std::ostringstream oss;
+    oss << "[";
+    for (std::size_t i = 0; i < dims.size(); ++i) {
+        if (i) oss << ",";
+        oss << dims[i];
     }
-    using MapMat = Eigen::Map<const Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic, Eigen::ColMajor>>;
-    MapMat map(data.data(), static_cast<Eigen::Index>(rows), static_cast<Eigen::Index>(cols));
-    return Eigen::MatrixXcd(map);
+    oss << "]";
+    return oss.str();
 }
 
-std::complex<double> at_colmajor_2d(const std::vector<std::complex<double>>& data,
+std::complex<double> at_colmajor_2d(const std::vector<cd>& data,
                                     const std::vector<hsize_t>& dims,
                                     std::size_t row,
                                     std::size_t col) {
     return data[row + static_cast<std::size_t>(dims[0]) * col];
 }
 
-std::complex<double> at_colmajor_3d(const std::vector<std::complex<double>>& data,
+std::complex<double> at_colmajor_3d(const std::vector<cd>& data,
                                     const std::vector<hsize_t>& dims,
                                     std::size_t i0,
                                     std::size_t i1,
@@ -233,7 +151,7 @@ std::complex<double> at_colmajor_3d(const std::vector<std::complex<double>>& dat
     return data[i0 + d0 * (i1 + d1 * i2)];
 }
 
-std::complex<double> at_colmajor_4d(const std::vector<std::complex<double>>& data,
+std::complex<double> at_colmajor_4d(const std::vector<cd>& data,
                                     const std::vector<hsize_t>& dims,
                                     std::size_t i0,
                                     std::size_t i1,
@@ -245,455 +163,16 @@ std::complex<double> at_colmajor_4d(const std::vector<std::complex<double>>& dat
     return data[i0 + d0 * (i1 + d1 * (i2 + d2 * i3))];
 }
 
-std::string dims_to_string(const std::vector<hsize_t>& dims) {
-    std::ostringstream os;
-    os << "[";
-    for (std::size_t i = 0; i < dims.size(); ++i) {
-        if (i) os << ",";
-        os << dims[i];
-    }
-    os << "]";
-    return os.str();
-}
-
-std::vector<hsize_t> reverse_dims(const std::vector<hsize_t>& dims) {
-    std::vector<hsize_t> out = dims;
-    std::reverse(out.begin(), out.end());
-    return out;
-}
-
-enum class GammaRule {
-    Trapz,
-    Left,
-    Right,
-    Rect
-};
-
-enum class GwBasis {
-    Pair,
-    Omega
-};
-
-enum class GtMode {
-    Auto,
-    Omega,
-    Matrix
-};
-
-double coth_stable(double x) {
-    if (x < 1e-8) return 1.0 / x;
-    if (x > 20.0) return 1.0;
-    const double e2x = std::exp(2.0 * x);
-    return (e2x + 1.0) / (e2x - 1.0);
-}
-
-std::vector<std::complex<double>> bcf_fft_ohmic_simple(double beta,
-                                                       double dt,
-                                                       std::size_t Nt_time,
-                                                       double omegac,
-                                                       std::size_t pad_factor,
-                                                       bool use_pow2) {
-    using cd = std::complex<double>;
-    if (!(beta > 0.0)) throw std::invalid_argument("bcf_fft_ohmic_simple: beta must be > 0");
-    if (!(dt > 0.0)) throw std::invalid_argument("bcf_fft_ohmic_simple: dt must be > 0");
-    if (!(omegac > 0.0)) throw std::invalid_argument("bcf_fft_ohmic_simple: omegac must be > 0");
-
-    std::size_t Nfft = 2;
-    if (Nt_time > 1) {
-        Nfft = std::max<std::size_t>(2, pad_factor * (Nt_time - 1));
-    }
-    if (use_pow2) {
-        Nfft = bcf::next_pow2(Nfft);
-    }
-    if (Nfft % 2 != 0) ++Nfft;
-    if (!use_pow2) {
-        if ((Nfft & (Nfft - 1)) != 0) {
-            throw std::invalid_argument("bcf_fft_ohmic_simple: Nfft must be power-of-two when use_pow2=false");
-        }
-    }
-
-    const double pi = bcf::PI;
-    const double domega = 2.0 * pi / (static_cast<double>(Nfft) * dt);
-    const std::size_t wpos_len = Nfft / 2 + 1;
-
-    std::vector<double> wpos(wpos_len, 0.0);
-    for (std::size_t k = 0; k < wpos_len; ++k) wpos[k] = static_cast<double>(k) * domega;
-
-    std::vector<cd> Spos(wpos_len, cd{0.0, 0.0});
-    Spos[0] = cd{pi / (2.0 * beta), 0.0};
-    if (wpos_len > 2) {
-        for (std::size_t k = 1; k + 1 < wpos_len; ++k) {
-            const double w = wpos[k];
-            const double num = w * std::exp(-w / omegac);
-            const double den = 1.0 - std::exp(-beta * w);
-            Spos[k] = cd{(pi / 2.0) * (num / den), 0.0};
-        }
-    }
-    const double wNyq = wpos[wpos_len - 1];
-    const double x = 0.5 * beta * wNyq;
-    const double cothv = coth_stable(x);
-    Spos[wpos_len - 1] = cd{0.25 * pi * wNyq * std::exp(-wNyq / omegac) * cothv, 0.0};
-
-    std::vector<cd> S(Nfft, cd{0.0, 0.0});
-    for (std::size_t k = 0; k < wpos_len; ++k) S[k] = Spos[k];
-    if (Nfft / 2 > 1) {
-        for (std::size_t k = 1; k + 1 < wpos_len; ++k) {
-            const double kms = std::exp(-beta * wpos[k]);
-            S[Nfft - k] = Spos[k] * kms;
-        }
-    }
-
-    bcf::FFTPlan plan(Nfft);
-    plan.exec_forward(S);
-    const double scale = domega / pi;
-
-    std::vector<cd> C(Nt_time, cd{0.0, 0.0});
-    for (std::size_t n = 0; n < Nt_time; ++n) {
-        C[n] = S[n] * scale;
-    }
-    return C;
-}
-
-Eigen::MatrixXcd compute_gamma_prefix_matrix(const std::vector<std::complex<double>>& C,
-                                             double dt,
-                                             const std::vector<double>& omegas,
-                                             GammaRule rule) {
-    const std::size_t N = C.size();
-    const std::size_t M = omegas.size();
-    if (N == 0 || M == 0 || !(dt > 0.0)) return Eigen::MatrixXcd();
-    Eigen::MatrixXcd G(static_cast<Eigen::Index>(N), static_cast<Eigen::Index>(M));
-    G.row(0).setZero();
-    const std::complex<double> half_dt(dt / 2.0, 0.0);
-    for (std::size_t j = 0; j < M; ++j) {
-        const std::complex<double> step = std::exp(std::complex<double>{0.0, omegas[j] * dt});
-        std::complex<double> phi(1.0, 0.0);
-        std::complex<double> acc(0.0, 0.0);
-        if (rule == GammaRule::Rect) {
-            acc += dt * phi * C[0];
-            G(static_cast<Eigen::Index>(0), static_cast<Eigen::Index>(j)) = acc;
-        }
-        for (std::size_t k = 1; k < N; ++k) {
-            const auto phi_next = phi * step;
-            switch (rule) {
-                case GammaRule::Left:
-                    acc += dt * phi * C[k - 1];
-                    break;
-                case GammaRule::Right:
-                    acc += dt * phi_next * C[k];
-                    break;
-                case GammaRule::Rect:
-                    acc += dt * phi_next * C[k];
-                    break;
-                case GammaRule::Trapz:
-                default:
-                    acc += half_dt * (phi * C[k - 1] + phi_next * C[k]);
-                    break;
-            }
-            G(static_cast<Eigen::Index>(k), static_cast<Eigen::Index>(j)) = acc;
-            phi = phi_next;
-        }
-    }
-    return G;
-}
-
-std::vector<int> build_pair_to_bucket_by_omega(const taco::sys::BohrFrequencies& bf,
-                                               const std::vector<double>& omegas,
-                                               double tol,
-                                               std::vector<int>* bucket_to_pair_out,
-                                               std::vector<double>* pair_omega_out) {
-    const std::size_t N = bf.dim;
-    const std::size_t N2 = N * N;
-    std::vector<int> pair_to_bucket(N2, -1);
-    if (bucket_to_pair_out) bucket_to_pair_out->assign(omegas.size(), -1);
-    if (pair_omega_out) pair_omega_out->assign(N2, 0.0);
-    std::vector<char> used(omegas.size(), 0);
-
-    for (std::size_t idx = 0; idx < N2; ++idx) {
-        const std::size_t n = idx % N;
-        const std::size_t m = idx / N;
-        const double w = bf.omega(static_cast<Eigen::Index>(n), static_cast<Eigen::Index>(m));
-        if (pair_omega_out) (*pair_omega_out)[idx] = w;
-        int best = -1;
-        for (std::size_t b = 0; b < omegas.size(); ++b) {
-            if (std::abs(omegas[b] - w) <= tol && !used[b]) {
-                best = static_cast<int>(b);
-                break;
-            }
-        }
-        if (best < 0) {
-            for (std::size_t b = 0; b < omegas.size(); ++b) {
-                if (std::abs(omegas[b] - w) <= tol) {
-                    best = static_cast<int>(b);
-                    break;
-                }
-            }
-        }
-        pair_to_bucket[idx] = best;
-        if (best >= 0 && best < static_cast<int>(omegas.size()) && !used[best]) {
-            used[best] = 1;
-            if (bucket_to_pair_out) (*bucket_to_pair_out)[best] = static_cast<int>(idx);
-        }
-    }
-    return pair_to_bucket;
-}
-
-struct GwLayout {
-    enum class Mode {
-        FlatTimeRow,
-        FlatTimeCol,
-        MatTimeFirst,
-        MatTimeMiddle,
-        MatTimeLast
-    };
-    Mode mode{Mode::FlatTimeRow};
-    std::vector<hsize_t> dims;
-    std::size_t Nt{0};
-    std::size_t time_dim{0};
-    bool row_major_flat{true};
-};
-
-GwLayout infer_gw_layout(const std::vector<hsize_t>& dims, std::size_t N2) {
-    const std::size_t flat_len = N2 * N2;
-    GwLayout layout;
-    layout.dims = dims;
-    if (dims.size() == 2) {
-        if (static_cast<std::size_t>(dims[1]) == flat_len) {
-            layout.mode = GwLayout::Mode::FlatTimeRow;
-            layout.Nt = static_cast<std::size_t>(dims[0]);
-            layout.time_dim = 0;
-            return layout;
-        }
-        if (static_cast<std::size_t>(dims[0]) == flat_len) {
-            layout.mode = GwLayout::Mode::FlatTimeCol;
-            layout.Nt = static_cast<std::size_t>(dims[1]);
-            layout.time_dim = 1;
-            return layout;
-        }
-    } else if (dims.size() == 3) {
-        const std::size_t d0 = static_cast<std::size_t>(dims[0]);
-        const std::size_t d1 = static_cast<std::size_t>(dims[1]);
-        const std::size_t d2 = static_cast<std::size_t>(dims[2]);
-        if (d0 == N2 && d1 == N2) {
-            layout.mode = GwLayout::Mode::MatTimeLast;
-            layout.Nt = d2;
-            layout.time_dim = 2;
-            return layout;
-        }
-        if (d1 == N2 && d2 == N2) {
-            layout.mode = GwLayout::Mode::MatTimeFirst;
-            layout.Nt = d0;
-            layout.time_dim = 0;
-            return layout;
-        }
-        if (d0 == N2 && d2 == N2) {
-            layout.mode = GwLayout::Mode::MatTimeMiddle;
-            layout.Nt = d1;
-            layout.time_dim = 1;
-            return layout;
-        }
-    }
-    throw std::runtime_error("Unsupported GW_flat dims: " + dims_to_string(dims));
-}
-
-std::complex<double> gw_value(const GwLayout& layout,
-                              const std::vector<std::complex<double>>& data,
-                              std::size_t tidx,
-                              std::size_t row,
-                              std::size_t col,
-                              std::size_t N2) {
-    const std::size_t flat_idx = layout.row_major_flat ? (row * N2 + col)
-                                                       : (col * N2 + row);
-    switch (layout.mode) {
-        case GwLayout::Mode::FlatTimeRow:
-            return at_colmajor_2d(data, layout.dims, tidx, flat_idx);
-        case GwLayout::Mode::FlatTimeCol:
-            return at_colmajor_2d(data, layout.dims, flat_idx, tidx);
-        case GwLayout::Mode::MatTimeLast:
-            return at_colmajor_3d(data, layout.dims, row, col, tidx);
-        case GwLayout::Mode::MatTimeFirst:
-            return at_colmajor_3d(data, layout.dims, tidx, row, col);
-        case GwLayout::Mode::MatTimeMiddle:
-            return at_colmajor_3d(data, layout.dims, row, tidx, col);
-    }
-    return std::complex<double>(0.0, 0.0);
-}
-
-struct MatLayout {
-    enum class Mode {
-        FlatTimeRow,
-        FlatTimeCol,
-        MatTimeFirst,
-        MatTimeMiddle,
-        MatTimeLast
-    };
-    Mode mode{Mode::FlatTimeRow};
-    std::vector<hsize_t> dims;
-    std::size_t Nt{0};
-    std::size_t time_dim{0};
-    bool row_major_flat{true};
-};
-
-MatLayout infer_mat_layout(const std::vector<hsize_t>& dims,
-                           std::size_t rows,
-                           std::size_t cols) {
-    const std::size_t flat_len = rows * cols;
-    MatLayout layout;
-    layout.dims = dims;
-    if (dims.size() == 2) {
-        if (static_cast<std::size_t>(dims[1]) == flat_len) {
-            layout.mode = MatLayout::Mode::FlatTimeRow;
-            layout.Nt = static_cast<std::size_t>(dims[0]);
-            layout.time_dim = 0;
-            return layout;
-        }
-        if (static_cast<std::size_t>(dims[0]) == flat_len) {
-            layout.mode = MatLayout::Mode::FlatTimeCol;
-            layout.Nt = static_cast<std::size_t>(dims[1]);
-            layout.time_dim = 1;
-            return layout;
-        }
-    } else if (dims.size() == 3) {
-        const std::size_t d0 = static_cast<std::size_t>(dims[0]);
-        const std::size_t d1 = static_cast<std::size_t>(dims[1]);
-        const std::size_t d2 = static_cast<std::size_t>(dims[2]);
-        if (d0 == rows && d1 == cols) {
-            layout.mode = MatLayout::Mode::MatTimeLast;
-            layout.Nt = d2;
-            layout.time_dim = 2;
-            return layout;
-        }
-        if (d1 == rows && d2 == cols) {
-            layout.mode = MatLayout::Mode::MatTimeFirst;
-            layout.Nt = d0;
-            layout.time_dim = 0;
-            return layout;
-        }
-        if (d0 == rows && d2 == cols) {
-            layout.mode = MatLayout::Mode::MatTimeMiddle;
-            layout.Nt = d1;
-            layout.time_dim = 1;
-            return layout;
-        }
-    }
-    throw std::runtime_error("Unsupported matrix dims: " + dims_to_string(dims));
-}
-
-std::complex<double> mat_value(const MatLayout& layout,
-                               const std::vector<std::complex<double>>& data,
-                               std::size_t tidx,
-                               std::size_t row,
-                               std::size_t col,
-                               std::size_t rows,
-                               std::size_t cols) {
-    const std::size_t flat_idx = layout.row_major_flat ? (row * cols + col)
-                                                       : (col * rows + row);
-    switch (layout.mode) {
-        case MatLayout::Mode::FlatTimeRow:
-            return at_colmajor_2d(data, layout.dims, tidx, flat_idx);
-        case MatLayout::Mode::FlatTimeCol:
-            return at_colmajor_2d(data, layout.dims, flat_idx, tidx);
-        case MatLayout::Mode::MatTimeLast:
-            return at_colmajor_3d(data, layout.dims, row, col, tidx);
-        case MatLayout::Mode::MatTimeFirst:
-            return at_colmajor_3d(data, layout.dims, tidx, row, col);
-        case MatLayout::Mode::MatTimeMiddle:
-            return at_colmajor_3d(data, layout.dims, row, tidx, col);
-    }
-    return std::complex<double>(0.0, 0.0);
-}
-
-struct GtSeriesLayout {
-    std::vector<hsize_t> dims;
-    std::size_t nf{0};
-    std::size_t time_dim{0};
-};
-
-std::complex<double> gt_series_value(const GtSeriesLayout& layout,
-                                     const std::vector<std::complex<double>>& data,
-                                     std::size_t tidx,
-                                     std::size_t bucket) {
-    if (layout.time_dim == 0) {
-        return at_colmajor_2d(data, layout.dims, tidx, bucket);
-    }
-    return at_colmajor_2d(data, layout.dims, bucket, tidx);
-}
-
-struct FcrLayout {
-    enum class Mode {
-        TimeFirst,
-        TimeLast
-    };
-    Mode mode{Mode::TimeFirst};
-    std::vector<hsize_t> dims;
-    std::size_t Nt{0};
-    std::size_t time_dim{0};
-};
-
-FcrLayout infer_fcr_layout(const std::vector<hsize_t>& dims, std::size_t nf) {
-    if (dims.size() != 4) {
-        throw std::runtime_error("Unsupported F/C/R dims: " + dims_to_string(dims));
-    }
-    FcrLayout layout;
-    layout.dims = dims;
-    if (static_cast<std::size_t>(dims[1]) == nf &&
-        static_cast<std::size_t>(dims[2]) == nf &&
-        static_cast<std::size_t>(dims[3]) == nf) {
-        layout.mode = FcrLayout::Mode::TimeFirst;
-        layout.Nt = static_cast<std::size_t>(dims[0]);
-        layout.time_dim = 0;
-        return layout;
-    }
-    if (static_cast<std::size_t>(dims[0]) == nf &&
-        static_cast<std::size_t>(dims[1]) == nf &&
-        static_cast<std::size_t>(dims[2]) == nf) {
-        layout.mode = FcrLayout::Mode::TimeLast;
-        layout.Nt = static_cast<std::size_t>(dims[3]);
-        layout.time_dim = 3;
-        return layout;
-    }
-    throw std::runtime_error("Unsupported F/C/R dims: " + dims_to_string(dims));
-}
-
-std::complex<double> fcr_value(const FcrLayout& layout,
-                               const std::vector<std::complex<double>>& data,
-                               std::size_t tidx,
-                               std::size_t i,
-                               std::size_t j,
-                               std::size_t k) {
-    if (layout.mode == FcrLayout::Mode::TimeFirst) {
-        return at_colmajor_4d(data, layout.dims, tidx, i, j, k);
-    }
-    return at_colmajor_4d(data, layout.dims, i, j, k, tidx);
-}
-
-long long detect_ij_base(const std::vector<long long>& map_ij, std::size_t nf) {
-    if (map_ij.empty()) return 0;
-    long long min_ij = *std::min_element(map_ij.begin(), map_ij.end());
-    long long max_ij = *std::max_element(map_ij.begin(), map_ij.end());
-    if (min_ij >= 1 && max_ij <= static_cast<long long>(nf)) return 1;
-    if (min_ij >= 0 && max_ij <= static_cast<long long>(nf) - 1) return 0;
-    // Heuristic for 1-based with trailing zeros (or 0-based with sparse negatives not expected)
-    if (min_ij == 0 && max_ij == static_cast<long long>(nf)) return 1;
-    return -1;
-}
-
-std::string trim_copy(const std::string& s) {
-    std::size_t start = 0;
-    while (start < s.size() && std::isspace(static_cast<unsigned char>(s[start]))) ++start;
-    std::size_t end = s.size();
-    while (end > start && std::isspace(static_cast<unsigned char>(s[end - 1]))) --end;
-    return s.substr(start, end - start);
-}
-
-std::vector<std::string> split_csv(const std::string& s) {
-    std::vector<std::string> out;
-    std::stringstream ss(s);
-    std::string item;
-    while (std::getline(ss, item, ',')) {
-        item = trim_copy(item);
-        if (!item.empty()) out.push_back(item);
-    }
-    return out;
+std::complex<double> at_rowmajor_4d(const std::vector<cd>& data,
+                                    const std::vector<hsize_t>& dims,
+                                    std::size_t i0,
+                                    std::size_t i1,
+                                    std::size_t i2,
+                                    std::size_t i3) {
+    const std::size_t d1 = static_cast<std::size_t>(dims[1]);
+    const std::size_t d2 = static_cast<std::size_t>(dims[2]);
+    const std::size_t d3 = static_cast<std::size_t>(dims[3]);
+    return data[(((i0 * d1) + i1) * d2 + i2) * d3 + i3];
 }
 
 struct DatasetInfo {
@@ -732,11 +211,7 @@ struct ErrSummary {
     bool ok{true};
 };
 
-void update_err(ErrSummary& s,
-                const std::complex<double>& got,
-                const std::complex<double>& expect,
-                double atol,
-                double rtol) {
+void update_err(ErrSummary& s, const cd& got, const cd& expect, double atol, double rtol) {
     const double diff = std::abs(got - expect);
     const double rel = diff / std::max(1.0, std::abs(expect));
     s.max_abs = std::max(s.max_abs, diff);
@@ -744,772 +219,1460 @@ void update_err(ErrSummary& s,
     if (diff > atol + rtol * std::max(1.0, std::abs(expect))) s.ok = false;
 }
 
+enum class GammaRule {
+    Rect,
+    Trapz
+};
+
+Eigen::MatrixXcd compute_gamma_prefix_matrix(const std::vector<cd>& C,
+                                             double dt,
+                                             const std::vector<double>& omegas,
+                                             GammaRule rule) {
+    const std::size_t N = C.size();
+    const std::size_t M = omegas.size();
+    if (N == 0 || M == 0 || !(dt > 0.0)) return Eigen::MatrixXcd();
+    Eigen::MatrixXcd G(static_cast<Eigen::Index>(N), static_cast<Eigen::Index>(M));
+    G.row(0).setZero();
+    const cd half_dt(dt / 2.0, 0.0);
+    for (std::size_t j = 0; j < M; ++j) {
+        const cd step = std::exp(cd{0.0, omegas[j] * dt});
+        cd phi(1.0, 0.0);
+        cd acc(0.0, 0.0);
+        if (rule == GammaRule::Rect) {
+            acc += dt * phi * C[0];
+            G(static_cast<Eigen::Index>(0), static_cast<Eigen::Index>(j)) = acc;
+        }
+        for (std::size_t k = 1; k < N; ++k) {
+            const cd phi_next = phi * step;
+            if (rule == GammaRule::Trapz) {
+                acc += half_dt * (phi * C[k - 1] + phi_next * C[k]);
+            } else {
+                acc += dt * phi_next * C[k];
+            }
+            G(static_cast<Eigen::Index>(k), static_cast<Eigen::Index>(j)) = acc;
+            phi = phi_next;
+        }
+    }
+    return G;
+}
+
+long long detect_ij_base(const std::vector<long long>& map_ij, std::size_t nf) {
+    if (map_ij.empty()) return 0;
+    const long long min_ij = *std::min_element(map_ij.begin(), map_ij.end());
+    const long long max_ij = *std::max_element(map_ij.begin(), map_ij.end());
+    if (min_ij >= 1 && max_ij <= static_cast<long long>(nf)) return 1;
+    if (min_ij >= 0 && max_ij <= static_cast<long long>(nf) - 1) return 0;
+    if (min_ij == 0 && max_ij == static_cast<long long>(nf)) return 1;
+    return -1;
+}
+
+struct MatrixSeriesLayout {
+    enum class Mode {
+        FlatTimeRow,
+        FlatTimeCol,
+        MatTimeFirst,
+        MatTimeMiddle,
+        MatTimeLast
+    };
+    Mode mode{Mode::FlatTimeRow};
+    std::vector<hsize_t> dims;
+    std::size_t Nt{0};
+    bool row_major_flat{true};
+    bool transpose{false};
+};
+
+MatrixSeriesLayout infer_matrix_series_layout(const std::vector<hsize_t>& dims,
+                                              std::size_t rows,
+                                              std::size_t cols,
+                                              bool row_major_flat,
+                                              int time_dim) {
+    const std::size_t flat_len = rows * cols;
+    MatrixSeriesLayout layout;
+    layout.dims = dims;
+    layout.row_major_flat = row_major_flat;
+    layout.transpose = false;
+    if (dims.size() == 2) {
+        const std::size_t d0 = static_cast<std::size_t>(dims[0]);
+        const std::size_t d1 = static_cast<std::size_t>(dims[1]);
+        if (time_dim == 0) {
+            layout.mode = MatrixSeriesLayout::Mode::FlatTimeRow;
+            if (d1 == flat_len) {
+                layout.Nt = d0;
+                return layout;
+            }
+            if (d0 == flat_len) {
+                layout.Nt = d1;
+                layout.transpose = true;
+                return layout;
+            }
+            throw std::runtime_error("Flat dataset has unexpected dims for time=row: " +
+                                     dims_to_string(dims));
+        }
+        if (time_dim == 1) {
+            layout.mode = MatrixSeriesLayout::Mode::FlatTimeCol;
+            if (d0 == flat_len) {
+                layout.Nt = d1;
+                return layout;
+            }
+            if (d1 == flat_len) {
+                layout.Nt = d0;
+                layout.transpose = true;
+                return layout;
+            }
+            throw std::runtime_error("Flat dataset has unexpected dims for time=col: " +
+                                     dims_to_string(dims));
+        }
+        if (d1 == flat_len) {
+            layout.mode = MatrixSeriesLayout::Mode::FlatTimeRow;
+            layout.Nt = d0;
+            return layout;
+        }
+        if (d0 == flat_len) {
+            layout.mode = MatrixSeriesLayout::Mode::FlatTimeCol;
+            layout.Nt = d1;
+            return layout;
+        }
+    } else if (dims.size() == 3) {
+        if (time_dim >= 0) {
+            throw std::runtime_error("time=row/col override only applies to flat datasets");
+        }
+        const std::size_t d0 = static_cast<std::size_t>(dims[0]);
+        const std::size_t d1 = static_cast<std::size_t>(dims[1]);
+        const std::size_t d2 = static_cast<std::size_t>(dims[2]);
+        if (d0 == rows && d1 == cols) {
+            layout.mode = MatrixSeriesLayout::Mode::MatTimeLast;
+            layout.Nt = d2;
+            return layout;
+        }
+        if (d1 == rows && d2 == cols) {
+            layout.mode = MatrixSeriesLayout::Mode::MatTimeFirst;
+            layout.Nt = d0;
+            return layout;
+        }
+        if (d0 == rows && d2 == cols) {
+            layout.mode = MatrixSeriesLayout::Mode::MatTimeMiddle;
+            layout.Nt = d1;
+            return layout;
+        }
+    }
+    throw std::runtime_error("Unsupported matrix dims: " + dims_to_string(dims));
+}
+
+cd matrix_series_value(const MatrixSeriesLayout& layout,
+                       const std::vector<cd>& data,
+                       std::size_t tidx,
+                       std::size_t row,
+                       std::size_t col,
+                       std::size_t rows,
+                       std::size_t cols) {
+    const std::size_t flat_idx = layout.row_major_flat ? (row * cols + col)
+                                                       : (col * rows + row);
+    std::vector<hsize_t> dims_use = layout.dims;
+    if (layout.transpose && dims_use.size() == 2) {
+        std::swap(dims_use[0], dims_use[1]);
+    }
+    switch (layout.mode) {
+        case MatrixSeriesLayout::Mode::FlatTimeRow:
+            return at_colmajor_2d(data, dims_use, tidx, flat_idx);
+        case MatrixSeriesLayout::Mode::FlatTimeCol:
+            return at_colmajor_2d(data, dims_use, flat_idx, tidx);
+        case MatrixSeriesLayout::Mode::MatTimeLast:
+            return at_colmajor_3d(data, dims_use, row, col, tidx);
+        case MatrixSeriesLayout::Mode::MatTimeFirst:
+            return at_colmajor_3d(data, dims_use, tidx, row, col);
+        case MatrixSeriesLayout::Mode::MatTimeMiddle:
+            return at_colmajor_3d(data, dims_use, row, tidx, col);
+    }
+    return cd{0.0, 0.0};
+}
+
+struct KernelSeriesLayout {
+    enum class TimeMode {
+        First,
+        Last
+    };
+    std::vector<hsize_t> dims;
+    std::size_t Nt{0};
+    TimeMode time_mode{TimeMode::Last};
+    bool transpose{false};
+    bool row_major{false};
+};
+
+KernelSeriesLayout infer_kernel_series_layout(const std::vector<hsize_t>& dims,
+                                              std::size_t nf,
+                                              int time_dim,
+                                              bool row_major) {
+    if (dims.size() != 4) {
+        throw std::runtime_error("Kernel dataset must be rank-4: " + dims_to_string(dims));
+    }
+    const std::size_t d0 = static_cast<std::size_t>(dims[0]);
+    const std::size_t d1 = static_cast<std::size_t>(dims[1]);
+    const std::size_t d2 = static_cast<std::size_t>(dims[2]);
+    const std::size_t d3 = static_cast<std::size_t>(dims[3]);
+    KernelSeriesLayout layout;
+    layout.dims = dims;
+    layout.transpose = false;
+    layout.row_major = row_major;
+    if (time_dim == 0) {
+        layout.time_mode = KernelSeriesLayout::TimeMode::First;
+        if (d1 == nf && d2 == nf && d3 == nf) {
+            layout.Nt = d0;
+            return layout;
+        }
+        if (d0 == nf && d1 == nf && d2 == nf) {
+            layout.Nt = d3;
+            layout.transpose = true;
+            return layout;
+        }
+        throw std::runtime_error("Kernel dims do not match nf for time=first: " + dims_to_string(dims));
+    }
+    if (time_dim == 1) {
+        layout.time_mode = KernelSeriesLayout::TimeMode::Last;
+        if (d0 == nf && d1 == nf && d2 == nf) {
+            layout.Nt = d3;
+            return layout;
+        }
+        if (d1 == nf && d2 == nf && d3 == nf) {
+            layout.Nt = d0;
+            layout.transpose = true;
+            return layout;
+        }
+        throw std::runtime_error("Kernel dims do not match nf for time=last: " + dims_to_string(dims));
+    }
+    if (d0 == nf && d1 == nf && d2 == nf) {
+        layout.time_mode = KernelSeriesLayout::TimeMode::Last;
+        layout.Nt = d3;
+        return layout;
+    }
+    if (d1 == nf && d2 == nf && d3 == nf) {
+        layout.time_mode = KernelSeriesLayout::TimeMode::First;
+        layout.Nt = d0;
+        return layout;
+    }
+    throw std::runtime_error("Kernel dims do not match nf: " + dims_to_string(dims));
+}
+
+std::vector<hsize_t> reverse_dims_copy(const std::vector<hsize_t>& dims) {
+    std::vector<hsize_t> out = dims;
+    std::reverse(out.begin(), out.end());
+    return out;
+}
+
+cd kernel_series_value(const KernelSeriesLayout& layout,
+                       const std::vector<cd>& data,
+                       std::size_t tidx,
+                       std::size_t i,
+                       std::size_t j,
+                       std::size_t k) {
+    const auto dims_use = layout.transpose ? reverse_dims_copy(layout.dims) : layout.dims;
+    switch (layout.time_mode) {
+        case KernelSeriesLayout::TimeMode::Last:
+            return layout.row_major
+                ? at_rowmajor_4d(data, dims_use, i, j, k, tidx)
+                : at_colmajor_4d(data, dims_use, i, j, k, tidx);
+        case KernelSeriesLayout::TimeMode::First:
+            return layout.row_major
+                ? at_rowmajor_4d(data, dims_use, tidx, i, j, k)
+                : at_colmajor_4d(data, dims_use, tidx, i, j, k);
+    }
+    return cd{0.0, 0.0};
+}
+
+std::string trim_copy(const std::string& s) {
+    std::size_t start = 0;
+    while (start < s.size() && std::isspace(static_cast<unsigned char>(s[start]))) ++start;
+    std::size_t end = s.size();
+    while (end > start && std::isspace(static_cast<unsigned char>(s[end - 1]))) --end;
+    return s.substr(start, end - start);
+}
+
+std::string lower_copy(const std::string& s) {
+    std::string out = s;
+    std::transform(out.begin(), out.end(), out.begin(),
+                   [](unsigned char c){ return static_cast<char>(std::tolower(c)); });
+    return out;
+}
+
+std::vector<std::string> split_csv(const std::string& s) {
+    std::vector<std::string> out;
+    std::stringstream ss(s);
+    std::string item;
+    while (std::getline(ss, item, ',')) {
+        item = trim_copy(item);
+        if (!item.empty()) out.push_back(item);
+    }
+    return out;
+}
+
+std::vector<std::size_t> resolve_tidx_list(const std::vector<std::string>& tokens,
+                                           std::size_t Nt,
+                                           bool one_based) {
+    std::vector<std::size_t> out;
+    for (const auto& tok : tokens) {
+        std::size_t idx = 0;
+        if (tok == "mid") {
+            idx = Nt / 2;
+        } else if (tok == "last") {
+            if (Nt == 0) throw std::runtime_error("Nt is zero");
+            idx = Nt - 1;
+        } else {
+            long long val = std::stoll(tok);
+            if (one_based) val -= 1;
+            if (val < 0) throw std::runtime_error("tidx must be >= 0");
+            idx = static_cast<std::size_t>(val);
+        }
+        if (idx >= Nt) {
+            std::ostringstream msg;
+            msg << "tidx out of range: " << idx << " (Nt=" << Nt << ")";
+            throw std::runtime_error(msg.str());
+        }
+        if (std::find(out.begin(), out.end(), idx) == out.end()) {
+            out.push_back(idx);
+        }
+    }
+    return out;
+}
+
+std::vector<int> build_pair_to_bucket_by_omega(const taco::sys::BohrFrequencies& bf,
+                                               const std::vector<double>& omegas,
+                                               std::size_t N,
+                                               double tol,
+                                               bool row_major_flat) {
+    const std::size_t N2 = N * N;
+    std::vector<int> pair_to_bucket(N2, -1);
+    std::vector<char> used(omegas.size(), 0);
+    auto assign_bucket = [&](std::size_t idx, double w) {
+        int first_match = -1;
+        int free_match = -1;
+        for (std::size_t b = 0; b < omegas.size(); ++b) {
+            if (std::abs(omegas[b] - w) <= tol) {
+                if (first_match < 0) first_match = static_cast<int>(b);
+                if (!used[b]) {
+                    free_match = static_cast<int>(b);
+                    break;
+                }
+            }
+        }
+        int pick = (free_match >= 0) ? free_match : first_match;
+        if (pick >= 0) {
+            pair_to_bucket[idx] = pick;
+            if (!used[static_cast<std::size_t>(pick)]) used[static_cast<std::size_t>(pick)] = 1;
+        }
+    };
+
+    if (row_major_flat) {
+        for (std::size_t j = 0; j < N; ++j) {
+            for (std::size_t k = 0; k < N; ++k) {
+                const std::size_t idx = j + N * k;
+                assign_bucket(idx, bf.omega(static_cast<int>(j), static_cast<int>(k)));
+            }
+        }
+    } else {
+        for (std::size_t k = 0; k < N; ++k) {
+            for (std::size_t j = 0; j < N; ++j) {
+                const std::size_t idx = j + N * k;
+                assign_bucket(idx, bf.omega(static_cast<int>(j), static_cast<int>(k)));
+            }
+        }
+    }
+    return pair_to_bucket;
+}
+
+std::vector<int> build_omega_index_map(const std::vector<double>& from_omegas,
+                                       const std::vector<double>& to_omegas,
+                                       double tol) {
+    std::vector<int> out(from_omegas.size(), -1);
+    std::vector<char> used(to_omegas.size(), 0);
+    for (std::size_t i = 0; i < from_omegas.size(); ++i) {
+        int first_match = -1;
+        int free_match = -1;
+        for (std::size_t j = 0; j < to_omegas.size(); ++j) {
+            if (std::abs(from_omegas[i] - to_omegas[j]) <= tol) {
+                if (first_match < 0) first_match = static_cast<int>(j);
+                if (!used[j]) {
+                    free_match = static_cast<int>(j);
+                    break;
+                }
+            }
+        }
+        int pick = (free_match >= 0) ? free_match : first_match;
+        if (pick >= 0) {
+            out[i] = pick;
+            if (!used[static_cast<std::size_t>(pick)]) used[static_cast<std::size_t>(pick)] = 1;
+        }
+    }
+    return out;
+}
+
+taco::sys::FrequencyIndex build_frequency_index_from_map(const std::vector<double>& omegas,
+                                                         const std::vector<long long>& map_ij,
+                                                         long long map_base,
+                                                         std::size_t N,
+                                                         double tol) {
+    taco::sys::FrequencyIndex fidx;
+    fidx.tol = std::max(1e-12, tol);
+    fidx.buckets.resize(omegas.size());
+    for (std::size_t b = 0; b < omegas.size(); ++b) {
+        fidx.buckets[b].omega = omegas[b];
+    }
+    for (std::size_t j = 0; j < N; ++j) {
+        for (std::size_t k = 0; k < N; ++k) {
+            const std::size_t idx = j + N * k;
+            const long long b = map_ij[idx] - map_base;
+            if (b < 0 || b >= static_cast<long long>(omegas.size())) {
+                throw std::runtime_error("map/ij index out of range for omegas");
+            }
+            fidx.buckets[static_cast<std::size_t>(b)].pairs.emplace_back(static_cast<int>(j),
+                                                                         static_cast<int>(k));
+        }
+    }
+    return fidx;
+}
+
+struct Options {
+    std::string file{"tests/tcl_test.h5"};
+    std::string tidx_list{"0,mid,last"};
+    bool one_based{false};
+    bool compare_gt{false};
+    bool compare_gw{false};
+    bool compare_fcr{false};
+    bool compare_fcr_methods{false};
+    bool list{false};
+    bool dump_map{false};
+    bool print_gt{false};
+    bool print_gw{false};
+    bool print_fcr{false};
+    bool print_mikx{false};
+    std::size_t fcr_fft_pad{0};
+    enum class OmegaOrder {
+        File,
+        Sorted
+    };
+    enum class MikxSource {
+        Computed,
+        File
+    };
+    OmegaOrder fcr_omega_order{OmegaOrder::File};
+    OmegaOrder gt_omega_order{OmegaOrder::File};
+    MikxSource mikx_source{MikxSource::Computed};
+    std::array<int, 3> fcr_axes{0, 1, 2};
+    bool fcr_row_major{false};
+    enum class FcrWhich {
+        All,
+        F,
+        C,
+        R
+    };
+    FcrWhich fcr_which{FcrWhich::All};
+    bool fcr_filter_enabled{false};
+    bool fcr_filter_by_omega{false};
+    std::array<int, 3> fcr_ijk{0, 0, 0};
+    std::array<double, 3> fcr_omega{0.0, 0.0, 0.0};
+    std::size_t fcr_nt{0};
+    std::size_t fcr_offset{0};
+    int fcr_time_dim{-1};          // -1=auto, 0=first, 1=last
+    double atol{1e-6};
+    double rtol{1e-6};
+    std::size_t gt_offset{0};
+    bool gt_row_major_flat{false};  // column-major flatten by default
+    bool gw_row_major_flat{false};  // column-major flatten by default
+    int gt_time_dim{0};             // 0=row, 1=col, -1=auto
+    int gw_time_dim{0};             // 0=row, 1=col, -1=auto
+    GammaRule gamma_rule{GammaRule::Rect};
+    double gamma_sign{1.0};
+    double omega_tol{1e-9};
+    enum class GtMapMode {
+        Omega,
+        Ij
+    };
+    GtMapMode gt_map_mode{GtMapMode::Omega};
+    taco::tcl4::FCRMethod method{taco::tcl4::FCRMethod::Convolution};
+};
+
 void print_usage() {
     std::cout
         << "Usage: tcl4_h5_compare.exe [--file=PATH] [--tidx=LIST] [--one-based]\n"
-        << "                           [--method=direct|convolution] [--atol=VAL] [--rtol=VAL]\n"
-        << "                           [--compare-fcr] [--nt=COUNT] [--list] [--matlab|--no-matlab]\n"
-        << "                           [--gamma-sign=+1|-1] [--gamma-rule=trapz|left|right|rect]\n"
-        << "                           [--gw-flat=row|col] [--gw-basis=pair|omega]\n"
-        << "                           [--gw-omega=VAL] [--omega-tol=VAL] [--dump-map]\n"
-        << "                           [--compare-bcf] [--bcf-pad=N] [--bcf-pow2=0|1] [--bcf-nt=COUNT]\n"
-        << "                           [--compare-gt] [--gt-mode=auto|omega|matrix] [--gt-omega=VAL]\n"
-        << "                           [--gt-time-dim=0|1]\n"
-        << "                           [--gt-offset=N] [--print-gt]\n"
-        << "Defaults: file=tests/tcl_test.h5, tidx=0,mid,last, method=convolution\n";
+        << "                           [--compare-gt] [--compare-gw] [--compare-fcr]\n"
+        << "                           [--compare-fcr-methods] [--gt-offset=N]\n"
+        << "                           [--gamma-rule=rect|trapz] [--gamma-sign=+1|-1]\n"
+        << "                           [--gt-flat=row|col] [--gt-time=row|col|auto]\n"
+        << "                           [--gt-map=omega|ij] [--gt-omega-order=file|sorted]\n"
+        << "                           [--omega-tol=VAL]\n"
+        << "                           [--gw-flat=row|col] [--gw-time=row|col|auto]\n"
+        << "                           [--method=direct|convolution]\n"
+        << "                           [--atol=VAL] [--rtol=VAL]\n"
+        << "                           [--list] [--dump-map] [--print-gt] [--print-gw] [--print-fcr] [--print-mikx]\n"
+        << "                           [--mikx-source=file|computed]\n"
+        << "                           [--fcr=all|f|c|r] [--fcr-ijk=i,j,k] [--fcr-omega=w|w1,w2,w3]\n"
+        << "                           [--fcr-omega-order=file|sorted] [--fcr-offset=N]\n"
+        << "                           [--fcr-time=first|last|auto] [--fcr-axes=0,1,2]\n"
+        << "                           [--fcr-order=row|col]\n"
+        << "                           [--fcr-nt=COUNT] [--fcr-fft-pad=N]\n"
+        << "Defaults: file=tests/tcl_test.h5, tidx=0,mid,last, gamma-rule=rect, gt-time=row, gw-time=row\n";
 }
 
 } // namespace
 
 int main(int argc, char** argv) {
-    std::string file = "tests/tcl_test.h5";
-    std::vector<std::string> tidx_tokens;
-    bool one_based = false;
-    bool compare_fcr = false;
-    double atol = 1e-8;
-    double rtol = 1e-6;
-    std::size_t max_steps = 0;
-    bool list_only = false;
-    bool matlab_order = false;
-    double gamma_sign = 1.0;
-    GammaRule gamma_rule = GammaRule::Trapz;
-    bool gw_row_major = true;
-    GwBasis gw_basis = GwBasis::Pair;
-    GtMode gt_mode = GtMode::Auto;
-    bool use_gw_omega_filter = false;
-    double gw_omega_target = 0.0;
-    double omega_tol = 1e-9;
-    bool dump_map = false;
-    bool compare_bcf = false;
-    std::size_t bcf_pad = 10;
-    bool bcf_pow2 = true;
-    std::size_t bcf_nt = 0;
-    bool compare_gt = false;
-    std::size_t gt_offset = 0;
-    bool print_gt = false;
-    bool use_gt_omega_filter = false;
-    double gt_omega_target = 0.0;
-    int gt_time_dim_override = -1;
-    auto method = taco::tcl4::FCRMethod::Convolution;
-
-    for (int i = 1; i < argc; ++i) {
-        std::string arg(argv[i]);
-        if (arg == "--help" || arg == "-h") {
-            print_usage();
-            return 0;
-        }
-        if (arg.rfind("--file=", 0) == 0) {
-            file = arg.substr(7);
-            continue;
-        }
-        if (arg.rfind("--tidx=", 0) == 0) {
-            tidx_tokens = split_csv(arg.substr(7));
-            continue;
-        }
-        if (arg == "--one-based") {
-            one_based = true;
-            continue;
-        }
-        if (arg.rfind("--method=", 0) == 0) {
-            const std::string val = arg.substr(9);
-            if (val == "direct") method = taco::tcl4::FCRMethod::Direct;
-            else method = taco::tcl4::FCRMethod::Convolution;
-            continue;
-        }
-        if (arg.rfind("--atol=", 0) == 0) {
-            atol = std::stod(arg.substr(7));
-            continue;
-        }
-        if (arg.rfind("--rtol=", 0) == 0) {
-            rtol = std::stod(arg.substr(7));
-            continue;
-        }
-        if (arg == "--compare-fcr") {
-            compare_fcr = true;
-            continue;
-        }
-        if (arg == "--matlab") {
-            matlab_order = true;
-            continue;
-        }
-        if (arg == "--no-matlab") {
-            matlab_order = false;
-            continue;
-        }
-        if (arg.rfind("--gamma-sign=", 0) == 0) {
-            gamma_sign = std::stod(arg.substr(13));
-            if (gamma_sign != 1.0 && gamma_sign != -1.0) {
-                std::cerr << "gamma-sign must be +1 or -1\n";
-                return 2;
-            }
-            continue;
-        }
-        if (arg.rfind("--gamma-rule=", 0) == 0) {
-            const std::string val = arg.substr(13);
-            if (val == "left") gamma_rule = GammaRule::Left;
-            else if (val == "right") gamma_rule = GammaRule::Right;
-            else if (val == "rect") gamma_rule = GammaRule::Rect;
-            else gamma_rule = GammaRule::Trapz;
-            continue;
-        }
-        if (arg.rfind("--gw-flat=", 0) == 0) {
-            const std::string val = arg.substr(10);
-            if (val == "col") gw_row_major = false;
-            else gw_row_major = true;
-            continue;
-        }
-        if (arg.rfind("--gw-basis=", 0) == 0) {
-            const std::string val = arg.substr(11);
-            if (val == "omega") gw_basis = GwBasis::Omega;
-            else gw_basis = GwBasis::Pair;
-            continue;
-        }
-        if (arg.rfind("--gt-mode=", 0) == 0) {
-            const std::string val = arg.substr(10);
-            if (val == "omega") gt_mode = GtMode::Omega;
-            else if (val == "matrix") gt_mode = GtMode::Matrix;
-            else gt_mode = GtMode::Auto;
-            continue;
-        }
-        if (arg.rfind("--gw-omega=", 0) == 0) {
-            gw_omega_target = std::stod(arg.substr(11));
-            use_gw_omega_filter = true;
-            continue;
-        }
-        if (arg.rfind("--gt-omega=", 0) == 0) {
-            gt_omega_target = std::stod(arg.substr(11));
-            use_gt_omega_filter = true;
-            continue;
-        }
-        if (arg.rfind("--gt-time-dim=", 0) == 0) {
-            gt_time_dim_override = std::stoi(arg.substr(14));
-            if (gt_time_dim_override != 0 && gt_time_dim_override != 1) {
-                std::cerr << "gt-time-dim must be 0 or 1\n";
-                return 2;
-            }
-            continue;
-        }
-        if (arg.rfind("--omega-tol=", 0) == 0) {
-            omega_tol = std::stod(arg.substr(12));
-            continue;
-        }
-        if (arg == "--dump-map") {
-            dump_map = true;
-            continue;
-        }
-        if (arg == "--compare-bcf") {
-            compare_bcf = true;
-            continue;
-        }
-        if (arg == "--compare-gt") {
-            compare_gt = true;
-            continue;
-        }
-        if (arg.rfind("--gt-offset=", 0) == 0) {
-            gt_offset = static_cast<std::size_t>(std::stoull(arg.substr(12)));
-            continue;
-        }
-        if (arg == "--print-gt") {
-            print_gt = true;
-            continue;
-        }
-        if (arg.rfind("--bcf-pad=", 0) == 0) {
-            bcf_pad = static_cast<std::size_t>(std::stoull(arg.substr(10)));
-            continue;
-        }
-        if (arg.rfind("--bcf-pow2=", 0) == 0) {
-            bcf_pow2 = (std::stoi(arg.substr(11)) != 0);
-            continue;
-        }
-        if (arg.rfind("--bcf-nt=", 0) == 0) {
-            bcf_nt = static_cast<std::size_t>(std::stoull(arg.substr(9)));
-            continue;
-        }
-        if (arg.rfind("--nt=", 0) == 0) {
-            max_steps = static_cast<std::size_t>(std::stoull(arg.substr(5)));
-            continue;
-        }
-        if (arg == "--list") {
-            list_only = true;
-            continue;
-        }
-        std::cerr << "Unknown arg: " << arg << "\n";
-        print_usage();
-        return 2;
-    }
-
-    H5Eset_auto2(H5E_DEFAULT, nullptr, nullptr);
-
     try {
-        H5File h5(file);
-        if (list_only) {
-            auto datasets = list_datasets(h5.id);
-            std::sort(datasets.begin(), datasets.end(),
-                      [](const DatasetInfo& a, const DatasetInfo& b) { return a.path < b.path; });
-            for (const auto& d : datasets) {
+        Options opt;
+        bool compare_flag_seen = false;
+        for (int i = 1; i < argc; ++i) {
+            std::string arg = argv[i];
+            if (arg == "--help" || arg == "-h") {
+                print_usage();
+                return 0;
+            }
+            if (arg.rfind("--file=", 0) == 0) {
+                opt.file = arg.substr(7);
+                continue;
+            }
+            if (arg.rfind("--tidx=", 0) == 0) {
+                opt.tidx_list = arg.substr(7);
+                continue;
+            }
+            if (arg == "--one-based") {
+                opt.one_based = true;
+                continue;
+            }
+            if (arg == "--compare-gt") {
+                opt.compare_gt = true;
+                compare_flag_seen = true;
+                continue;
+            }
+            if (arg == "--compare-gw") {
+                opt.compare_gw = true;
+                compare_flag_seen = true;
+                continue;
+            }
+            if (arg == "--compare-fcr") {
+                opt.compare_fcr = true;
+                compare_flag_seen = true;
+                continue;
+            }
+            if (arg == "--compare-fcr-methods") {
+                opt.compare_fcr_methods = true;
+                compare_flag_seen = true;
+                continue;
+            }
+            if (arg.rfind("--gt-offset=", 0) == 0) {
+                opt.gt_offset = static_cast<std::size_t>(std::stoull(arg.substr(12)));
+                continue;
+            }
+            if (arg.rfind("--gamma-rule=", 0) == 0) {
+                const std::string val = arg.substr(13);
+                if (val == "trapz") opt.gamma_rule = GammaRule::Trapz;
+                else opt.gamma_rule = GammaRule::Rect;
+                continue;
+            }
+            if (arg.rfind("--gamma-sign=", 0) == 0) {
+                opt.gamma_sign = std::stod(arg.substr(13));
+                if (opt.gamma_sign != 1.0 && opt.gamma_sign != -1.0) {
+                    std::cerr << "gamma-sign must be +1 or -1\n";
+                    return 1;
+                }
+                continue;
+            }
+            if (arg.rfind("--gt-flat=", 0) == 0) {
+                const std::string val = arg.substr(10);
+                opt.gt_row_major_flat = (val == "row");
+                continue;
+            }
+            if (arg.rfind("--gt-time=", 0) == 0) {
+                const std::string val = arg.substr(10);
+                if (val == "auto") opt.gt_time_dim = -1;
+                else if (val == "col") opt.gt_time_dim = 1;
+                else opt.gt_time_dim = 0;
+                continue;
+            }
+            if (arg.rfind("--gt-map=", 0) == 0) {
+                const std::string val = arg.substr(9);
+                if (val == "ij") opt.gt_map_mode = Options::GtMapMode::Ij;
+                else opt.gt_map_mode = Options::GtMapMode::Omega;
+                continue;
+            }
+            if (arg.rfind("--gt-omega-order=", 0) == 0) {
+                const std::string val = lower_copy(arg.substr(17));
+                if (val == "sorted") opt.gt_omega_order = Options::OmegaOrder::Sorted;
+                else opt.gt_omega_order = Options::OmegaOrder::File;
+                continue;
+            }
+            if (arg.rfind("--omega-tol=", 0) == 0) {
+                opt.omega_tol = std::stod(arg.substr(12));
+                continue;
+            }
+            if (arg.rfind("--gw-flat=", 0) == 0) {
+                const std::string val = arg.substr(10);
+                opt.gw_row_major_flat = (val != "col");
+                continue;
+            }
+            if (arg.rfind("--gw-time=", 0) == 0) {
+                const std::string val = arg.substr(10);
+                if (val == "auto") opt.gw_time_dim = -1;
+                else if (val == "col") opt.gw_time_dim = 1;
+                else opt.gw_time_dim = 0;
+                continue;
+            }
+            if (arg.rfind("--method=", 0) == 0) {
+                const std::string val = arg.substr(9);
+                if (val == "direct") opt.method = taco::tcl4::FCRMethod::Direct;
+                else opt.method = taco::tcl4::FCRMethod::Convolution;
+                continue;
+            }
+            if (arg.rfind("--atol=", 0) == 0) {
+                opt.atol = std::stod(arg.substr(7));
+                continue;
+            }
+            if (arg.rfind("--rtol=", 0) == 0) {
+                opt.rtol = std::stod(arg.substr(7));
+                continue;
+            }
+            if (arg == "--list") {
+                opt.list = true;
+                continue;
+            }
+            if (arg == "--dump-map") {
+                opt.dump_map = true;
+                continue;
+            }
+            if (arg == "--print-gt") {
+                opt.print_gt = true;
+                continue;
+            }
+            if (arg == "--print-gw") {
+                opt.print_gw = true;
+                continue;
+            }
+            if (arg == "--print-fcr") {
+                opt.print_fcr = true;
+                continue;
+            }
+            if (arg == "--print-mikx") {
+                opt.print_mikx = true;
+                compare_flag_seen = true;
+                continue;
+            }
+            if (arg.rfind("--mikx-source=", 0) == 0) {
+                const std::string val = lower_copy(arg.substr(14));
+                if (val == "file") opt.mikx_source = Options::MikxSource::File;
+                else opt.mikx_source = Options::MikxSource::Computed;
+                continue;
+            }
+            if (arg.rfind("--fcr=", 0) == 0) {
+                const std::string val = lower_copy(arg.substr(6));
+                if (val == "f") opt.fcr_which = Options::FcrWhich::F;
+                else if (val == "c") opt.fcr_which = Options::FcrWhich::C;
+                else if (val == "r") opt.fcr_which = Options::FcrWhich::R;
+                else opt.fcr_which = Options::FcrWhich::All;
+                continue;
+            }
+            if (arg.rfind("--fcr-ijk=", 0) == 0) {
+                auto tokens = split_csv(arg.substr(10));
+                if (tokens.size() == 1) {
+                    const int v = std::stoi(tokens[0]);
+                    opt.fcr_ijk = {v, v, v};
+                } else if (tokens.size() == 3) {
+                    opt.fcr_ijk = {std::stoi(tokens[0]), std::stoi(tokens[1]), std::stoi(tokens[2])};
+                } else {
+                    throw std::runtime_error("fcr-ijk expects 1 or 3 comma-separated values");
+                }
+                opt.fcr_filter_enabled = true;
+                continue;
+            }
+            if (arg.rfind("--fcr-omega=", 0) == 0) {
+                auto tokens = split_csv(arg.substr(12));
+                if (tokens.size() == 1) {
+                    const double w = std::stod(tokens[0]);
+                    opt.fcr_omega = {w, w, w};
+                } else if (tokens.size() == 3) {
+                    opt.fcr_omega = {std::stod(tokens[0]), std::stod(tokens[1]), std::stod(tokens[2])};
+                } else {
+                    throw std::runtime_error("fcr-omega expects 1 or 3 comma-separated values");
+                }
+                opt.fcr_filter_by_omega = true;
+                continue;
+            }
+            if (arg.rfind("--fcr-omega-order=", 0) == 0) {
+                const std::string val = lower_copy(arg.substr(18));
+                if (val == "sorted") opt.fcr_omega_order = Options::OmegaOrder::Sorted;
+                else opt.fcr_omega_order = Options::OmegaOrder::File;
+                continue;
+            }
+            if (arg.rfind("--fcr-offset=", 0) == 0) {
+                opt.fcr_offset = static_cast<std::size_t>(std::stoull(arg.substr(13)));
+                continue;
+            }
+            if (arg.rfind("--fcr-time=", 0) == 0) {
+                const std::string val = lower_copy(arg.substr(11));
+                if (val == "first") opt.fcr_time_dim = 0;
+                else if (val == "last") opt.fcr_time_dim = 1;
+                else opt.fcr_time_dim = -1;
+                continue;
+            }
+            if (arg.rfind("--fcr-order=", 0) == 0) {
+                const std::string val = lower_copy(arg.substr(12));
+                opt.fcr_row_major = (val == "row");
+                continue;
+            }
+            if (arg.rfind("--fcr-axes=", 0) == 0) {
+                auto tokens = split_csv(arg.substr(11));
+                if (tokens.size() != 3) {
+                    throw std::runtime_error("fcr-axes expects 3 comma-separated values");
+                }
+                std::array<int, 3> axes{
+                    std::stoi(tokens[0]),
+                    std::stoi(tokens[1]),
+                    std::stoi(tokens[2])
+                };
+                std::array<bool, 3> seen{false, false, false};
+                for (int v : axes) {
+                    if (v < 0 || v > 2) {
+                        throw std::runtime_error("fcr-axes values must be 0,1,2");
+                    }
+                    if (seen[static_cast<std::size_t>(v)]) {
+                        throw std::runtime_error("fcr-axes must be a permutation of 0,1,2");
+                    }
+                    seen[static_cast<std::size_t>(v)] = true;
+                }
+                opt.fcr_axes = axes;
+                continue;
+            }
+            if (arg.rfind("--fcr-nt=", 0) == 0) {
+                opt.fcr_nt = static_cast<std::size_t>(std::stoull(arg.substr(9)));
+                continue;
+            }
+            if (arg.rfind("--fcr-fft-pad=", 0) == 0) {
+                opt.fcr_fft_pad = static_cast<std::size_t>(std::stoull(arg.substr(14)));
+                continue;
+            }
+            std::cerr << "Unknown argument: " << arg << "\n";
+            print_usage();
+            return 1;
+        }
+        if (!compare_flag_seen) {
+            opt.compare_gt = true;
+        }
+
+        H5File h5(opt.file);
+
+        if (opt.list) {
+            auto info = list_datasets(h5.id);
+            for (const auto& d : info) {
                 std::cout << d.path << " dims=" << dims_to_string(d.dims) << "\n";
             }
-            return 0;
-        }
-        if (!dataset_exists(h5.id, "/params/dt")) {
-            throw std::runtime_error("Missing /params/dt in HDF5");
         }
 
         const double dt = read_scalar_double(h5.id, "/params/dt");
 
-        std::vector<hsize_t> dims_H;
-        auto Hc = read_complex_array(h5.id, "/system/H", &dims_H);
-        auto H_dims = squeeze_dims(dims_H);
-        if (H_dims.size() != 2) throw std::runtime_error("system/H is not 2D");
-        Eigen::MatrixXcd H = to_matrix_colmajor(Hc, H_dims[0], H_dims[1]);
-
-        std::vector<hsize_t> dims_A;
-        auto Ac = read_complex_array(h5.id, "/system/A", &dims_A);
-        auto A_dims = squeeze_dims(dims_A);
-        if (A_dims.size() != 2) throw std::runtime_error("system/A is not 2D");
-        Eigen::MatrixXcd A_eig = to_matrix_colmajor(Ac, A_dims[0], A_dims[1]);
-
-        Eigen::VectorXd eig_vals;
-        if (dataset_exists(h5.id, "/system/Eig/re")) {
-            std::vector<hsize_t> dims_E;
-            auto Ec = read_complex_array(h5.id, "/system/Eig", &dims_E);
-            auto E_dims = squeeze_dims(dims_E);
-            const std::size_t En = numel(E_dims);
-            eig_vals.resize(static_cast<Eigen::Index>(En));
-            for (std::size_t i = 0; i < En; ++i) eig_vals(static_cast<Eigen::Index>(i)) = Ec[i].real();
+        if (!dataset_exists(h5.id, "/bath/C/re")) {
+            throw std::runtime_error("/bath/C not found in file");
         }
-
-        if (dump_map) {
-            std::cout << "H (re):\n";
-            for (Eigen::Index r = 0; r < H.rows(); ++r) {
-                for (Eigen::Index c = 0; c < H.cols(); ++c) {
-                    std::cout << H(r, c).real() << (c + 1 < H.cols() ? " " : "");
-                }
-                std::cout << "\n";
-            }
-            std::cout << "A (re):\n";
-            for (Eigen::Index r = 0; r < A_eig.rows(); ++r) {
-                for (Eigen::Index c = 0; c < A_eig.cols(); ++c) {
-                    std::cout << A_eig(r, c).real() << (c + 1 < A_eig.cols() ? " " : "");
-                }
-                std::cout << "\n";
-            }
-        }
-
-        std::vector<double> map_omegas;
-        std::vector<long long> map_ij;
-        bool have_map = false;
-        if (dataset_exists(h5.id, "/map/omegas") && dataset_exists(h5.id, "/map/ij")) {
-            std::vector<hsize_t> dims_om;
-            map_omegas = read_array<double>(h5.id, "/map/omegas", H5T_NATIVE_DOUBLE, &dims_om);
-            std::vector<hsize_t> dims_ij;
-            map_ij = read_array<long long>(h5.id, "/map/ij", H5T_NATIVE_LLONG, &dims_ij);
-            have_map = !map_omegas.empty() && !map_ij.empty();
-        }
-
-        taco::sys::System system;
-        if (eig_vals.size() > 0) {
-            const std::size_t En = static_cast<std::size_t>(eig_vals.size());
-            if (H.rows() != static_cast<Eigen::Index>(En) || H.cols() != static_cast<Eigen::Index>(En)) {
-                throw std::runtime_error("system/Eig size does not match system/H");
-            }
-            system.eig.dim = En;
-            system.eig.eps = eig_vals;
-            system.eig.U = Eigen::MatrixXcd::Identity(static_cast<Eigen::Index>(En), static_cast<Eigen::Index>(En));
-            system.eig.U_dag = system.eig.U;
-        } else {
-            system.eig = taco::sys::Eigensystem(H);
-        }
-        system.bf = taco::sys::BohrFrequencies(system.eig.eps);
-        if (have_map) {
-            const std::size_t N = static_cast<std::size_t>(H.rows());
-            const std::size_t nf = map_omegas.size();
-            if (map_ij.size() != N * N) {
-                throw std::runtime_error("map/ij length does not match N^2");
-            }
-            long long base = detect_ij_base(map_ij, nf);
-            if (base < 0) {
-                std::ostringstream msg;
-                msg << "map/ij values must be 0..nf-1 or 1..nf (min="
-                    << *std::min_element(map_ij.begin(), map_ij.end())
-                    << ", max=" << *std::max_element(map_ij.begin(), map_ij.end())
-                    << ", nf=" << nf << ")";
-                throw std::runtime_error(msg.str());
-            }
-
-            if (dump_map) {
-                if (eig_vals.size() > 0) {
-                    std::cout << "eig:";
-                    for (Eigen::Index i = 0; i < eig_vals.size(); ++i) {
-                        std::cout << " " << eig_vals(i);
-                    }
-                    std::cout << "\n";
-                }
-                std::cout << "map.omegas:";
-                for (double w : map_omegas) std::cout << " " << w;
-                std::cout << "\nmap.ij (raw):\n";
-                for (std::size_t j = 0; j < N; ++j) {
-                    for (std::size_t k = 0; k < N; ++k) {
-                        const std::size_t idx = j + N * k;
-                        std::cout << map_ij[idx] << (k + 1 < N ? " " : "");
-                    }
-                    std::cout << "\n";
-                }
-                std::cout << "map.ij (0-based):\n";
-                for (std::size_t j = 0; j < N; ++j) {
-                    for (std::size_t k = 0; k < N; ++k) {
-                        const std::size_t idx = j + N * k;
-                        std::cout << (map_ij[idx] - base) << (k + 1 < N ? " " : "");
-                    }
-                    std::cout << "\n";
-                }
-            }
-
-            taco::sys::FrequencyIndex fidx;
-            fidx.tol = 1e-9;
-            fidx.buckets.resize(nf);
-            for (std::size_t b = 0; b < nf; ++b) {
-                fidx.buckets[b].omega = map_omegas[b];
-            }
-            for (std::size_t j = 0; j < N; ++j) {
-                for (std::size_t k = 0; k < N; ++k) {
-                    const std::size_t idx = j + N * k;
-                    const long long b = map_ij[idx] - base;
-                    if (b < 0 || b >= static_cast<long long>(nf)) {
-                        std::ostringstream msg;
-                        msg << "map/ij bucket index out of range at (" << j << "," << k
-                            << "): value=" << map_ij[idx] << ", base=" << base
-                            << ", nf=" << nf;
-                        throw std::runtime_error(msg.str());
-                    }
-                    fidx.buckets[static_cast<std::size_t>(b)].pairs.emplace_back(static_cast<int>(j),
-                                                                                 static_cast<int>(k));
-                }
-            }
-            system.fidx = std::move(fidx);
-        } else {
-            system.fidx = taco::sys::build_frequency_buckets(system.bf, 1e-9);
-        }
-        system.A_eig = {A_eig};
-        system.A_lab = {system.eig.to_lab(A_eig)};
-        system.A_eig_parts = taco::sys::decompose_operators_by_frequency(system.A_eig, system.bf, system.fidx);
-
-        std::vector<double> omegas;
-        if (have_map) {
-            omegas = map_omegas;
-        } else {
-            omegas.reserve(system.fidx.buckets.size());
-            for (const auto& b : system.fidx.buckets) omegas.push_back(b.omega);
-        }
-
-        const std::size_t N = static_cast<std::size_t>(H.rows());
-        const std::size_t N2 = N * N;
-
-        if (gw_basis == GwBasis::Omega && map_omegas.empty()) {
-            throw std::runtime_error("gw-basis=omega requires /map/omegas");
-        }
-
-        auto dims_c_re_raw = get_dataset_dims(h5.id, "/bath/C/re");
-        std::size_t c_time_dim = 0;
-        if (dims_c_re_raw.size() == 2 && dims_c_re_raw[0] == 1 && dims_c_re_raw[1] > 1) {
-            c_time_dim = 1;
-        }
-        const std::size_t Nt_c = static_cast<std::size_t>(dims_c_re_raw.empty() ? 0 : dims_c_re_raw[c_time_dim]);
-        if (Nt_c == 0) throw std::runtime_error("Empty /bath/C");
-
-        auto dims_gw_re_raw = get_dataset_dims(h5.id, "/out/GW_flat/re");
-        auto gw_dims_base = squeeze_dims(dims_gw_re_raw);
-        auto gw_dims_interp = matlab_order ? reverse_dims(gw_dims_base) : gw_dims_base;
-        auto gw_map = squeezed_index_map(dims_gw_re_raw);
-        const std::size_t gw_side = (gw_basis == GwBasis::Omega ? map_omegas.size() : N2);
-        GwLayout gw_layout = infer_gw_layout(gw_dims_interp, gw_side);
-        gw_layout.row_major_flat = gw_row_major;
-        const std::size_t Nt_gw = gw_layout.Nt;
-
-        bool have_gt = false;
-        GtMode gt_mode_use = gt_mode;
-        MatLayout gt_layout;
-        GtSeriesLayout gt_series_layout;
-        std::size_t Nt_gt = Nt_c;
-        std::vector<hsize_t> dims_gt_raw;
-        std::vector<std::size_t> gt_map;
-        if (compare_gt && dataset_exists(h5.id, "/out/Gt_flat/re")) {
-            dims_gt_raw = get_dataset_dims(h5.id, "/out/Gt_flat/re");
-            auto gt_dims_base = squeeze_dims(dims_gt_raw);
-            auto gt_dims_interp = matlab_order ? reverse_dims(gt_dims_base) : gt_dims_base;
-            gt_map = squeezed_index_map(dims_gt_raw);
-            const std::size_t nf = omegas.size();
-            const bool gt_like_omega = (gt_dims_interp.size() == 2) &&
-                                       (static_cast<std::size_t>(gt_dims_interp[0]) == nf ||
-                                        static_cast<std::size_t>(gt_dims_interp[1]) == nf);
-            if (gt_mode_use == GtMode::Auto) {
-                gt_mode_use = gt_like_omega ? GtMode::Omega : GtMode::Matrix;
-            }
-            if (gt_mode_use == GtMode::Omega) {
-                if (!gt_like_omega) {
-                    throw std::runtime_error("Gt_flat dims do not match omega series layout");
-                }
-                gt_series_layout.dims = gt_dims_interp;
-                gt_series_layout.nf = nf;
-                gt_series_layout.time_dim = (static_cast<std::size_t>(gt_dims_interp[0]) == nf) ? 1 : 0;
-                if (gt_time_dim_override >= 0) {
-                    if (gt_dims_interp.size() != 2) {
-                        throw std::runtime_error("gt-time-dim override requires 2D Gt_flat");
-                    }
-                    gt_series_layout.time_dim = static_cast<std::size_t>(gt_time_dim_override);
-                }
-                Nt_gt = static_cast<std::size_t>(gt_dims_interp[gt_series_layout.time_dim]);
-            } else {
-                gt_layout = infer_mat_layout(gt_dims_interp, N, N);
-                gt_layout.row_major_flat = gw_row_major;
-                Nt_gt = gt_layout.Nt;
-            }
-            have_gt = true;
-        }
-
-        bool have_fcr = false;
-        FcrLayout fcr_layout;
-        std::size_t Nt_fcr = Nt_c;
-        std::size_t fcr_time_dim_raw = 0;
-        if (compare_fcr && dataset_exists(h5.id, "/kernels/F_all/re") &&
-            dataset_exists(h5.id, "/kernels/C_all/re") &&
-            dataset_exists(h5.id, "/kernels/R_all/re")) {
-            auto dims_f_raw = get_dataset_dims(h5.id, "/kernels/F_all/re");
-            auto dims_c2_raw = get_dataset_dims(h5.id, "/kernels/C_all/re");
-            auto dims_r_raw = get_dataset_dims(h5.id, "/kernels/R_all/re");
-            auto dims_f = squeeze_dims(dims_f_raw);
-            auto dims_c2 = squeeze_dims(dims_c2_raw);
-            auto dims_r = squeeze_dims(dims_r_raw);
-            auto dims_f_interp = matlab_order ? reverse_dims(dims_f) : dims_f;
-            auto dims_c2_interp = matlab_order ? reverse_dims(dims_c2) : dims_c2;
-            auto dims_r_interp = matlab_order ? reverse_dims(dims_r) : dims_r;
-            if (dims_f_interp == dims_c2_interp && dims_f_interp == dims_r_interp) {
-                fcr_layout = infer_fcr_layout(dims_f_interp, omegas.size());
-                Nt_fcr = fcr_layout.Nt;
-                have_fcr = true;
-                std::size_t time_dim_raw = fcr_layout.time_dim;
-                if (matlab_order) time_dim_raw = dims_f.size() - 1 - fcr_layout.time_dim;
-                fcr_time_dim_raw = squeezed_index_map(dims_f_raw)[time_dim_raw];
-            }
-        }
-
-        std::size_t Nt_avail = std::min(Nt_c, Nt_gw);
-        if (compare_gt && have_gt) {
-            if (gt_offset >= Nt_gt) {
-                throw std::runtime_error("gt-offset exceeds Gt time length");
-            }
-            Nt_avail = std::min(Nt_avail, Nt_gt - gt_offset);
-        }
-        if (compare_fcr && have_fcr) Nt_avail = std::min(Nt_avail, Nt_fcr);
-        if (max_steps > 0) Nt_avail = std::min(Nt_avail, max_steps);
-        if (Nt_avail == 0) throw std::runtime_error("No overlapping time samples to compare");
-        if (Nt_avail < Nt_c || Nt_avail < Nt_gw ||
-            (compare_gt && have_gt && Nt_avail < Nt_gt) ||
-            (compare_fcr && have_fcr && Nt_avail < Nt_fcr)) {
-            std::cout << "Using Nt=" << Nt_avail << " (C=" << Nt_c << ", GW=" << Nt_gw;
-            if (compare_gt && have_gt) std::cout << ", Gt=" << Nt_gt;
-            if (compare_fcr && have_fcr) std::cout << ", FCR=" << Nt_fcr;
-            std::cout << ")\n";
-        }
-
-        std::vector<std::string> tokens = tidx_tokens;
-        if (tokens.empty()) {
-            tokens = {"0", "mid", "last"};
-        }
-        std::vector<std::size_t> tidx_list;
-        tidx_list.reserve(tokens.size());
-        for (const auto& tok : tokens) {
-            if (tok == "last") {
-                tidx_list.push_back(Nt_avail - 1);
-            } else if (tok == "mid") {
-                tidx_list.push_back(Nt_avail / 2);
-            } else {
-                const long long v = std::stoll(tok);
-                if (v < 0) throw std::runtime_error("Negative tidx: " + tok);
-                tidx_list.push_back(static_cast<std::size_t>(v));
-            }
-        }
-        if (one_based) {
-            for (auto& t : tidx_list) {
-                if (t == 0) throw std::runtime_error("one-based tidx must be >= 1");
-                t -= 1;
-            }
-        }
-        for (auto t : tidx_list) {
-            if (t >= Nt_avail) throw std::runtime_error("tidx out of range");
-        }
-
-        const std::size_t Nt_use = Nt_avail;
-
-        int failures = 0;
         std::vector<hsize_t> dims_c;
-        auto Cc = read_complex_array_prefix_dim(h5.id, "/bath/C", Nt_use, c_time_dim, &dims_c);
-
-        if (compare_bcf) {
-            if (!dataset_exists(h5.id, "/params/beta") || !dataset_exists(h5.id, "/params/omegac")) {
-                throw std::runtime_error("Missing /params/beta or /params/omegac for BCF compare");
-            }
-            const double beta = read_scalar_double(h5.id, "/params/beta");
-            const double omegac = read_scalar_double(h5.id, "/params/omegac");
-            const std::size_t Nt_bcf = (bcf_nt > 0) ? bcf_nt : Nt_c;
-            const std::size_t Nt_cmp = std::min(Nt_use, Nt_bcf);
-            if (Nt_cmp != Nt_use) {
-                std::cout << "BCF compare uses Nt=" << Nt_cmp << " (requested Nt=" << Nt_use << ")\n";
-            }
-            auto Ccalc = bcf_fft_ohmic_simple(beta, dt, Nt_bcf, omegac, bcf_pad, bcf_pow2);
-            ErrSummary cstat;
-            for (std::size_t k = 0; k < Nt_cmp; ++k) {
-                update_err(cstat, Cc[k], Ccalc[k], atol, rtol);
-            }
-            std::cout << "BCF max_abs=" << cstat.max_abs
-                      << " max_rel=" << cstat.max_rel
-                      << (cstat.ok ? " ok\n" : " FAIL\n");
-            if (!cstat.ok) failures++;
-        }
+        auto Cc = read_complex_array(h5.id, "/bath/C", &dims_c);
+        const std::size_t Nt_c = Cc.size();
+        if (Nt_c == 0) throw std::runtime_error("Empty /bath/C");
 
         std::vector<double> tvals;
         if (dataset_exists(h5.id, "/time/t")) {
             std::vector<hsize_t> dims_t;
-            auto dims_t_raw = get_dataset_dims(h5.id, "/time/t");
-            std::size_t t_time_dim = 0;
-            if (dims_t_raw.size() == 2 && dims_t_raw[0] == 1 && dims_t_raw[1] > 1) {
-                t_time_dim = 1;
-            }
-            tvals = read_array_prefix_dim<double>(h5.id, "/time/t", H5T_NATIVE_DOUBLE, Nt_use, t_time_dim, &dims_t);
+            tvals = read_array<double>(h5.id, "/time/t", H5T_NATIVE_DOUBLE, &dims_t);
         }
 
-        std::vector<hsize_t> dims_gw;
-        std::size_t gw_time_dim_raw = gw_layout.time_dim;
-        if (matlab_order) gw_time_dim_raw = gw_dims_base.size() - 1 - gw_layout.time_dim;
-        gw_time_dim_raw = gw_map[gw_time_dim_raw];
-        auto GW_flat = read_complex_array_prefix_dim(h5.id, "/out/GW_flat", Nt_use, gw_time_dim_raw, &dims_gw);
-        auto dims_gw_base = squeeze_dims(dims_gw);
-        gw_layout.dims = matlab_order ? reverse_dims(dims_gw_base) : dims_gw_base;
-        gw_layout.Nt = Nt_use;
+        std::vector<double> map_omegas;
+        std::vector<long long> map_ij;
+        if (dataset_exists(h5.id, "/map/omegas")) {
+            std::vector<hsize_t> dims_om;
+            map_omegas = read_array<double>(h5.id, "/map/omegas", H5T_NATIVE_DOUBLE, &dims_om);
+        }
+        if (dataset_exists(h5.id, "/map/ij")) {
+            std::vector<hsize_t> dims_ij;
+            map_ij = read_array<long long>(h5.id, "/map/ij", H5T_NATIVE_LLONG, &dims_ij);
+        }
 
-        std::vector<std::complex<double>> Gt_flat;
-        MatLayout gt_use;
-        GtSeriesLayout gt_series_use;
-        if (compare_gt && have_gt) {
-            std::vector<hsize_t> dims_gt;
-            auto gt_dims_base = squeeze_dims(dims_gt_raw);
-            std::size_t gt_time_dim_raw = (gt_mode_use == GtMode::Omega)
-                                              ? gt_series_layout.time_dim
-                                              : gt_layout.time_dim;
-            if (matlab_order) gt_time_dim_raw = gt_dims_base.size() - 1 - gt_time_dim_raw;
-            gt_time_dim_raw = gt_map[gt_time_dim_raw];
-            const std::size_t Nt_gt_read = Nt_use + gt_offset;
-            Gt_flat = read_complex_array_prefix_dim(h5.id, "/out/Gt_flat", Nt_gt_read, gt_time_dim_raw, &dims_gt);
-            auto dims_gt_use = squeeze_dims(dims_gt);
-            auto dims_gt_interp = matlab_order ? reverse_dims(dims_gt_use) : dims_gt_use;
-            if (gt_mode_use == GtMode::Omega) {
-                gt_series_use = gt_series_layout;
-                gt_series_use.dims = dims_gt_interp;
-                gt_series_use.time_dim = (static_cast<std::size_t>(dims_gt_interp[0]) == gt_series_layout.nf) ? 1 : 0;
-                if (gt_time_dim_override >= 0) {
-                    if (dims_gt_interp.size() != 2) {
-                        throw std::runtime_error("gt-time-dim override requires 2D Gt_flat");
+        if ((opt.compare_gt || opt.compare_gw || opt.compare_fcr || opt.print_mikx) &&
+            (map_omegas.empty() || map_ij.empty())) {
+            throw std::runtime_error("map/omegas and map/ij are required for comparison");
+        }
+
+        std::size_t N = 0;
+        if (dataset_exists(h5.id, "/map/N")) {
+            N = static_cast<std::size_t>(read_scalar_double(h5.id, "/map/N"));
+        }
+        if (N == 0 && dataset_exists(h5.id, "/system/H/re")) {
+            auto dims_h = get_dataset_dims(h5.id, "/system/H/re");
+            if (dims_h.size() >= 2) N = static_cast<std::size_t>(dims_h[0]);
+        }
+        if (N == 0) throw std::runtime_error("Failed to determine N");
+
+        const std::size_t N2 = N * N;
+        std::size_t nf = map_omegas.size();
+        if (dataset_exists(h5.id, "/map/nf")) {
+            const auto map_nf = static_cast<std::size_t>(read_scalar_double(h5.id, "/map/nf"));
+            if (map_nf > 0) nf = map_nf;
+        }
+        if (map_omegas.size() < nf) {
+            throw std::runtime_error("map/omegas length is smaller than map/nf");
+        }
+        if (map_omegas.size() > nf) {
+            map_omegas.resize(nf);
+        }
+        if (opt.fcr_filter_by_omega) {
+            if (opt.fcr_filter_enabled) {
+                throw std::runtime_error("Use either fcr-ijk or fcr-omega, not both");
+            }
+            auto find_idx = [&](double w) -> int {
+                for (std::size_t b = 0; b < map_omegas.size(); ++b) {
+                    if (std::abs(map_omegas[b] - w) <= opt.omega_tol) {
+                        return static_cast<int>(b);
                     }
-                    gt_series_use.time_dim = static_cast<std::size_t>(gt_time_dim_override);
                 }
-            } else {
-                gt_use = gt_layout;
-                gt_use.dims = dims_gt_interp;
-                gt_use.Nt = Nt_gt_read;
+                return -1;
+            };
+            const int i = find_idx(opt.fcr_omega[0]);
+            const int j = find_idx(opt.fcr_omega[1]);
+            const int k = find_idx(opt.fcr_omega[2]);
+            if (i < 0 || j < 0 || k < 0) {
+                throw std::runtime_error("fcr-omega not found in map/omegas");
+            }
+            opt.fcr_ijk = {i, j, k};
+            opt.fcr_filter_enabled = true;
+        }
+        if (map_ij.size() != N2) {
+            throw std::runtime_error("map/ij length does not match N^2");
+        }
+        const long long map_base = detect_ij_base(map_ij, nf);
+        if (map_base < 0) {
+            std::ostringstream msg;
+            msg << "map/ij values must be 0..nf-1 or 1..nf (min="
+                << *std::min_element(map_ij.begin(), map_ij.end())
+                << ", max=" << *std::max_element(map_ij.begin(), map_ij.end())
+                << ", nf=" << nf << ")";
+            throw std::runtime_error(msg.str());
+        }
+
+        if (opt.dump_map) {
+            std::cout << "map.omegas:";
+            for (double w : map_omegas) std::cout << " " << w;
+            std::cout << "\nmap.ij (raw):\n";
+            for (std::size_t j = 0; j < N; ++j) {
+                for (std::size_t k = 0; k < N; ++k) {
+                    const std::size_t idx = j + N * k;
+                    std::cout << map_ij[idx] << (k + 1 < N ? " " : "");
+                }
+                std::cout << "\n";
+            }
+            std::cout << "map.ij (0-based):\n";
+            for (std::size_t j = 0; j < N; ++j) {
+                for (std::size_t k = 0; k < N; ++k) {
+                    const std::size_t idx = j + N * k;
+                    std::cout << (map_ij[idx] - map_base) << (k + 1 < N ? " " : "");
+                }
+                std::cout << "\n";
             }
         }
 
-        std::vector<double> omegas_gamma = omegas;
-        if (gamma_sign < 0.0) {
+        std::vector<double> gt_omegas = map_omegas;
+        std::vector<int> gt_sorted_to_map;
+        std::vector<int> gt_map_to_sorted;
+        if (opt.compare_gt) {
+            if (opt.gt_omega_order == Options::OmegaOrder::Sorted) {
+                std::vector<double> sorted_omegas = map_omegas;
+                std::sort(sorted_omegas.begin(), sorted_omegas.end());
+                gt_sorted_to_map = build_omega_index_map(sorted_omegas, map_omegas, opt.omega_tol);
+                gt_map_to_sorted = build_omega_index_map(map_omegas, sorted_omegas, opt.omega_tol);
+                gt_omegas = std::move(sorted_omegas);
+            } else {
+                gt_sorted_to_map.resize(map_omegas.size());
+                gt_map_to_sorted.resize(map_omegas.size());
+                for (std::size_t i = 0; i < map_omegas.size(); ++i) {
+                    gt_sorted_to_map[i] = static_cast<int>(i);
+                    gt_map_to_sorted[i] = static_cast<int>(i);
+                }
+            }
+            for (int idx : gt_sorted_to_map) {
+                if (idx < 0) {
+                    throw std::runtime_error("Failed to map omega indices for Gt compare");
+                }
+            }
+            for (int idx : gt_map_to_sorted) {
+                if (idx < 0) {
+                    throw std::runtime_error("Failed to map omega indices for Gt compare");
+                }
+            }
+        }
+
+        std::vector<double> omegas_gamma = map_omegas;
+        if (opt.gamma_sign < 0.0) {
             for (auto& w : omegas_gamma) w = -w;
         }
-        auto gamma_series = compute_gamma_prefix_matrix(Cc, dt, omegas_gamma, gamma_rule);
-        auto kernels = taco::tcl4::compute_triple_kernels(system, gamma_series, dt, 2, method);
-        auto map = taco::tcl4::build_map(system, {});
+        auto gamma_series = compute_gamma_prefix_matrix(Cc, dt, omegas_gamma, opt.gamma_rule);
 
-        if (print_gt) {
-            std::cout << std::setprecision(12);
-            const std::size_t nf = omegas.size();
+        MatrixSeriesLayout gt_layout;
+        std::vector<cd> Gt_flat;
+        std::size_t Nt_gt = Nt_c;
+        if (opt.compare_gt) {
+            if (!dataset_exists(h5.id, "/out/Gt_flat/re")) {
+                throw std::runtime_error("/out/Gt_flat not found");
+            }
+            std::vector<hsize_t> dims_gt;
+            Gt_flat = read_complex_array(h5.id, "/out/Gt_flat", &dims_gt);
+            auto dims_gt_use = squeeze_dims(dims_gt);
+            gt_layout = infer_matrix_series_layout(dims_gt_use, N, N,
+                                                   opt.gt_row_major_flat, opt.gt_time_dim);
+            Nt_gt = gt_layout.Nt;
+            if (opt.gt_offset >= Nt_gt) {
+                throw std::runtime_error("gt-offset exceeds Gt time length");
+            }
+        }
+
+        MatrixSeriesLayout gw_layout;
+        std::vector<cd> GW_flat;
+        std::size_t Nt_gw = Nt_c;
+        if (opt.compare_gw) {
+            if (!dataset_exists(h5.id, "/out/GW_flat/re")) {
+                throw std::runtime_error("/out/GW_flat not found");
+            }
+            std::vector<hsize_t> dims_gw;
+            GW_flat = read_complex_array(h5.id, "/out/GW_flat", &dims_gw);
+            auto dims_gw_use = squeeze_dims(dims_gw);
+            gw_layout = infer_matrix_series_layout(dims_gw_use, N2, N2,
+                                                   opt.gw_row_major_flat, opt.gw_time_dim);
+            Nt_gw = gw_layout.Nt;
+        }
+
+        KernelSeriesLayout f_layout;
+        KernelSeriesLayout c_layout;
+        KernelSeriesLayout r_layout;
+        std::vector<cd> F_all;
+        std::vector<cd> C_all;
+        std::vector<cd> R_all;
+        std::size_t Nt_fcr = Nt_c;
+        std::vector<int> fcr_index_map;
+        const bool need_file_kernels =
+            opt.compare_fcr || (opt.print_mikx && opt.mikx_source == Options::MikxSource::File);
+        if (need_file_kernels) {
+            if (!dataset_exists(h5.id, "/kernels/F_all/re") ||
+                !dataset_exists(h5.id, "/kernels/C_all/re") ||
+                !dataset_exists(h5.id, "/kernels/R_all/re")) {
+                throw std::runtime_error("/kernels/F_all, C_all, R_all are required for file kernels");
+            }
+            std::vector<hsize_t> dims_f;
+            std::vector<hsize_t> dims_c2;
+            std::vector<hsize_t> dims_r;
+            F_all = read_complex_array(h5.id, "/kernels/F_all", &dims_f);
+            C_all = read_complex_array(h5.id, "/kernels/C_all", &dims_c2);
+            R_all = read_complex_array(h5.id, "/kernels/R_all", &dims_r);
+            auto dims_f_use = squeeze_dims(dims_f);
+            auto dims_c_use = squeeze_dims(dims_c2);
+            auto dims_r_use = squeeze_dims(dims_r);
+            if (dims_f_use != dims_c_use || dims_f_use != dims_r_use) {
+                throw std::runtime_error("F/C/R kernel dims mismatch");
+            }
+            f_layout = infer_kernel_series_layout(dims_f_use, nf, opt.fcr_time_dim, opt.fcr_row_major);
+            c_layout = infer_kernel_series_layout(dims_c_use, nf, opt.fcr_time_dim, opt.fcr_row_major);
+            r_layout = infer_kernel_series_layout(dims_r_use, nf, opt.fcr_time_dim, opt.fcr_row_major);
+            Nt_fcr = f_layout.Nt;
+            if (opt.fcr_omega_order == Options::OmegaOrder::Sorted) {
+                std::vector<double> sorted_omegas = map_omegas;
+                std::sort(sorted_omegas.begin(), sorted_omegas.end());
+                fcr_index_map = build_omega_index_map(map_omegas, sorted_omegas, opt.omega_tol);
+            } else {
+                fcr_index_map.resize(nf);
+                for (std::size_t i = 0; i < nf; ++i) fcr_index_map[i] = static_cast<int>(i);
+            }
+                for (int idx : fcr_index_map) {
+                    if (idx < 0) {
+                        throw std::runtime_error("Failed to map omega indices for FCR compare");
+                    }
+                }
+        }
+
+        std::size_t Nt_method = Nt_c;
+        if (opt.compare_fcr_methods) {
+            if (opt.fcr_nt > 0) {
+                Nt_method = std::min(Nt_method, opt.fcr_nt);
+            } else if (Nt_method > 4096) {
+                Nt_method = 1024;
+                std::cout << "compare-fcr-methods: using first " << Nt_method
+                          << " samples; override with --fcr-nt=COUNT\n";
+            }
+        }
+
+        std::size_t Nt_avail = Nt_c;
+        if (opt.compare_gt) Nt_avail = std::min(Nt_avail, Nt_gt - opt.gt_offset);
+        if (opt.compare_gw) Nt_avail = std::min(Nt_avail, Nt_gw);
+        if (need_file_kernels) {
+            if (opt.fcr_offset >= Nt_fcr) {
+                throw std::runtime_error("fcr-offset exceeds F/C/R time length");
+            }
+            Nt_avail = std::min(Nt_avail, Nt_fcr - opt.fcr_offset);
+        }
+        if (opt.compare_fcr_methods) Nt_avail = std::min(Nt_avail, Nt_method);
+
+        auto tidx_tokens = split_csv(opt.tidx_list);
+        auto tidx_list = resolve_tidx_list(tidx_tokens, Nt_avail, opt.one_based);
+
+        taco::sys::System system;
+        taco::tcl4::Tcl4Map map;
+        taco::tcl4::TripleKernelSeries kernels;
+        Eigen::MatrixXcd Hm;
+        Eigen::MatrixXcd Am;
+        bool have_system = false;
+
+        if (dataset_exists(h5.id, "/system/H/re")) {
+            std::vector<hsize_t> dims_h;
+            auto H = read_complex_array(h5.id, "/system/H", &dims_h);
+            auto dims_h_use = squeeze_dims(dims_h);
+            Hm.resize(static_cast<Eigen::Index>(dims_h_use[0]), static_cast<Eigen::Index>(dims_h_use[1]));
+            for (std::size_t col = 0; col < dims_h_use[1]; ++col) {
+                for (std::size_t row = 0; row < dims_h_use[0]; ++row) {
+                    Hm(static_cast<Eigen::Index>(row), static_cast<Eigen::Index>(col)) =
+                        at_colmajor_2d(H, dims_h_use, row, col);
+                }
+            }
+            have_system = true;
+        }
+        if (dataset_exists(h5.id, "/system/A/re")) {
+            std::vector<hsize_t> dims_a;
+            auto A = read_complex_array(h5.id, "/system/A", &dims_a);
+            auto dims_a_use = squeeze_dims(dims_a);
+            Am.resize(static_cast<Eigen::Index>(dims_a_use[0]), static_cast<Eigen::Index>(dims_a_use[1]));
+            for (std::size_t col = 0; col < dims_a_use[1]; ++col) {
+                for (std::size_t row = 0; row < dims_a_use[0]; ++row) {
+                    Am(static_cast<Eigen::Index>(row), static_cast<Eigen::Index>(col)) =
+                        at_colmajor_2d(A, dims_a_use, row, col);
+                }
+            }
+        }
+
+        if (dataset_exists(h5.id, "/system/Eig/re")) {
+            std::vector<hsize_t> dims_e;
+            auto eig_re = read_array<double>(h5.id, "/system/Eig/re", H5T_NATIVE_DOUBLE, &dims_e);
+            system.eig.dim = eig_re.size();
+            system.eig.eps = Eigen::VectorXd::Zero(static_cast<Eigen::Index>(eig_re.size()));
+            for (std::size_t i = 0; i < eig_re.size(); ++i) {
+                system.eig.eps(static_cast<Eigen::Index>(i)) = eig_re[i];
+            }
+            system.eig.U = Eigen::MatrixXcd::Identity(static_cast<Eigen::Index>(system.eig.dim),
+                                                      static_cast<Eigen::Index>(system.eig.dim));
+            system.eig.U_dag = system.eig.U;
+            system.bf = taco::sys::BohrFrequencies(system.eig.eps);
+        } else if (have_system) {
+            system.eig = taco::sys::Eigensystem(Hm);
+            system.bf = taco::sys::BohrFrequencies(system.eig.eps);
+        }
+
+        if (opt.compare_gw || opt.compare_fcr || opt.compare_fcr_methods ||
+            (opt.print_mikx && opt.mikx_source == Options::MikxSource::Computed)) {
+            system.fidx = build_frequency_index_from_map(map_omegas, map_ij, map_base, N, opt.omega_tol);
+        }
+
+        if (opt.fcr_fft_pad > 0) {
+            taco::tcl4::set_fcr_fft_pad_factor(opt.fcr_fft_pad);
+        }
+
+        if (opt.compare_gw || opt.compare_fcr ||
+            (opt.print_mikx && opt.mikx_source == Options::MikxSource::Computed)) {
+            kernels = taco::tcl4::compute_triple_kernels(system, gamma_series, dt, 2, opt.method);
+        }
+
+        if (opt.compare_gw || (opt.print_mikx && opt.mikx_source == Options::MikxSource::Computed)) {
+            if (!have_system || Am.size() == 0) {
+                throw std::runtime_error("system/H and system/A required for GW compare");
+            }
+            system.A_eig = {Am};
+            system.A_lab = {system.eig.to_lab(Am)};
+            system.A_eig_parts = taco::sys::decompose_operators_by_frequency(system.A_eig, system.bf, system.fidx);
+            map = taco::tcl4::build_map(system, {});
+        }
+
+        std::size_t failures = 0;
+        std::cout << std::setprecision(12);
+
+        if (opt.compare_gt) {
+            ErrSummary gtstat;
+            std::vector<int> pair_to_bucket;
+            if (opt.gt_map_mode == Options::GtMapMode::Omega) {
+                if (system.bf.dim == 0) {
+                    throw std::runtime_error("system/Eig or system/H required for gt-map=omega");
+                }
+                pair_to_bucket = build_pair_to_bucket_by_omega(system.bf, gt_omegas, N,
+                                                               opt.omega_tol, opt.gt_row_major_flat);
+                for (int b : pair_to_bucket) {
+                    if (b < 0) {
+                        throw std::runtime_error("Failed to map pair to omega bucket; check omega-tol");
+                    }
+                }
+            }
             for (std::size_t tidx : tidx_list) {
-                const double tval = (!tvals.empty() && tidx < tvals.size()) ? tvals[tidx] : (dt * static_cast<double>(tidx));
-                std::cout << "Gt(omega) tidx=" << tidx << " t=" << tval << "\n";
-                for (std::size_t b = 0; b < nf; ++b) {
-                    if (use_gt_omega_filter) {
-                        if (std::abs(omegas[b] - gt_omega_target) > omega_tol) continue;
-                    }
-                    const auto got = gamma_series(static_cast<Eigen::Index>(tidx), static_cast<Eigen::Index>(b));
-                    std::cout << "  omega[" << b << "]=" << omegas[b]
-                              << " Gt=(" << got.real() << "," << got.imag() << ")";
-                    if (compare_gt && have_gt && gt_mode_use == GtMode::Omega) {
-                        const auto file_tidx = tidx + gt_offset;
-                        const auto expect = gt_series_value(gt_series_use, Gt_flat, file_tidx, b);
-                        std::cout << " file=(" << expect.real() << "," << expect.imag() << ")";
-                    }
-                    std::cout << "\n";
+                const std::size_t file_tidx = tidx + opt.gt_offset;
+                const double tval = (!tvals.empty() && tidx < tvals.size())
+                                        ? tvals[tidx]
+                                        : dt * static_cast<double>(tidx);
+                if (opt.print_gt) {
+                    std::cout << "Gt tidx=" << tidx << " t=" << tval << "\n";
                 }
-            }
-        }
-
-        std::vector<int> pair_to_bucket;
-        std::vector<double> pair_omegas;
-        if (gw_basis == GwBasis::Omega) {
-            pair_to_bucket = build_pair_to_bucket_by_omega(system.bf, map_omegas, omega_tol, nullptr, &pair_omegas);
-            std::size_t missing_pairs = 0;
-            for (int b : pair_to_bucket) if (b < 0) ++missing_pairs;
-            if (missing_pairs > 0) {
-                std::cerr << "Warning: " << missing_pairs << " pair indices could not be matched to map/omegas\n";
-            }
-        }
-        for (std::size_t tidx : tidx_list) {
-            const double tval = (!tvals.empty() && tidx < tvals.size()) ? tvals[tidx] : (dt * static_cast<double>(tidx));
-            auto mikx = taco::tcl4::build_mikx_serial(map, kernels, tidx);
-            Eigen::MatrixXcd GW = taco::tcl4::assemble_liouvillian(mikx, system.A_eig);
-
-            ErrSummary stat;
-            for (int r = 0; r < GW.rows(); ++r) {
-                for (int c = 0; c < GW.cols(); ++c) {
-                    if (gw_basis == GwBasis::Omega) {
-                        const int brow = pair_to_bucket[static_cast<std::size_t>(r)];
-                        const int bcol = pair_to_bucket[static_cast<std::size_t>(c)];
-                        if (brow < 0 || bcol < 0) continue;
-                        if (use_gw_omega_filter) {
-                            if (std::abs(map_omegas[static_cast<std::size_t>(brow)] - gw_omega_target) > omega_tol) continue;
-                            if (std::abs(map_omegas[static_cast<std::size_t>(bcol)] - gw_omega_target) > omega_tol) continue;
+                for (std::size_t j = 0; j < N; ++j) {
+                    for (std::size_t k = 0; k < N; ++k) {
+                        const std::size_t idx = j + N * k;
+                        long long b = 0;
+                        if (opt.gt_map_mode == Options::GtMapMode::Ij) {
+                            b = map_ij[idx] - map_base;
+                        } else {
+                            b = pair_to_bucket[idx];
                         }
-                        const auto expect = gw_value(gw_layout, GW_flat, tidx,
-                                                     static_cast<std::size_t>(brow),
-                                                     static_cast<std::size_t>(bcol),
-                                                     gw_side);
-                        update_err(stat, GW(r, c), expect, atol, rtol);
-                    } else {
-                        if (use_gw_omega_filter) {
-                            const double wr = system.bf.omega(r % static_cast<int>(N), r / static_cast<int>(N));
-                            const double wc = system.bf.omega(c % static_cast<int>(N), c / static_cast<int>(N));
-                            if (std::abs(wr - gw_omega_target) > omega_tol) continue;
-                            if (std::abs(wc - gw_omega_target) > omega_tol) continue;
+                        if (b < 0 || static_cast<std::size_t>(b) >= gt_omegas.size()) {
+                            throw std::runtime_error("Gt omega index out of range");
                         }
-                        const auto expect = gw_value(gw_layout, GW_flat, tidx,
-                                                     static_cast<std::size_t>(r),
-                                                     static_cast<std::size_t>(c),
-                                                     gw_side);
-                        update_err(stat, GW(r, c), expect, atol, rtol);
+                        std::size_t b_map = static_cast<std::size_t>(b);
+                        std::size_t b_print = static_cast<std::size_t>(b);
+                        if (opt.gt_omega_order == Options::OmegaOrder::Sorted) {
+                            if (opt.gt_map_mode == Options::GtMapMode::Omega) {
+                                b_map = static_cast<std::size_t>(
+                                    gt_sorted_to_map[static_cast<std::size_t>(b)]);
+                                b_print = static_cast<std::size_t>(b);
+                            } else {
+                                b_print = static_cast<std::size_t>(
+                                    gt_map_to_sorted[static_cast<std::size_t>(b)]);
+                            }
+                        }
+                        const cd got = gamma_series(static_cast<Eigen::Index>(tidx),
+                                                    static_cast<Eigen::Index>(b_map));
+                        const cd expect = matrix_series_value(gt_layout, Gt_flat, file_tidx, j, k, N, N);
+                        update_err(gtstat, got, expect, opt.atol, opt.rtol);
+                        if (opt.print_gt) {
+                            std::cout << "  (" << j << "," << k << ") omega=" << gt_omegas[b_print]
+                                      << " Gt=(" << got.real() << "," << got.imag() << ")"
+                                      << " file=(" << expect.real() << "," << expect.imag() << ")\n";
+                        }
                     }
                 }
             }
-            const bool ok = stat.ok;
+            const bool ok = gtstat.ok;
             if (!ok) failures++;
-            std::cout << "GW tidx=" << tidx << " t=" << tval
-                      << " max_abs=" << stat.max_abs
-                      << " max_rel=" << stat.max_rel
+            std::cout << "Gt(matrix) max_abs=" << gtstat.max_abs
+                      << " max_rel=" << gtstat.max_rel
                       << (ok ? " ok\n" : " FAIL\n");
         }
 
-        if (compare_gt && have_gt) {
-            ErrSummary gtstat;
-            if (gt_mode_use == GtMode::Omega) {
-                const std::size_t nf = omegas.size();
-                for (std::size_t tidx : tidx_list) {
-                    for (std::size_t b = 0; b < nf; ++b) {
-                        if (use_gt_omega_filter) {
-                            if (std::abs(omegas[b] - gt_omega_target) > omega_tol) continue;
-                        }
-                        const auto file_tidx = tidx + gt_offset;
-                        const auto expect = gt_series_value(gt_series_use, Gt_flat, file_tidx, b);
-                        const auto got = gamma_series(static_cast<Eigen::Index>(tidx), static_cast<Eigen::Index>(b));
-                        update_err(gtstat, got, expect, atol, rtol);
-                    }
-                }
-                const bool ok = gtstat.ok;
-                if (!ok) failures++;
-                std::cout << "Gt(omega) max_abs=" << gtstat.max_abs
-                          << " max_rel=" << gtstat.max_rel
-                          << (ok ? " ok\n" : " FAIL\n");
-            } else {
-                for (std::size_t tidx : tidx_list) {
-                    const auto file_tidx = tidx + gt_offset;
-                    Eigen::MatrixXcd Gt = taco::tcl4::build_gamma_matrix_at(map, gamma_series, tidx);
-                    for (int r = 0; r < Gt.rows(); ++r) {
-                        for (int c = 0; c < Gt.cols(); ++c) {
-                            const auto expect = mat_value(gt_use, Gt_flat, file_tidx,
-                                                          static_cast<std::size_t>(r),
-                                                          static_cast<std::size_t>(c),
-                                                          N, N);
-                            update_err(gtstat, Gt(r, c), expect, atol, rtol);
-                        }
-                    }
-                }
-                const bool ok = gtstat.ok;
-                if (!ok) failures++;
-                std::cout << "Gt(matrix) max_abs=" << gtstat.max_abs
-                          << " max_rel=" << gtstat.max_rel
-                          << (ok ? " ok\n" : " FAIL\n");
+        auto file_kernel_value = [&](const KernelSeriesLayout& layout,
+                                     const std::vector<cd>& data,
+                                     std::size_t file_tidx,
+                                     std::size_t bi,
+                                     std::size_t bj,
+                                     std::size_t bk) -> cd {
+            if (fcr_index_map.empty()) {
+                throw std::runtime_error("fcr_index_map is empty; file kernels not loaded");
             }
-        } else if (compare_gt && !have_gt) {
-            std::cerr << "Gt_flat not found; skipping Gt compare\n";
-        }
+            const int idx[3] = {static_cast<int>(bi), static_cast<int>(bj), static_cast<int>(bk)};
+            const int i0 = idx[opt.fcr_axes[0]];
+            const int i1 = idx[opt.fcr_axes[1]];
+            const int i2 = idx[opt.fcr_axes[2]];
+            if (i0 < 0 || i1 < 0 || i2 < 0 ||
+                static_cast<std::size_t>(i0) >= fcr_index_map.size() ||
+                static_cast<std::size_t>(i1) >= fcr_index_map.size() ||
+                static_cast<std::size_t>(i2) >= fcr_index_map.size()) {
+                throw std::runtime_error("File kernel index out of range");
+            }
+            const std::size_t fi = static_cast<std::size_t>(fcr_index_map[static_cast<std::size_t>(i0)]);
+            const std::size_t fj = static_cast<std::size_t>(fcr_index_map[static_cast<std::size_t>(i1)]);
+            const std::size_t fk = static_cast<std::size_t>(fcr_index_map[static_cast<std::size_t>(i2)]);
+            return kernel_series_value(layout, data, file_tidx, fi, fj, fk);
+        };
 
-        if (compare_fcr) {
-            if (have_fcr) {
-                std::vector<hsize_t> dimsF;
-                auto F_all = read_complex_array_prefix_dim(h5.id, "/kernels/F_all", Nt_use,
-                                                           fcr_time_dim_raw, &dimsF);
-                std::vector<hsize_t> dimsC;
-                auto C_all = read_complex_array_prefix_dim(h5.id, "/kernels/C_all", Nt_use,
-                                                           fcr_time_dim_raw, &dimsC);
-                std::vector<hsize_t> dimsR;
-                auto R_all = read_complex_array_prefix_dim(h5.id, "/kernels/R_all", Nt_use,
-                                                           fcr_time_dim_raw, &dimsR);
-                if (dimsF == dimsC && dimsF == dimsR) {
-                    FcrLayout fcr_use = fcr_layout;
-                    auto dimsF_base = squeeze_dims(dimsF);
-                    fcr_use.dims = matlab_order ? reverse_dims(dimsF_base) : dimsF_base;
-                    const std::size_t nf = omegas.size();
-                    auto compare_kernel = [&](const char* name,
-                                              const std::vector<std::complex<double>>& data,
-                                              auto getter) {
-                        ErrSummary stat;
-                        for (std::size_t tidx : tidx_list) {
-                            for (std::size_t i = 0; i < nf; ++i) {
-                                for (std::size_t j = 0; j < nf; ++j) {
-                                    for (std::size_t k = 0; k < nf; ++k) {
-                                        const auto expect = fcr_value(fcr_use, data, tidx, i, j, k);
-                                        const auto got = getter(i, j, k, tidx);
-                                        update_err(stat, got, expect, atol, rtol);
+        auto bucket_from_pair = [&](int a, int b) -> std::size_t {
+            const std::size_t idx = static_cast<std::size_t>(a) + N * static_cast<std::size_t>(b);
+            const long long val = map_ij[idx] - map_base;
+            if (val < 0 || val >= static_cast<long long>(nf)) {
+                throw std::runtime_error("map/ij index out of range for kernels");
+            }
+            return static_cast<std::size_t>(val);
+        };
+
+        if (opt.compare_gw || opt.print_mikx) {
+            ErrSummary gwstat;
+            for (std::size_t tidx : tidx_list) {
+                const double tval = (!tvals.empty() && tidx < tvals.size())
+                                        ? tvals[tidx]
+                                        : dt * static_cast<double>(tidx);
+                taco::tcl4::MikxTensors mikx;
+                if (opt.print_mikx && opt.mikx_source == Options::MikxSource::File) {
+                    const std::size_t file_tidx = tidx + opt.fcr_offset;
+                    const int Nloc = static_cast<int>(N);
+                    const std::size_t N2loc = N * N;
+                    mikx.N = Nloc;
+                    mikx.M = Eigen::MatrixXcd::Zero(static_cast<Eigen::Index>(N2loc),
+                                                    static_cast<Eigen::Index>(N2loc));
+                    mikx.I = Eigen::MatrixXcd::Zero(static_cast<Eigen::Index>(N2loc),
+                                                    static_cast<Eigen::Index>(N2loc));
+                    mikx.K = Eigen::MatrixXcd::Zero(static_cast<Eigen::Index>(N2loc),
+                                                    static_cast<Eigen::Index>(N2loc));
+                    std::size_t totalX = 1;
+                    for (int d = 0; d < 6; ++d) totalX *= N;
+                    mikx.X.assign(totalX, cd{0.0, 0.0});
+
+                    for (int j = 0; j < Nloc; ++j) {
+                        for (int k = 0; k < Nloc; ++k) {
+                            const std::size_t f_jk = bucket_from_pair(j, k);
+                            const auto row = static_cast<Eigen::Index>(j + k * Nloc);
+                            for (int p = 0; p < Nloc; ++p) {
+                                for (int q = 0; q < Nloc; ++q) {
+                                    const auto col = static_cast<Eigen::Index>(p + q * Nloc);
+                                    const std::size_t f_jq = bucket_from_pair(j, q);
+                                    const std::size_t f_pj = bucket_from_pair(p, j);
+                                    const std::size_t f_pq = bucket_from_pair(p, q);
+                                    const std::size_t f_qk = bucket_from_pair(q, k);
+                                    const std::size_t f_kq = bucket_from_pair(k, q);
+                                    const std::size_t f_qj = bucket_from_pair(q, j);
+                                    const std::size_t f_qp = bucket_from_pair(q, p);
+
+                                    const cd M1 = file_kernel_value(f_layout, F_all, file_tidx, f_jk, f_jq, f_pj);
+                                    const cd M2 = file_kernel_value(r_layout, R_all, file_tidx, f_jq, f_pq, f_qk);
+                                    mikx.M(row, col) = M1 - M2;
+
+                                    const cd Ival = file_kernel_value(f_layout, F_all, file_tidx, f_jk, f_qp, f_kq);
+                                    mikx.I(row, col) = Ival;
+
+                                    const cd Kval = file_kernel_value(r_layout, R_all, file_tidx, f_jk, f_pq, f_qj);
+                                    mikx.K(row, col) = Kval;
+
+                                    for (int r = 0; r < Nloc; ++r) {
+                                        for (int s = 0; s < Nloc; ++s) {
+                                            const std::size_t f_rs = bucket_from_pair(r, s);
+                                            const cd Cval = file_kernel_value(c_layout, C_all, file_tidx, f_jk, f_pq, f_rs);
+                                            const cd Rval = file_kernel_value(r_layout, R_all, file_tidx, f_jk, f_pq, f_rs);
+                                            const std::size_t idx6 = static_cast<std::size_t>(j)
+                                                + N * (static_cast<std::size_t>(k)
+                                                + N * (static_cast<std::size_t>(p)
+                                                + N * (static_cast<std::size_t>(q)
+                                                + N * (static_cast<std::size_t>(r)
+                                                + N * static_cast<std::size_t>(s)))));
+                                            mikx.X[idx6] = Cval + Rval;
+                                        }
                                     }
                                 }
                             }
                         }
-                        const bool ok = stat.ok;
-                        if (!ok) failures++;
-                        std::cout << name << " max_abs=" << stat.max_abs
-                                  << " max_rel=" << stat.max_rel
-                                  << (ok ? " ok\n" : " FAIL\n");
-                    };
-                    compare_kernel("F", F_all,
-                                   [&](std::size_t i, std::size_t j, std::size_t k, std::size_t t) {
-                                       return kernels.F[i][j][k](static_cast<Eigen::Index>(t));
-                                   });
-                    compare_kernel("C", C_all,
-                                   [&](std::size_t i, std::size_t j, std::size_t k, std::size_t t) {
-                                       return kernels.C[i][j][k](static_cast<Eigen::Index>(t));
-                                   });
-                    compare_kernel("R", R_all,
-                                   [&](std::size_t i, std::size_t j, std::size_t k, std::size_t t) {
-                                       return kernels.R[i][j][k](static_cast<Eigen::Index>(t));
-                                   });
+                    }
                 } else {
-                    std::cerr << "F/C/R dataset dims mismatch; skipping FCR compare\n";
+                    mikx = taco::tcl4::build_mikx_serial(map, kernels, tidx);
                 }
-            } else {
-                std::cerr << "F/C/R datasets not found or unsupported layout; skipping FCR compare\n";
+                if (opt.print_mikx) {
+                    const int Nloc = mikx.N;
+                    std::cout << "MIKX tidx=" << tidx << " t=" << tval << " N=" << Nloc << "\n";
+                    std::cout << "M:\n";
+                    for (int r = 0; r < mikx.M.rows(); ++r) {
+                        for (int c = 0; c < mikx.M.cols(); ++c) {
+                            const cd v = mikx.M(r, c);
+                            std::cout << "  (" << r << "," << c << ")=(" << v.real()
+                                      << "," << v.imag() << ")\n";
+                        }
+                    }
+                    std::cout << "I:\n";
+                    for (int r = 0; r < mikx.I.rows(); ++r) {
+                        for (int c = 0; c < mikx.I.cols(); ++c) {
+                            const cd v = mikx.I(r, c);
+                            std::cout << "  (" << r << "," << c << ")=(" << v.real()
+                                      << "," << v.imag() << ")\n";
+                        }
+                    }
+                    std::cout << "K:\n";
+                    for (int r = 0; r < mikx.K.rows(); ++r) {
+                        for (int c = 0; c < mikx.K.cols(); ++c) {
+                            const cd v = mikx.K(r, c);
+                            std::cout << "  (" << r << "," << c << ")=(" << v.real()
+                                      << "," << v.imag() << ")\n";
+                        }
+                    }
+                    std::cout << "X (flat, column-major j,k,p,q,r,s):\n";
+                    const std::size_t N6 = mikx.X.size();
+                    for (std::size_t idx = 0; idx < N6; ++idx) {
+                        std::size_t tmp = idx;
+                        const std::size_t j = tmp % Nloc; tmp /= Nloc;
+                        const std::size_t k = tmp % Nloc; tmp /= Nloc;
+                        const std::size_t p = tmp % Nloc; tmp /= Nloc;
+                        const std::size_t q = tmp % Nloc; tmp /= Nloc;
+                        const std::size_t r = tmp % Nloc; tmp /= Nloc;
+                        const std::size_t s = tmp % Nloc;
+                        const cd v = mikx.X[idx];
+                        std::cout << "  (" << j << "," << k << "," << p << "," << q
+                                  << "," << r << "," << s << ")=("
+                                  << v.real() << "," << v.imag() << ")\n";
+                    }
+                }
+                if (opt.compare_gw) {
+                    Eigen::MatrixXcd GW = taco::tcl4::assemble_liouvillian(mikx, system.A_eig);
+                    if (opt.print_gw) {
+                        std::cout << "GW tidx=" << tidx << " t=" << tval << "\n";
+                    }
+                    for (int r = 0; r < GW.rows(); ++r) {
+                        for (int c = 0; c < GW.cols(); ++c) {
+                            const cd expect = matrix_series_value(gw_layout, GW_flat, tidx,
+                                                                  static_cast<std::size_t>(r),
+                                                                  static_cast<std::size_t>(c),
+                                                                  N2, N2);
+                            update_err(gwstat, GW(r, c), expect, opt.atol, opt.rtol);
+                            if (opt.print_gw) {
+                                std::cout << "  (" << r << "," << c << ") GW=("
+                                          << GW(r, c).real() << "," << GW(r, c).imag() << ")"
+                                          << " file=(" << expect.real() << "," << expect.imag() << ")\n";
+                            }
+                        }
+                    }
+                    std::cout << "GW tidx=" << tidx << " t=" << tval
+                              << " max_abs=" << gwstat.max_abs
+                              << " max_rel=" << gwstat.max_rel
+                              << (gwstat.ok ? " ok\n" : " FAIL\n");
+                }
             }
+            if (opt.compare_gw && !gwstat.ok) failures++;
         }
 
-        if (failures) {
-            std::cerr << "FAILED: " << failures << " comparison(s)\n";
-            return 1;
+        if (opt.compare_fcr) {
+            if (kernels.F.empty() || kernels.F.front().empty() ||
+                kernels.F.front().front().empty()) {
+                throw std::runtime_error("Kernel series is empty");
+            }
+            ErrSummary fstat;
+            ErrSummary cstat;
+            ErrSummary rstat;
+            if (opt.fcr_filter_enabled) {
+                for (int v : opt.fcr_ijk) {
+                    if (v < 0 || v >= static_cast<int>(nf)) {
+                        throw std::runtime_error("fcr-ijk out of range for nf");
+                    }
+                }
+            }
+            for (std::size_t tidx : tidx_list) {
+                const std::size_t file_tidx = tidx + opt.fcr_offset;
+                if (opt.print_fcr) {
+                    const double tval = (!tvals.empty() && tidx < tvals.size())
+                                            ? tvals[tidx]
+                                            : dt * static_cast<double>(tidx);
+                    std::cout << "FCR tidx=" << tidx << " t=" << tval << "\n";
+                }
+                const std::size_t i0 = opt.fcr_filter_enabled ? static_cast<std::size_t>(opt.fcr_ijk[0]) : 0;
+                const std::size_t j0 = opt.fcr_filter_enabled ? static_cast<std::size_t>(opt.fcr_ijk[1]) : 0;
+                const std::size_t k0 = opt.fcr_filter_enabled ? static_cast<std::size_t>(opt.fcr_ijk[2]) : 0;
+                const std::size_t i1 = opt.fcr_filter_enabled ? (i0 + 1) : nf;
+                const std::size_t j1 = opt.fcr_filter_enabled ? (j0 + 1) : nf;
+                const std::size_t k1 = opt.fcr_filter_enabled ? (k0 + 1) : nf;
+                for (std::size_t i = i0; i < i1; ++i) {
+                    for (std::size_t j = j0; j < j1; ++j) {
+                        for (std::size_t k = k0; k < k1; ++k) {
+                            const std::array<std::size_t, 3> idx{ i, j, k };
+                            const std::size_t fi = static_cast<std::size_t>(
+                                fcr_index_map[static_cast<std::size_t>(idx[opt.fcr_axes[0]])]);
+                            const std::size_t fj = static_cast<std::size_t>(
+                                fcr_index_map[static_cast<std::size_t>(idx[opt.fcr_axes[1]])]);
+                            const std::size_t fk = static_cast<std::size_t>(
+                                fcr_index_map[static_cast<std::size_t>(idx[opt.fcr_axes[2]])]);
+                            const cd got_f = kernels.F[i][j][k](static_cast<Eigen::Index>(tidx));
+                            const cd got_c = kernels.C[i][j][k](static_cast<Eigen::Index>(tidx));
+                            const cd got_r = kernels.R[i][j][k](static_cast<Eigen::Index>(tidx));
+                            const cd exp_f = kernel_series_value(f_layout, F_all, file_tidx, fi, fj, fk);
+                            const cd exp_c = kernel_series_value(c_layout, C_all, file_tidx, fi, fj, fk);
+                            const cd exp_r = kernel_series_value(r_layout, R_all, file_tidx, fi, fj, fk);
+                            update_err(fstat, got_f, exp_f, opt.atol, opt.rtol);
+                            update_err(cstat, got_c, exp_c, opt.atol, opt.rtol);
+                            update_err(rstat, got_r, exp_r, opt.atol, opt.rtol);
+                            if (opt.print_fcr) {
+                                const bool show_f = opt.fcr_which == Options::FcrWhich::All ||
+                                                    opt.fcr_which == Options::FcrWhich::F;
+                                const bool show_c = opt.fcr_which == Options::FcrWhich::All ||
+                                                    opt.fcr_which == Options::FcrWhich::C;
+                                const bool show_r = opt.fcr_which == Options::FcrWhich::All ||
+                                                    opt.fcr_which == Options::FcrWhich::R;
+                                if (show_f) {
+                                    std::cout << "  (" << i << "," << j << "," << k << ")"
+                                              << " F=(" << got_f.real() << "," << got_f.imag() << ")"
+                                              << " file=(" << exp_f.real() << "," << exp_f.imag() << ")\n";
+                                }
+                                if (show_c) {
+                                    std::cout << "  (" << i << "," << j << "," << k << ")"
+                                              << " C=(" << got_c.real() << "," << got_c.imag() << ")"
+                                              << " file=(" << exp_c.real() << "," << exp_c.imag() << ")\n";
+                                }
+                                if (show_r) {
+                                    std::cout << "  (" << i << "," << j << "," << k << ")"
+                                              << " R=(" << got_r.real() << "," << got_r.imag() << ")"
+                                              << " file=(" << exp_r.real() << "," << exp_r.imag() << ")\n";
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            if (!fstat.ok || !cstat.ok || !rstat.ok) failures++;
+            std::cout << "F_all max_abs=" << fstat.max_abs
+                      << " max_rel=" << fstat.max_rel
+                      << (fstat.ok ? " ok\n" : " FAIL\n");
+            std::cout << "C_all max_abs=" << cstat.max_abs
+                      << " max_rel=" << cstat.max_rel
+                      << (cstat.ok ? " ok\n" : " FAIL\n");
+            std::cout << "R_all max_abs=" << rstat.max_abs
+                      << " max_rel=" << rstat.max_rel
+                      << (rstat.ok ? " ok\n" : " FAIL\n");
         }
-        std::cout << "All comparisons passed.\n";
+
+        if (opt.compare_fcr_methods) {
+            Eigen::MatrixXcd gamma_use = gamma_series;
+            if (Nt_method < static_cast<std::size_t>(gamma_series.rows())) {
+                gamma_use = gamma_series.topRows(static_cast<Eigen::Index>(Nt_method));
+            }
+            auto kernels_conv = taco::tcl4::compute_triple_kernels(
+                system, gamma_use, dt, 2, taco::tcl4::FCRMethod::Convolution);
+            auto kernels_dir = taco::tcl4::compute_triple_kernels(
+                system, gamma_use, dt, 2, taco::tcl4::FCRMethod::Direct);
+            ErrSummary fstat;
+            ErrSummary cstat;
+            ErrSummary rstat;
+            if (opt.fcr_filter_enabled) {
+                for (int v : opt.fcr_ijk) {
+                    if (v < 0 || v >= static_cast<int>(nf)) {
+                        throw std::runtime_error("fcr-ijk out of range for nf");
+                    }
+                }
+            }
+            for (std::size_t tidx : tidx_list) {
+                const std::size_t i0 = opt.fcr_filter_enabled ? static_cast<std::size_t>(opt.fcr_ijk[0]) : 0;
+                const std::size_t j0 = opt.fcr_filter_enabled ? static_cast<std::size_t>(opt.fcr_ijk[1]) : 0;
+                const std::size_t k0 = opt.fcr_filter_enabled ? static_cast<std::size_t>(opt.fcr_ijk[2]) : 0;
+                const std::size_t i1 = opt.fcr_filter_enabled ? (i0 + 1) : nf;
+                const std::size_t j1 = opt.fcr_filter_enabled ? (j0 + 1) : nf;
+                const std::size_t k1 = opt.fcr_filter_enabled ? (k0 + 1) : nf;
+                for (std::size_t i = i0; i < i1; ++i) {
+                    for (std::size_t j = j0; j < j1; ++j) {
+                        for (std::size_t k = k0; k < k1; ++k) {
+                            const cd conv_f = kernels_conv.F[i][j][k](static_cast<Eigen::Index>(tidx));
+                            const cd conv_c = kernels_conv.C[i][j][k](static_cast<Eigen::Index>(tidx));
+                            const cd conv_r = kernels_conv.R[i][j][k](static_cast<Eigen::Index>(tidx));
+                            const cd dir_f = kernels_dir.F[i][j][k](static_cast<Eigen::Index>(tidx));
+                            const cd dir_c = kernels_dir.C[i][j][k](static_cast<Eigen::Index>(tidx));
+                            const cd dir_r = kernels_dir.R[i][j][k](static_cast<Eigen::Index>(tidx));
+                            update_err(fstat, conv_f, dir_f, opt.atol, opt.rtol);
+                            update_err(cstat, conv_c, dir_c, opt.atol, opt.rtol);
+                            update_err(rstat, conv_r, dir_r, opt.atol, opt.rtol);
+                        }
+                    }
+                }
+            }
+            if (!fstat.ok || !cstat.ok || !rstat.ok) failures++;
+            std::cout << "F(methods) max_abs=" << fstat.max_abs
+                      << " max_rel=" << fstat.max_rel
+                      << (fstat.ok ? " ok\n" : " FAIL\n");
+            std::cout << "C(methods) max_abs=" << cstat.max_abs
+                      << " max_rel=" << cstat.max_rel
+                      << (cstat.ok ? " ok\n" : " FAIL\n");
+            std::cout << "R(methods) max_abs=" << rstat.max_abs
+                      << " max_rel=" << rstat.max_rel
+                      << (rstat.ok ? " ok\n" : " FAIL\n");
+        }
+
+        if (failures > 0) {
+            std::cout << "FAILED: " << failures << " comparison(s)\n";
+            return 2;
+        }
         return 0;
     } catch (const std::exception& ex) {
         std::cerr << "Error: " << ex.what() << "\n";

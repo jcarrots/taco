@@ -11,7 +11,7 @@ struct MikxTensors {
     Eigen::MatrixXcd M; // size N^2 x N^2 (flattened)
     Eigen::MatrixXcd I;
     Eigen::MatrixXcd K;
-    std::vector<std::complex<double>> X; // stored as length N^6 (row-major)
+    std::vector<std::complex<double>> X; // stored as length N^6 (column-major)
     int N{0};
 };
 

@@ -10,11 +10,14 @@ namespace {
 inline std::size_t flat6(std::size_t N,
                          int j,int k,int p,int q,int r,int s)
 {
-    // Row-major index for 6D tensor of size N in each dim
-    std::size_t NN = static_cast<std::size_t>(N);
-    return (((((static_cast<std::size_t>(j) * NN + static_cast<std::size_t>(k)) * NN
-                + static_cast<std::size_t>(p)) * NN + static_cast<std::size_t>(q)) * NN
-              + static_cast<std::size_t>(r)) * NN + static_cast<std::size_t>(s));
+    // Column-major index for 6D tensor of size N in each dim (first index varies fastest)
+    const std::size_t NN = static_cast<std::size_t>(N);
+    return static_cast<std::size_t>(j) +
+           NN * (static_cast<std::size_t>(k) +
+           NN * (static_cast<std::size_t>(p) +
+           NN * (static_cast<std::size_t>(q) +
+           NN * (static_cast<std::size_t>(r) +
+           NN * static_cast<std::size_t>(s)))));
 }
 
 // Column-major pair flattening: idx(row,col) = row + col*N
