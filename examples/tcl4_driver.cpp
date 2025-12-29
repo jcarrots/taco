@@ -119,14 +119,21 @@ int main(int argc, char** argv) {
 
     // --- Build M/I/K/X tensors and assemble Liouvillian correction ---
     auto mikx = tcl4::build_mikx_serial(map, kernels, tidx);
-    Eigen::MatrixXcd GW = tcl4::assemble_liouvillian(mikx, std::vector<Matrix>{A_eig});
+    const Eigen::MatrixXcd GW_raw = tcl4::assemble_liouvillian(mikx, std::vector<Matrix>{A_eig}); // (n,i;m,j)
+    const Eigen::MatrixXcd L4 = tcl4::gw_to_liouvillian(GW_raw, system.eig.dim);                   // (n,m;i,j)
 
     // --- Report diagnostics ---
-    const double fro = ops::fro_norm(GW);
-    const double herm_err = ops::fro_norm(GW - GW.adjoint());
-    std::cout << "GW size: " << GW.rows() << "x" << GW.cols()
-              << ", ||GW||_F=" << fro
-              << ", ||GW-GW^H||_F=" << herm_err << "\n";
+    const double fro_gw = ops::fro_norm(GW_raw);
+    const double herm_gw_err = ops::fro_norm(GW_raw - GW_raw.adjoint());
+    std::cout << "GW_raw size: " << GW_raw.rows() << "x" << GW_raw.cols()
+              << ", ||GW_raw||_F=" << fro_gw
+              << ", ||GW_raw-GW_raw^H||_F=" << herm_gw_err << "\n";
+
+    const double fro_l4 = ops::fro_norm(L4);
+    const double herm_l4_err = ops::fro_norm(L4 - L4.adjoint());
+    std::cout << "L4 size: " << L4.rows() << "x" << L4.cols()
+              << ", ||L4||_F=" << fro_l4
+              << ", ||L4-L4^H||_F=" << herm_l4_err << "\n";
 
     // Optionally, rebuild and show Γ(NxN) at this time
     auto Gmat = tcl4::build_gamma_matrix_at(map, gamma_series, tidx);

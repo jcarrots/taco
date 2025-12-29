@@ -20,6 +20,7 @@
 #include "taco/tcl4_assemble.hpp"
 #include "taco/tcl4_kernels.hpp"
 #include "taco/tcl4_mikx.hpp"
+#include "taco/profile.hpp"
 
 namespace {
 
@@ -372,6 +373,14 @@ std::string lower_copy(const std::string& s) {
     return out;
 }
 
+bool parse_bool_flag(const std::string& raw) {
+    const std::string v = lower_copy(trim_copy(raw));
+    if (v.empty()) return true;
+    if (v == "1" || v == "true" || v == "yes" || v == "on") return true;
+    if (v == "0" || v == "false" || v == "no" || v == "off") return false;
+    throw std::runtime_error("Invalid bool value: " + raw);
+}
+
 std::vector<std::string> split_csv(const std::string& s) {
     std::vector<std::string> out;
     std::stringstream ss(s);
@@ -413,6 +422,7 @@ struct Options {
     std::string file{"tests/tcl_test.h5"};
     std::string tidx_list{"0,mid,last"};
     bool one_based{false};
+    bool profile{false};
 
     bool list{false};
     bool dump_map{false};
@@ -442,6 +452,7 @@ struct Options {
 void print_usage() {
     std::cout
         << "Usage: tcl4_h5_compare.exe [--file=PATH] [--tidx=LIST] [--one-based]\n"
+        << "                           [--profile]\n"
         << "                           [--list] [--dump-map]\n"
         << "                           [--compare-gt] [--compare-fcr] [--compare-gw]\n"
         << "                           [--print-gt] [--print-fcr] [--print-mikx] [--print-gw]\n"
@@ -474,6 +485,14 @@ int main(int argc, char** argv) {
             }
             if (arg == "--one-based") {
                 opt.one_based = true;
+                continue;
+            }
+            if (arg == "--profile") {
+                opt.profile = true;
+                continue;
+            }
+            if (arg.rfind("--profile=", 0) == 0) {
+                opt.profile = parse_bool_flag(arg.substr(10));
                 continue;
             }
             if (arg == "--list") {
@@ -571,37 +590,61 @@ int main(int argc, char** argv) {
             opt.compare_gt = true;
         }
 
+        taco::profile::Session prof(opt.profile, std::cout);
+        auto total_sec = prof.section("Total");
+
+        taco::profile::Session::Section open_sec = prof.section("Open HDF5");
         H5File h5(opt.file);
+        open_sec.stop();
 
         if (opt.list) {
+            auto sec = prof.section("List datasets");
             for (const auto& d : list_datasets(h5.id)) {
                 std::cout << d.path << " dims=" << dims_to_string(d.dims) << "\n";
             }
             if (!opt.dump_map && !compare_or_print_seen) return 0;
         }
 
-        const double dt = read_scalar_double(h5.id, "/params/dt");
+        double dt = 0.0;
+        {
+            auto sec = prof.section("Read params");
+            dt = read_scalar_double(h5.id, "/params/dt");
+        }
 
         if (!dataset_exists(h5.id, "/bath/C/re")) {
             throw std::runtime_error("/bath/C not found in file");
         }
         std::vector<hsize_t> dims_c;
-        auto C_full = read_complex(h5.id, "/bath/C", &dims_c);
+        std::vector<cd> C_full;
+        {
+            auto sec = prof.section("Read /bath/C");
+            C_full = read_complex(h5.id, "/bath/C", &dims_c);
+        }
         if (C_full.empty()) throw std::runtime_error("Empty /bath/C");
         const std::size_t Nt_c = C_full.size();
 
         std::vector<double> tvals;
         if (dataset_exists(h5.id, "/time/t")) {
             std::vector<hsize_t> dims_t;
+            auto sec = prof.section("Read /time/t");
             tvals = read_array<double>(h5.id, "/time/t", H5T_NATIVE_DOUBLE, &dims_t);
         }
 
-        const std::size_t N = static_cast<std::size_t>(read_scalar_double(h5.id, "/map/N"));
-        const std::size_t nf = static_cast<std::size_t>(read_scalar_double(h5.id, "/map/nf"));
+        std::size_t N = 0;
+        std::size_t nf = 0;
+        {
+            auto sec = prof.section("Read map scalars");
+            N = static_cast<std::size_t>(read_scalar_double(h5.id, "/map/N"));
+            nf = static_cast<std::size_t>(read_scalar_double(h5.id, "/map/nf"));
+        }
         if (N == 0 || nf == 0) throw std::runtime_error("map/N and map/nf must be > 0");
 
         std::vector<hsize_t> dims_ij;
-        auto map_ij_raw = read_array<long long>(h5.id, "/map/ij", H5T_NATIVE_LLONG, &dims_ij);
+        std::vector<long long> map_ij_raw;
+        {
+            auto sec = prof.section("Read /map/ij");
+            map_ij_raw = read_array<long long>(h5.id, "/map/ij", H5T_NATIVE_LLONG, &dims_ij);
+        }
         if (map_ij_raw.size() != N * N) {
             throw std::runtime_error("map/ij length must be N^2");
         }
@@ -623,30 +666,34 @@ int main(int argc, char** argv) {
         }
 
         taco::sys::System system;
-        if (dataset_exists(h5.id, "/system/Eig/re")) {
-            std::vector<hsize_t> dims_e;
-            auto eig_re = read_array<double>(h5.id, "/system/Eig/re", H5T_NATIVE_DOUBLE, &dims_e);
-            system.eig.dim = eig_re.size();
-            system.eig.eps = Eigen::VectorXd::Zero(static_cast<Eigen::Index>(eig_re.size()));
-            for (std::size_t ii = 0; ii < eig_re.size(); ++ii) {
-                system.eig.eps(static_cast<Eigen::Index>(ii)) = eig_re[ii];
+        Eigen::MatrixXcd A_eig;
+        {
+            auto sec = prof.section("Read system + derive frequencies");
+            if (dataset_exists(h5.id, "/system/Eig/re")) {
+                std::vector<hsize_t> dims_e;
+                auto eig_re = read_array<double>(h5.id, "/system/Eig/re", H5T_NATIVE_DOUBLE, &dims_e);
+                system.eig.dim = eig_re.size();
+                system.eig.eps = Eigen::VectorXd::Zero(static_cast<Eigen::Index>(eig_re.size()));
+                for (std::size_t ii = 0; ii < eig_re.size(); ++ii) {
+                    system.eig.eps(static_cast<Eigen::Index>(ii)) = eig_re[ii];
+                }
+                system.eig.U = Eigen::MatrixXcd::Identity(static_cast<Eigen::Index>(system.eig.dim),
+                                                          static_cast<Eigen::Index>(system.eig.dim));
+                system.eig.U_dag = system.eig.U;
+            } else if (dataset_exists(h5.id, "/system/H/re")) {
+                system.eig = taco::sys::Eigensystem(read_matrix(h5.id, "/system/H"));
+            } else {
+                throw std::runtime_error("Need /system/Eig or /system/H to derive Bohr frequencies");
             }
-            system.eig.U = Eigen::MatrixXcd::Identity(static_cast<Eigen::Index>(system.eig.dim),
-                                                      static_cast<Eigen::Index>(system.eig.dim));
-            system.eig.U_dag = system.eig.U;
-        } else if (dataset_exists(h5.id, "/system/H/re")) {
-            system.eig = taco::sys::Eigensystem(read_matrix(h5.id, "/system/H"));
-        } else {
-            throw std::runtime_error("Need /system/Eig or /system/H to derive Bohr frequencies");
-        }
-        system.bf = taco::sys::BohrFrequencies(system.eig.eps);
+            system.bf = taco::sys::BohrFrequencies(system.eig.eps);
 
-        if (!dataset_exists(h5.id, "/system/A/re")) {
-            throw std::runtime_error("Need /system/A for MIKX/GW");
-        }
-        const Eigen::MatrixXcd A_eig = read_matrix(h5.id, "/system/A");
-        if (static_cast<std::size_t>(A_eig.rows()) != N || static_cast<std::size_t>(A_eig.cols()) != N) {
-            throw std::runtime_error("/system/A dims do not match map/N");
+            if (!dataset_exists(h5.id, "/system/A/re")) {
+                throw std::runtime_error("Need /system/A for MIKX/GW");
+            }
+            A_eig = read_matrix(h5.id, "/system/A");
+            if (static_cast<std::size_t>(A_eig.rows()) != N || static_cast<std::size_t>(A_eig.cols()) != N) {
+                throw std::runtime_error("/system/A dims do not match map/N");
+            }
         }
 
         // Derive bucket omegas in map/ij bucket order.
@@ -694,7 +741,11 @@ int main(int argc, char** argv) {
             }
         }
 
-        Eigen::MatrixXcd gamma_series = compute_gamma_prefix_matrix(C_full, dt, omegas_u, opt.gamma_rule);
+        Eigen::MatrixXcd gamma_series;
+        {
+            auto sec = prof.section("Compute Gamma series");
+            gamma_series = compute_gamma_prefix_matrix(C_full, dt, omegas_u, opt.gamma_rule);
+        }
         if (gamma_series.rows() != static_cast<Eigen::Index>(Nt_c) ||
             gamma_series.cols() != static_cast<Eigen::Index>(nf)) {
             throw std::runtime_error("Failed to build gamma_series");
@@ -718,8 +769,14 @@ int main(int argc, char** argv) {
         taco::tcl4::Tcl4Map map;
         const bool need_kernels = opt.compare_fcr || opt.compare_gw || opt.print_mikx || opt.print_fcr;
         const bool need_map = opt.compare_gw || opt.print_mikx;
-        if (need_kernels) kernels = taco::tcl4::compute_triple_kernels(system, gamma_series, dt, 2, opt.method);
-        if (need_map) map = taco::tcl4::build_map(system, {});
+        if (need_kernels) {
+            auto sec = prof.section("Compute kernels (F/C/R)");
+            kernels = taco::tcl4::compute_triple_kernels(system, gamma_series, dt, 2, opt.method);
+        }
+        if (need_map) {
+            auto sec = prof.section("Build TCL4 map");
+            map = taco::tcl4::build_map(system, {});
+        }
 
         // Load file outputs (only when needed).
         const std::size_t N2 = N * N;
@@ -734,13 +791,19 @@ int main(int argc, char** argv) {
         std::size_t Nt_avail = Nt_c;
         if (opt.compare_gt) {
             if (!dataset_exists(h5.id, "/out/Gt_flat/re")) throw std::runtime_error("Missing /out/Gt_flat");
-            Gt_file = load_flat_series(h5.id, "/out/Gt_flat", N2);
+            {
+                auto sec = prof.section("Read /out/Gt_flat");
+                Gt_file = load_flat_series(h5.id, "/out/Gt_flat", N2);
+            }
             if (opt.gt_offset >= Gt_file.Nt) throw std::runtime_error("gt-offset exceeds Gt length");
             Nt_avail = std::min(Nt_avail, Gt_file.Nt - opt.gt_offset);
         }
         if (opt.compare_gw) {
             if (!dataset_exists(h5.id, "/out/GW_flat/re")) throw std::runtime_error("Missing /out/GW_flat");
-            GW_file = load_flat_series(h5.id, "/out/GW_flat", N2 * N2);
+            {
+                auto sec = prof.section("Read /out/GW_flat");
+                GW_file = load_flat_series(h5.id, "/out/GW_flat", N2 * N2);
+            }
             Nt_avail = std::min(Nt_avail, GW_file.Nt);
         }
         if (opt.compare_fcr) {
@@ -749,20 +812,29 @@ int main(int argc, char** argv) {
                 !dataset_exists(h5.id, "/kernels/R_all/re")) {
                 throw std::runtime_error("Missing /kernels/F_all,C_all,R_all");
             }
-            F_file = load_kernel_series(h5.id, "/kernels/F_all", nf);
-            C_file = load_kernel_series(h5.id, "/kernels/C_all", nf);
-            R_file = load_kernel_series(h5.id, "/kernels/R_all", nf);
+            {
+                auto sec = prof.section("Read /kernels/*_all");
+                F_file = load_kernel_series(h5.id, "/kernels/F_all", nf);
+                C_file = load_kernel_series(h5.id, "/kernels/C_all", nf);
+                R_file = load_kernel_series(h5.id, "/kernels/R_all", nf);
+            }
             if (opt.fcr_offset >= F_file.Nt) throw std::runtime_error("fcr-offset exceeds kernel length");
             Nt_avail = std::min(Nt_avail, F_file.Nt - opt.fcr_offset);
         }
         if (opt.print_redt) {
             if (!dataset_exists(h5.id, "/out/RedT_flat/re")) throw std::runtime_error("Missing /out/RedT_flat");
-            RedT_file = load_flat_series(h5.id, "/out/RedT_flat", N2 * N2);
+            {
+                auto sec = prof.section("Read /out/RedT_flat");
+                RedT_file = load_flat_series(h5.id, "/out/RedT_flat", N2 * N2);
+            }
             Nt_avail = std::min(Nt_avail, RedT_file.Nt);
         }
         if (opt.print_tcl) {
             if (!dataset_exists(h5.id, "/out/TCL_flat/re")) throw std::runtime_error("Missing /out/TCL_flat");
-            TCL_file = load_flat_series(h5.id, "/out/TCL_flat", N2 * N2);
+            {
+                auto sec = prof.section("Read /out/TCL_flat");
+                TCL_file = load_flat_series(h5.id, "/out/TCL_flat", N2 * N2);
+            }
             Nt_avail = std::min(Nt_avail, TCL_file.Nt);
         }
 
@@ -778,6 +850,7 @@ int main(int argc, char** argv) {
         std::size_t failures = 0;
 
         if (opt.compare_gt) {
+            auto sec = prof.section("Compare Gt");
             ErrSummary gtstat;
             for (std::size_t tidx : tidx_list) {
                 const std::size_t file_tidx = tidx + opt.gt_offset;
@@ -804,6 +877,7 @@ int main(int argc, char** argv) {
         }
 
         if (opt.compare_fcr) {
+            auto sec = prof.section("Compare F/C/R");
             ErrSummary fstat, cstat, rstat;
             for (std::size_t tidx : tidx_list) {
                 const std::size_t file_tidx = tidx + opt.fcr_offset;
@@ -841,6 +915,7 @@ int main(int argc, char** argv) {
         if (opt.print_mikx) {
             if (!need_map || !need_kernels) throw std::runtime_error("MIKX requires computed kernels");
             for (std::size_t tidx : tidx_list) {
+                auto sec = prof.section("MIKX@tidx=" + std::to_string(tidx));
                 const taco::tcl4::MikxTensors mikx = taco::tcl4::build_mikx_serial(map, kernels, tidx);
                 std::cout << "MIKX tidx=" << tidx << " t=" << t_at(tidx) << " N=" << mikx.N << "\n";
                 std::cout << "M:\n";
@@ -885,6 +960,7 @@ int main(int argc, char** argv) {
             if (!need_map || !need_kernels) throw std::runtime_error("GW requires computed kernels");
             ErrSummary gwstat;
             for (std::size_t tidx : tidx_list) {
+                auto sec = prof.section("GW@tidx=" + std::to_string(tidx));
                 taco::tcl4::MikxTensors mikx = taco::tcl4::build_mikx_serial(map, kernels, tidx);
                 Eigen::MatrixXcd GW = taco::tcl4::assemble_liouvillian(mikx, system.A_eig);
                 if (opt.print_gw) std::cout << "GW tidx=" << tidx << " t=" << t_at(tidx) << "\n";

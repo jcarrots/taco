@@ -10,7 +10,7 @@ taco/
 │  ├─ generator_demo.cpp      # shows how to use tcl2::build_tcl2_components
 │  ├─ spin_boson.cpp          # configurable spin-boson simulator (CLI)
 │  ├─ tcl4_driver.cpp         # TCL4 pipeline driver (FFT Γ, F/C/R, MIKX, assemble)
-│  └─ spin_boson_tcl4.cpp     # spin-boson TCL4 composition demo (L2 + α²·GW propagation)
+│  └─ TCL4_spin_boson_example.cpp  # spin-boson TCL4 example (prints GW + L4; optional propagation)
 ├─ tests/
 │  ├─ integrator_tests.cpp    # quadrature / convolution tests
 │  ├─ gamma_tests.cpp         # Γ(ω,t) integrator accuracy check
@@ -61,7 +61,7 @@ gamma_tests.exe         # Γ integrator tests
 spin_boson_tests.exe    # spin-boson regression dump
 tcl4_driver.exe         # TCL4 end-to-end driver (Γ FFT → F/C/R → MIKX → assemble)
 tcl4_tests.exe          # Direct vs Convolution consistency check
-spin_boson_tcl4.exe     # Spin-boson TCL4 propagation (L2 + α²·GW)
+tcl4_spin_boson_example.exe  # Spin-boson TCL4 example (GW->L4 reshuffle + propagation)
 ```
 
 Generated artifacts

@@ -156,4 +156,32 @@ Eigen::MatrixXcd assemble_liouvillian(const MikxTensors& tensors,
     return GW;
 }
 
+Eigen::MatrixXcd gw_to_liouvillian(const Eigen::MatrixXcd& GW, std::size_t N)
+{
+    if (N == 0) throw std::invalid_argument("gw_to_liouvillian: N must be > 0");
+    const std::size_t N2 = N * N;
+    if (GW.rows() != GW.cols()) {
+        throw std::invalid_argument("gw_to_liouvillian: GW must be square");
+    }
+    if (static_cast<std::size_t>(GW.rows()) != N2) {
+        throw std::invalid_argument("gw_to_liouvillian: GW dims must be (N^2 x N^2)");
+    }
+
+    Eigen::MatrixXcd L(static_cast<Eigen::Index>(N2), static_cast<Eigen::Index>(N2));
+    for (int n = 0; n < static_cast<int>(N); ++n) {
+        for (int m = 0; m < static_cast<int>(N); ++m) {
+            for (int i = 0; i < static_cast<int>(N); ++i) {
+                for (int j = 0; j < static_cast<int>(N); ++j) {
+                    const auto row_L = static_cast<Eigen::Index>(flat2(N, n, m));
+                    const auto col_L = static_cast<Eigen::Index>(flat2(N, i, j));
+                    const auto row_G = static_cast<Eigen::Index>(flat2(N, n, i));
+                    const auto col_G = static_cast<Eigen::Index>(flat2(N, m, j));
+                    L(row_L, col_L) = GW(row_G, col_G);
+                }
+            }
+        }
+    }
+    return L;
+}
+
 } // namespace taco::tcl4

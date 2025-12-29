@@ -77,14 +77,14 @@ void build_FCR_6d_series(const Tcl4Map& map,
 
 // ---------------- High-level TCL4 wrappers ----------------
 
-// Build the TCL4 correction GW (generator) at a single time index using system's eigen-basis couplings.
+// Build the TCL4 Liouvillian superoperator L4 at a single time index (acts on vec(rho)).
 Eigen::MatrixXcd build_TCL4_generator(const sys::System& system,
                                       const Eigen::MatrixXcd& gamma_series,
                                       double dt,
                                       std::size_t time_index,
                                       FCRMethod method = FCRMethod::Convolution);
 
-// Build the TCL4 correction GW for all time indices [0..Nt-1]. Returns a vector of length Nt.
+// Build the TCL4 Liouvillian superoperator L4 for all time indices [0..Nt-1]. Returns a vector of length Nt.
 std::vector<Eigen::MatrixXcd> build_correction_series(const sys::System& system,
                                                       const Eigen::MatrixXcd& gamma_series,
                                                       double dt,

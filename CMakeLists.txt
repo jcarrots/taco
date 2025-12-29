@@ -97,8 +97,8 @@ target_link_libraries(spin_boson PRIVATE taco_tcl)
 add_executable(tcl4_driver examples/tcl4_driver.cpp)
 target_link_libraries(tcl4_driver PRIVATE taco_tcl)
 
-add_executable(spin_boson_tcl4 examples/spin_boson_tcl4.cpp)
-target_link_libraries(spin_boson_tcl4 PRIVATE taco_tcl)
+add_executable(tcl4_spin_boson_example examples/TCL4_spin_boson_example.cpp)
+target_link_libraries(tcl4_spin_boson_example PRIVATE taco_tcl)
 
 add_executable(tcl4_bench examples/tcl4_bench.cpp)
 target_link_libraries(tcl4_bench PRIVATE taco_tcl)
