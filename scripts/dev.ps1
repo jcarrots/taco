@@ -17,10 +17,16 @@ function Ensure-BuildDir {
 }
 
 function Get-ExePath([string]$Config) {
-  $p1 = Join-Path -Path "build" -ChildPath "$Config/tcl2_demo.exe"
-  $p2 = Join-Path -Path "build" -ChildPath "tcl2_demo.exe"
-  if (Test-Path $p1) { return $p1 }
-  if (Test-Path $p2) { return $p2 }
+  $primary1 = Join-Path -Path "build" -ChildPath "$Config/tcl_driver.exe"
+  $primary2 = Join-Path -Path "build" -ChildPath "tcl_driver.exe"
+  if (Test-Path $primary1) { return $primary1 }
+  if (Test-Path $primary2) { return $primary2 }
+
+  # Fallback (doesn't require yaml-cpp)
+  $fallback1 = Join-Path -Path "build" -ChildPath "$Config/tcl4_bench.exe"
+  $fallback2 = Join-Path -Path "build" -ChildPath "tcl4_bench.exe"
+  if (Test-Path $fallback1) { return $fallback1 }
+  if (Test-Path $fallback2) { return $fallback2 }
   return $null
 }
 
@@ -46,7 +52,7 @@ switch ($Action) {
     Invoke-CMake -Args "-S . -B build"
     Invoke-CMake -Args "--build build --config $Config -j $Jobs"
     $exe = Get-ExePath $Config
-    if (-not $exe) { throw "Demo executable not found after build" }
+    if (-not $exe) { throw "Executable not found after build" }
     & $exe
     break
   }
@@ -55,7 +61,7 @@ switch ($Action) {
     Invoke-CMake -Args "-S . -B build"
     Invoke-CMake -Args "--build build --config $Config -j $Jobs"
     $exe = Get-ExePath $Config
-    if (-not $exe) { throw "Demo executable not found after build" }
+    if (-not $exe) { throw "Executable not found after build" }
     & $exe
     break
   }

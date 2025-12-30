@@ -2,11 +2,11 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Launch tcl2_demo (Debug)",
+      "name": "Launch tcl_driver (Debug)",
       "type": "cppvsdbg",
       "request": "launch",
-      "program": "${workspaceFolder}\\build\\Debug\\tcl2_demo.exe",
-      "args": [],
+      "program": "${workspaceFolder}\\build\\Debug\\tcl_driver.exe",
+      "args": ["--config=configs/tcl_driver.yaml"],
       "stopAtEntry": false,
       "cwd": "${workspaceFolder}",
       "environment": [],
@@ -14,11 +14,11 @@
       "preLaunchTask": "build-debug"
     },
     {
-      "name": "Launch tcl2_demo (Release)",
+      "name": "Launch tcl_driver (Release)",
       "type": "cppvsdbg",
       "request": "launch",
-      "program": "${workspaceFolder}\\build\\Release\\tcl2_demo.exe",
-      "args": [],
+      "program": "${workspaceFolder}\\build\\Release\\tcl_driver.exe",
+      "args": ["--config=configs/tcl_driver.yaml"],
       "stopAtEntry": false,
       "cwd": "${workspaceFolder}",
       "environment": [],

@@ -27,7 +27,7 @@ This document captures the steps required to translate the MATLAB TCL4 workflow 
 - Implement `compute_FCR_timeseries_all(system, GammaSeries, dt, nmax)` producing time-series arrays for all `(Ï‰1, Ï‰2, Ï‰3)` combinations. Shapes:
   - `F_all`, `C_all`, `R_all` â€“ stored as `std::vector<Eigen::MatrixXcd>` or custom tensor wrapper (`time Ã— nf Ã— nf Ã— nf`).
   - Use `map` mappings to fill data in the same layout as MATLAB (`map.ij` style conversions).
-- For each time index `k` (matching `tcl4_driver` logic: `tidx = 2*nmax*ns + 1`), later reshape these into 6D tensors for system indices.
+- For each time index `k` (matching the legacy `tcl4_driver` logic: `tidx = 2*nmax*ns + 1`), later reshape these into 6D tensors for system indices.
   - Current implementation computes F/C/R using Î“ columns (`Eigen::VectorXcd`) with `FCRMethod::Convolution` by default; Î“^T is realized by using the mirrored frequency bucket.
   - Results are kept in frequency space (unique buckets). Dedicated rebuild helpers project back to full frequencyâ€‘index tensors:
     - `build_FCR_6d_at(map, kernels, t_idx, F,C,R)` and `build_FCR_6d_series(...)`.
@@ -79,7 +79,7 @@ Status: Implemented
     - `build_correction_series(system, gamma_series, dt, method)` â†’ GW for all times.
     - Rebuild helpers as noted in Phase 1.2.
   - Optionally, helper overload to accept a `tcl::TCL2Generator` (stateful) to reuse Simpson integrals.
-- Update `examples/spin_boson.cpp` CLI: new flag `--generator=tcl2|tcl4|both` to compute TCL4 correction and optionally add to TCL2 Liouvillian.
+- Update `examples/tcl_driver.cpp`: extend YAML knobs to select generator order (0|2|4) and optionally combine TCL2 + TCL4 in the output Liouvillian.
 - Provide YAML knobs (`spectral`, `cutoff`, `generator`) already extended earlier.
  - Convenience rebuild helpers are available:
    - `build_gamma_matrix_at(map, gamma_series, t_idx)`

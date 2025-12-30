@@ -17,6 +17,20 @@ Template (copy/paste for new entries)
 
 -----------------------------------------------------------------------
 
+Date: 2025-12-29
+Summary: Replace hardcoded TCL4 driver with YAML-driven tcl_driver
+Details:
+  - Rationale:
+    - Move TCL4 end-to-end runs toward a generic workflow where the system (H/A) and bath (J(ω)) come from a parameter file instead of being hardcoded to spin-boson defaults.
+  - Files:
+    - Driver: examples/tcl_driver.cpp (new), configs/tcl_driver.yaml (sample), CMakeLists.txt (new target `tcl_driver`)
+    - Utility: cpp/include/taco/expression.hpp (J(ω) expression compiler used by the driver)
+  - Notes:
+    - `tcl_driver` uses `yaml-cpp` to parse matrices and a small expression parser to evaluate `J(w)` from config.
+    - The previous `tcl4_driver` executable was removed; use `tcl_driver` instead.
+  - Migration:
+    - Update build scripts from `tcl4_driver` → `tcl_driver`.
+
 Date: 2025-10-16
 Summary: Implement TCL4 Liouvillian assembly (NAKZWAN) in C++
 Details:

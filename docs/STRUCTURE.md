@@ -4,18 +4,17 @@
 taco/
 ├─ CMakeLists.txt             # build script (taco_tcl + executables/tests)
 ├─ configs/
-│  └─ spin_boson.yaml         # sample configuration for the spin-boson CLI
+│  └─ tcl_driver.yaml         # sample config for `tcl_driver`
 ├─ examples/
-│  ├─ tcl2_demo.cpp           # legacy fixed-parameter TCL2 demo
-│  ├─ generator_demo.cpp      # shows how to use tcl2::build_tcl2_components
-│  ├─ spin_boson.cpp          # configurable spin-boson simulator (CLI)
-│  ├─ tcl4_driver.cpp         # TCL4 pipeline driver (FFT Γ, F/C/R, MIKX, assemble)
+│  ├─ tcl_driver.cpp          # TCL driver (YAML system/bath config; BCF → Γ → F/C/R → MIKX → GW/L4)
+│  ├─ tcl4_bench.cpp          # kernel builder benchmark / quick OpenMP sanity
 │  └─ TCL4_spin_boson_example.cpp  # spin-boson TCL4 example (prints GW + L4; optional propagation)
 ├─ tests/
 │  ├─ integrator_tests.cpp    # quadrature / convolution tests
 │  ├─ gamma_tests.cpp         # Γ(ω,t) integrator accuracy check
 │  ├─ spin_boson_tests.cpp    # dumps ρ(t) + Liouvillian for regression analysis
-│  └─ tcl4_tests.cpp          # compares Direct vs Convolution F/C/R builders
+│  ├─ tcl4_tests.cpp          # compares Direct vs Convolution F/C/R builders
+│  └─ tcl4_h5_compare.cpp     # MATLAB HDF5 compare tool (requires HDF5)
 ├─ cpp/
 │  ├─ include/taco/
 │  │  ├─ bath.hpp             # correlation-function interface (abstract)
@@ -43,8 +42,6 @@ taco/
 │        └─ tcl4_kernels.cpp        # F/C/R kernel time-series (discrete integrals)
     │        ├─ tcl4_mikx.cpp           # M/I/K/X assembly (explicit contractions)
 │        └─ tcl4_assemble.cpp       # placeholder for TCL4 Liouvillian assembly
-├─ configs/
-│   └─ spin_boson.yaml        # (duplicated above for clarity)
 └─ docs/
     └─ STRUCTURE.md           # this file
     └─ PARALLEL_PLAN.md       # serial/omp/cuda/mpi_omp/mpi_cuda plan (Exec, phases, backends)
@@ -53,19 +50,17 @@ taco/
 Key binaries after a Release build live under `build/Release/`:
 
 ```
-spin_boson.exe          # CLI simulator (configurable)
-generator_demo.exe      # Liouvillian builder example
-tcl2_demo.exe           # legacy demo
 integrator_tests.exe    # quadrature/convolution tests
 gamma_tests.exe         # Γ integrator tests
 spin_boson_tests.exe    # spin-boson regression dump
-tcl4_driver.exe         # TCL4 end-to-end driver (Γ FFT → F/C/R → MIKX → assemble)
+tcl_driver.exe          # TCL driver (YAML config; Γ FFT → F/C/R → MIKX → GW/L4)
 tcl4_tests.exe          # Direct vs Convolution consistency check
+tcl4_bench.exe          # kernel builder benchmark / quick OpenMP sanity
 tcl4_spin_boson_example.exe  # Spin-boson TCL4 example (GW->L4 reshuffle + propagation)
+tcl4_h5_compare.exe     # (optional) MATLAB HDF5 compare tool (requires HDF5)
 ```
 
 Generated artifacts
 -------------------
-- `spin_boson_observables.csv`, `spin_boson_density.csv` (created by `spin_boson.exe`).
 - `gamma_test_results.txt`, `integrator_test_results.txt` written by respective tests.
 ```

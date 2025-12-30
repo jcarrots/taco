@@ -1,8 +1,13 @@
 #include "taco/tcl4.hpp"
 
+#include <cstddef>
 #include <stdexcept>
 #include <limits>
 #include <cmath>
+
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 
 #include "taco/tcl4_kernels.hpp"
 #include "taco/tcl4_mikx.hpp"
@@ -105,28 +110,32 @@ TripleKernelSeries compute_triple_kernels(const sys::System& system,
         mirror_idx[j] = (best_idx >= 0 ? best_idx : static_cast<int>(j));
     }
 
+    const std::ptrdiff_t nf_i = static_cast<std::ptrdiff_t>(nf);
+    const std::ptrdiff_t total = nf_i * nf_i;
+
     #ifdef _OPENMP
-    #pragma omp parallel for collapse(2) schedule(static)
+    #pragma omp parallel for schedule(static)
     #endif
-    for (std::ptrdiff_t ii = 0; ii < static_cast<std::ptrdiff_t>(nf); ++ii) {
-        for (std::ptrdiff_t jj = 0; jj < static_cast<std::ptrdiff_t>(nf); ++jj) {
-            const std::size_t i = static_cast<std::size_t>(ii);
-            const std::size_t j = static_cast<std::size_t>(jj);
-            const Eigen::VectorXcd g1col = gamma_series.col(static_cast<Eigen::Index>(i));
-            const int j_mirror = mirror_idx[j];
-            const Eigen::VectorXcd g2col = gamma_series.col(static_cast<Eigen::Index>(j));
-            const Eigen::VectorXcd g2mcol = gamma_series.col(static_cast<Eigen::Index>(j_mirror >= 0 ? j_mirror : static_cast<int>(j)));
-            for (std::size_t k = 0; k < nf; ++k) {
-                double omega = system.fidx.buckets[i].omega +
-                               system.fidx.buckets[j].omega +
-                               system.fidx.buckets[k].omega;
-                Eigen::VectorXcd Ft = compute_F_series(g1col, g2mcol, omega, dt, method);
-                Eigen::VectorXcd Ct = compute_C_series(g1col, g2col, omega, dt, method);
-                Eigen::VectorXcd Rt = compute_R_series(g1col, g2col, omega, dt, method);
-                result.F[i][j][k] = std::move(Ft);
-                result.C[i][j][k] = std::move(Ct);
-                result.R[i][j][k] = std::move(Rt);
-            }
+    for (std::ptrdiff_t idx = 0; idx < total; ++idx) {
+        const std::size_t i = static_cast<std::size_t>(idx / nf_i);
+        const std::size_t j = static_cast<std::size_t>(idx % nf_i);
+
+        const auto g1col = gamma_series.col(static_cast<Eigen::Index>(i));
+        const auto g2col = gamma_series.col(static_cast<Eigen::Index>(j));
+        const int j_mirror = mirror_idx[j];
+        const auto g2mcol =
+            gamma_series.col(static_cast<Eigen::Index>(j_mirror >= 0 ? j_mirror : static_cast<int>(j)));
+
+        const double wi = system.fidx.buckets[i].omega;
+        const double wj = system.fidx.buckets[j].omega;
+        for (std::size_t k = 0; k < nf; ++k) {
+            const double omega = wi + wj + system.fidx.buckets[k].omega;
+            Eigen::VectorXcd Ft = compute_F_series(g1col, g2mcol, omega, dt, method);
+            Eigen::VectorXcd Ct = compute_C_series(g1col, g2col, omega, dt, method);
+            Eigen::VectorXcd Rt = compute_R_series(g1col, g2col, omega, dt, method);
+            result.F[i][j][k] = std::move(Ft);
+            result.C[i][j][k] = std::move(Ct);
+            result.R[i][j][k] = std::move(Rt);
         }
     }
 
@@ -263,16 +272,21 @@ std::vector<Eigen::MatrixXcd> build_correction_series(const sys::System& system,
                                                       FCRMethod method)
 {
     const std::size_t Nt = static_cast<std::size_t>(gamma_series.rows());
-    std::vector<Eigen::MatrixXcd> out; out.reserve(Nt);
+    std::vector<Eigen::MatrixXcd> out(Nt);
     auto kernels = compute_triple_kernels(system, gamma_series, dt, /*nmax*/2, method);
     Tcl4Map map = build_map(system, /*time_grid*/{});
-    for (std::size_t t = 0; t < Nt; ++t) {
+
+    #ifdef _OPENMP
+    #pragma omp parallel for schedule(static) if(!omp_in_parallel())
+    #endif
+    for (std::ptrdiff_t tt = 0; tt < static_cast<std::ptrdiff_t>(Nt); ++tt) {
+        const std::size_t t = static_cast<std::size_t>(tt);
         auto mikx = build_mikx_serial(map, kernels, t);
         const Eigen::MatrixXcd GW = assemble_liouvillian(mikx, system.A_eig); // (n,i;m,j)
-        out.emplace_back(gw_to_liouvillian(GW, system.eig.dim));              // (n,m;i,j)
+        out[t] = gw_to_liouvillian(GW, system.eig.dim);                       // (n,m;i,j)
     }
     return out;
 }
 
-// Intentionally no combined TCL2+TCL4 builder here; see examples/tcl4_driver.cpp.
+// Intentionally no combined TCL2+TCL4 builder here; see examples/tcl_driver.cpp.
 } // namespace taco::tcl4

@@ -14,7 +14,7 @@ Quick Build
 - Configure: `cmake -S . -B build`
 - Build Debug: `cmake --build build --config Debug -j 8`
 - Build Release: `cmake --build build --config Release -j 8`
-- Run demo (Win): `build\Release\tcl2_demo.exe`
+- Run driver (Win): `build\Release\tcl_driver.exe --config=configs\tcl_driver.yaml`
 
 GCC (MSYS2)
 -----------
@@ -40,7 +40,7 @@ Python Extension
 VS Code
 -------
 - Terminal -> Run Task (build/run Debug/Release)
-- Debug: select "Launch tcl2_demo (Debug)" and press F5
+- Debug: select "Launch tcl_driver (Debug)" and press F5
 
 FFT Backend
 -----------
@@ -65,7 +65,7 @@ Modules Overview
 - `taco/tcl2.hpp` + `cpp/src/tcl/tcl2_generator.cpp` â€” stateful TCL2 generator (reset/advance/apply) for time stepping.
 - `taco/spin_boson.hpp` â€” convenience builders and `Model` wrapper for the spin-boson Hamiltonian, bath, and generator.
 - `taco/tcl4_kernels.hpp`, `taco/tcl4.hpp` â€” TCL4 kernel builder and triple-series helper (Î“â†’F/C/R) [work-in-progress].
-- Executables: `examples/spin_boson.cpp` (CLI simulator), `examples/generator_demo.cpp` (L builder example), `examples/tcl2_demo.cpp` (legacy demo).
+- Executables: `examples/tcl_driver.cpp` (YAML driver), `examples/TCL4_spin_boson_example.cpp` (TCL4 example), `tests/tcl4_h5_compare.cpp` (MATLAB HDF5 compare).
 - Overall layout: see `docs/STRUCTURE.md` for a filesystem tree.
 
 Module Reference
@@ -126,9 +126,8 @@ Module Reference
 - `Model`: owns `TabulatedCorrelation` and `TCL2Generator` with proper lifetime management.
 
 ### Executables & Tests
-- `examples/spin_boson.cpp`: CLI simulator (parameterized via flags/config), writes observables and full Ï(t).
-- `examples/generator_demo.cpp`: showcases `tcl2::build_tcl2_components` for small systems.
-- `examples/tcl2_demo.cpp`: legacy fixed-step TCL2 demo (kept for reference).
+- `examples/tcl_driver.cpp`: YAML-driven driver for end-to-end TCL2/TCL4 runs.
+- `tests/tcl4_h5_compare.cpp`: compare against MATLAB HDF5 exports.
 - Tests: `tests/integrator_tests.cpp`, `tests/gamma_tests.cpp`, `tests/spin_boson_tests.cpp` (now a data dump for regression analysis).
 
 Propagation Helpers
@@ -159,21 +158,11 @@ Eigen::VectorXcd r = initial_state_vec; // size N^2
 taco::tcl::propagate_rk4_dense_serial(L_series, L_half_series, r, t0, dt);
 ```
 
-- Spin-Boson Simulator
-----------------------
-- Build: `cmake --build build --config Release --target spin_boson`
-- Run with defaults: `build/Release/spin_boson.exe`
-- Outputs (CSV):
-  - `spin_boson_observables.csv` â€” time, âŸ¨Ïƒ_zâŸ©, excited population
-  - `spin_boson_density.csv` â€” time, full density matrix entries (real/imag)
-- Override parameters via `--key=value` flags:
-  - System/bath: `--delta`, `--epsilon`, `--alpha`, `--omega_c`, `--beta`, `--rank`, `--coupling=sz|sx|sy|sm|sp`
-  - Spectral density: `--spectral=ohmic|subohmic|superohmic|custom`, `--s=<exponent>`, `--cutoff=exponential|drude`
-  - Simulation: `--t0`, `--tf`, `--dt`, `--sample_every`
-  - Correlation grid: `--ncorr`, `--dt_corr`
-- Output files: `--observables=...`, `--density=...`
-- Config template: `configs/spin_boson.yaml` (copy & override via CLI flags)
-- Example: `spin_boson.exe --delta=0.8 --epsilon=0.1 --tf=20 --dt=0.02 --coupling=sx`
+- TCL Driver (YAML)
+-------------------
+- Build: `cmake --build build --config Release --target tcl_driver`
+- Run: `build/Release/tcl_driver.exe --config=configs/tcl_driver.yaml`
+- Notes: requires `yaml-cpp` (CMake will skip `tcl_driver` if not found).
 
 Integration Utilities
 ---------------------
@@ -258,7 +247,9 @@ TCL4 Driver & Tests
   - Propagate with dense RK4 on `vec(ρ)` (prints ⟨σ_z⟩ in lab basis):
     - `build-vcpkg-x64/Release/tcl4_spin_boson_example.exe --N=1024 --tidx=1024 --propagate=1 --order=2 --rho0=0 --print_series=1 --sample_every=64`
     - Use `--order=0` for unitary-only, `--order=2` for TCL2, and `--order=4` for TCL4 (`L0+L2+L4`, slower).
-- Driver: `examples/tcl4_driver.cpp` runs the full TCL4 pipeline (Gamma via FFT -> F/C/R -> MIKX -> assemble) and prints diagnostics.
+- Driver: `examples/tcl_driver.cpp` loads a YAML config (matrix `H`, `A` and `J_expr`) and runs the full TCL4 pipeline (BCF FFT -> Gamma -> F/C/R -> MIKX -> GW/L4).
+  - Build: `cmake --build build-vcpkg-x64 --config Release --target tcl_driver` (requires `yaml-cpp`)
+  - Run: `build-vcpkg-x64/Release/tcl_driver.exe --config=configs/tcl_driver.yaml`
 - Test: `tests/tcl4_tests.cpp` compares Direct vs Convolution F/C/R across multiple (N, dt, T) cases and reports max relative errors.
 
 High-Level TCL4 Wrappers

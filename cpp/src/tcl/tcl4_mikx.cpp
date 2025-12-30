@@ -1,7 +1,12 @@
 #include "taco/tcl4_mikx.hpp"
 
+#include <cstddef>
 #include <cmath>
 #include <stdexcept>
+
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 
 namespace taco::tcl4 {
 
@@ -74,49 +79,55 @@ MikxTensors build_mikx_serial(const Tcl4Map& map,
     const auto& C = kernels.C;
     const auto& R = kernels.R;
 
-    // Build M, I, K with explicit contractions mirroring MIKX.m
-    for (int j = 0; j < map.N; ++j) {
-        for (int k = 0; k < map.N; ++k) {
-            const auto f_jk = freq_idx_checked(map.pair_to_freq, j, k);
-            const auto row = static_cast<Eigen::Index>(flat2(N, j, k));
+    // Build M, I, K, X with explicit contractions mirroring MIKX.m.
+    // Parallelize over (j,k,p,q) coefficients (N^4 tasks) for better scaling on small N.
+    const std::size_t N4 = N2 * N2;
 
-            for (int p = 0; p < map.N; ++p) {
-                for (int q = 0; q < map.N; ++q) {
-                    const auto col = static_cast<Eigen::Index>(flat2(N, p, q));
+    #ifdef _OPENMP
+    #pragma omp parallel for schedule(static) if(!omp_in_parallel())
+    #endif
+    for (std::ptrdiff_t idx = 0; idx < static_cast<std::ptrdiff_t>(N4); ++idx) {
+        const std::size_t row_u = static_cast<std::size_t>(idx) / N2; // (j,k) flattened column-major
+        const std::size_t col_u = static_cast<std::size_t>(idx) % N2; // (p,q) flattened column-major
 
-                    // Precompute needed freq indices
-                    const auto f_jq = freq_idx_checked(map.pair_to_freq, j, q);
-                    const auto f_pj = freq_idx_checked(map.pair_to_freq, p, j);
-                    const auto f_pq = freq_idx_checked(map.pair_to_freq, p, q);
-                    const auto f_qk = freq_idx_checked(map.pair_to_freq, q, k);
-                    const auto f_kq = freq_idx_checked(map.pair_to_freq, k, q);
-                    const auto f_qj = freq_idx_checked(map.pair_to_freq, q, j);
+        const int j = static_cast<int>(row_u % N);
+        const int k = static_cast<int>(row_u / N);
+        const int p = static_cast<int>(col_u % N);
+        const int q = static_cast<int>(col_u / N);
 
-                    // M = M1 - M2
-                    // M1(j,k,p,q) = A(j,q,j,k,p,j) -> F[f(j,q)][f(j,k)][f(p,j)]
-                    // M2(j,k,p,q) = B(j,q,p,q,q,k) -> R[f(j,q)][f(p,q)][f(q,k)]
-                    std::complex<double> M1 = F[f_jq][f_jk][f_pj](static_cast<Eigen::Index>(time_index));
-                    std::complex<double> M2 = R[f_jq][f_pq][f_qk](static_cast<Eigen::Index>(time_index));
-                    tensors.M(row, col) = M1 - M2;
+        const auto row = static_cast<Eigen::Index>(row_u);
+        const auto col = static_cast<Eigen::Index>(col_u);
 
-                    // I(j,k,p,q) = A(j,k,q,p,k,q) -> F[f(j,k)][f(q,p)][f(k,q)]
-                    std::complex<double> Ival = F[f_jk][freq_idx_checked(map.pair_to_freq, q, p)][f_kq](static_cast<Eigen::Index>(time_index));
-                    tensors.I(row, col) = Ival;
+        const auto f_jk = freq_idx_checked(map.pair_to_freq, j, k);
+        const auto f_jq = freq_idx_checked(map.pair_to_freq, j, q);
+        const auto f_pj = freq_idx_checked(map.pair_to_freq, p, j);
+        const auto f_pq = freq_idx_checked(map.pair_to_freq, p, q);
+        const auto f_qk = freq_idx_checked(map.pair_to_freq, q, k);
+        const auto f_kq = freq_idx_checked(map.pair_to_freq, k, q);
+        const auto f_qp = freq_idx_checked(map.pair_to_freq, q, p);
+        const auto f_qj = freq_idx_checked(map.pair_to_freq, q, j);
 
-                    // K(j,k,p,q) = B(j,k,p,q,q,j) -> R[f(j,k)][f(p,q)][f(q,j)]
-                    std::complex<double> Kval = R[f_jk][f_pq][f_qj](static_cast<Eigen::Index>(time_index));
-                    tensors.K(row, col) = Kval;
+        // M = M1 - M2
+        // M1(j,k,p,q) = A(j,q,j,k,p,j) -> F[f(j,q)][f(j,k)][f(p,j)]
+        // M2(j,k,p,q) = B(j,q,p,q,q,k) -> R[f(j,q)][f(p,q)][f(q,k)]
+        const std::complex<double> M1 = F[f_jq][f_jk][f_pj](static_cast<Eigen::Index>(time_index));
+        const std::complex<double> M2 = R[f_jq][f_pq][f_qk](static_cast<Eigen::Index>(time_index));
+        tensors.M(row, col) = M1 - M2;
 
-                    // Fill X for all r,s at fixed (j,k,p,q)
-                    for (int r = 0; r < map.N; ++r) {
-                        for (int s = 0; s < map.N; ++s) {
-                            const auto f_rs = freq_idx_checked(map.pair_to_freq, r, s);
-                            std::complex<double> Xval = C[f_jk][f_pq][f_rs](static_cast<Eigen::Index>(time_index))
-                                                      + R[f_jk][f_pq][f_rs](static_cast<Eigen::Index>(time_index));
-                            tensors.X[flat6(map.N, j,k,p,q,r,s)] = Xval;
-                        }
-                    }
-                }
+        // I(j,k,p,q) = A(j,k,q,p,k,q) -> F[f(j,k)][f(q,p)][f(k,q)]
+        tensors.I(row, col) = F[f_jk][f_qp][f_kq](static_cast<Eigen::Index>(time_index));
+
+        // K(j,k,p,q) = B(j,k,p,q,q,j) -> R[f(j,k)][f(p,q)][f(q,j)]
+        tensors.K(row, col) = R[f_jk][f_pq][f_qj](static_cast<Eigen::Index>(time_index));
+
+        // Fill X for all r,s at fixed (j,k,p,q)
+        for (int r = 0; r < map.N; ++r) {
+            for (int s = 0; s < map.N; ++s) {
+                const auto f_rs = freq_idx_checked(map.pair_to_freq, r, s);
+                const std::complex<double> Xval =
+                    C[f_jk][f_pq][f_rs](static_cast<Eigen::Index>(time_index)) +
+                    R[f_jk][f_pq][f_rs](static_cast<Eigen::Index>(time_index));
+                tensors.X[flat6(map.N, j, k, p, q, r, s)] = Xval;
             }
         }
     }

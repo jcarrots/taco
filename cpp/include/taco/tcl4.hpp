@@ -73,7 +73,7 @@ void build_FCR_6d_series(const Tcl4Map& map,
                          std::vector<std::vector<std::complex<double>>>& R_series);
 
 // Composition of TCL2 + TCL4 is intentionally left to application layer
-// (e.g., examples/tcl4_driver.cpp) to keep modules orthogonal.
+// (e.g., examples/tcl_driver.cpp) to keep modules orthogonal.
 
 // ---------------- High-level TCL4 wrappers ----------------
 

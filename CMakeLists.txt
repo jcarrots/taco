@@ -39,7 +39,9 @@ target_include_directories(taco_tcl PUBLIC
 if (TACO_WITH_OPENMP)
   find_package(OpenMP QUIET)
   if (OpenMP_CXX_FOUND)
-    target_link_libraries(taco_tcl PRIVATE OpenMP::OpenMP_CXX)
+    # Use PUBLIC so consumers (executables/pybind) also compile with OpenMP flags
+    # (needed for `_OPENMP` and omp_* API usage in those translation units).
+    target_link_libraries(taco_tcl PUBLIC OpenMP::OpenMP_CXX)
     message(STATUS "OpenMP enabled for taco_tcl")
   else()
     message(STATUS "OpenMP not found; building without OpenMP")
@@ -85,17 +87,13 @@ if (TACO_BUILD_PYTHON)
   )
 endif()
 
-add_executable(tcl2_demo examples/tcl2_demo.cpp)
-target_link_libraries(tcl2_demo PRIVATE taco_tcl)
-
-add_executable(generator_demo examples/generator_demo.cpp)
-target_link_libraries(generator_demo PRIVATE taco_tcl)
-
-add_executable(spin_boson examples/spin_boson.cpp)
-target_link_libraries(spin_boson PRIVATE taco_tcl)
-
-add_executable(tcl4_driver examples/tcl4_driver.cpp)
-target_link_libraries(tcl4_driver PRIVATE taco_tcl)
+find_package(yaml-cpp CONFIG QUIET)
+if (yaml-cpp_FOUND)
+  add_executable(tcl_driver examples/tcl_driver.cpp)
+  target_link_libraries(tcl_driver PRIVATE taco_tcl yaml-cpp::yaml-cpp)
+else()
+  message(STATUS "yaml-cpp not found; skipping tcl_driver")
+endif()
 
 add_executable(tcl4_spin_boson_example examples/TCL4_spin_boson_example.cpp)
 target_link_libraries(tcl4_spin_boson_example PRIVATE taco_tcl)
