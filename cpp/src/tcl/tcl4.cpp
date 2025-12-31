@@ -10,6 +10,9 @@
 #endif
 
 #include "taco/tcl4_kernels.hpp"
+#ifdef TACO_HAS_CUDA
+#include "taco/backend/cuda/tcl4_kernels_cuda.hpp"
+#endif
 #include "taco/tcl4_mikx.hpp"
 #include "taco/tcl4_assemble.hpp"
 
@@ -81,9 +84,22 @@ Tcl4Map build_map(const sys::System& system, const std::vector<double>& time_gri
 TripleKernelSeries compute_triple_kernels(const sys::System& system,
                                           const Eigen::MatrixXcd& gamma_series,
                                           double dt,
-                                          int /*nmax*/,
-                                          FCRMethod method)
+                                          int nmax,
+                                          FCRMethod method,
+                                          Exec exec)
 {
+    if (exec.backend == Backend::Cuda) {
+        #ifdef TACO_HAS_CUDA
+        return compute_triple_kernels_cuda(system, gamma_series, dt, nmax, method, exec);
+        #else
+        throw std::invalid_argument("compute_triple_kernels: CUDA backend requested but taco_tcl was built without CUDA");
+        #endif
+    }
+    (void)nmax;
+    if (exec.backend != Backend::Serial && exec.backend != Backend::Omp) {
+        throw std::invalid_argument("compute_triple_kernels: unsupported backend (expected Serial/Omp/Cuda)");
+    }
+
     const std::size_t nf = gamma_series.cols();
     if (nf != system.fidx.buckets.size()) {
         throw std::invalid_argument("compute_triple_kernels: gamma_series column count does not match frequency buckets");
@@ -112,10 +128,15 @@ TripleKernelSeries compute_triple_kernels(const sys::System& system,
 
     const std::ptrdiff_t nf_i = static_cast<std::ptrdiff_t>(nf);
     const std::ptrdiff_t total = nf_i * nf_i;
+    const bool use_omp = (exec.backend == Backend::Omp);
 
     #ifdef _OPENMP
-    #pragma omp parallel for schedule(static)
+    if (use_omp && exec.threads > 0 && !omp_in_parallel()) {
+        omp_set_num_threads(exec.threads);
+    }
+    #pragma omp parallel for schedule(static) if(use_omp)
     #endif
+
     for (std::ptrdiff_t idx = 0; idx < total; ++idx) {
         const std::size_t i = static_cast<std::size_t>(idx / nf_i);
         const std::size_t j = static_cast<std::size_t>(idx % nf_i);
@@ -254,12 +275,13 @@ Eigen::MatrixXcd build_TCL4_generator(const sys::System& system,
                                       const Eigen::MatrixXcd& gamma_series,
                                       double dt,
                                       std::size_t time_index,
-                                      FCRMethod method)
+                                      FCRMethod method,
+                                      Exec exec)
 {
     if (time_index >= static_cast<std::size_t>(gamma_series.rows())) {
         throw std::out_of_range("build_TCL4_generator: time_index out of range");
     }
-    auto kernels = compute_triple_kernels(system, gamma_series, dt, /*nmax*/2, method);
+    auto kernels = compute_triple_kernels(system, gamma_series, dt, /*nmax*/2, method, exec);
     Tcl4Map map = build_map(system, /*time_grid*/{});
     auto mikx = build_mikx_serial(map, kernels, time_index);
     const Eigen::MatrixXcd GW = assemble_liouvillian(mikx, system.A_eig); // (n,i;m,j)
@@ -269,15 +291,21 @@ Eigen::MatrixXcd build_TCL4_generator(const sys::System& system,
 std::vector<Eigen::MatrixXcd> build_correction_series(const sys::System& system,
                                                       const Eigen::MatrixXcd& gamma_series,
                                                       double dt,
-                                                      FCRMethod method)
+                                                      FCRMethod method,
+                                                      Exec exec)
 {
     const std::size_t Nt = static_cast<std::size_t>(gamma_series.rows());
     std::vector<Eigen::MatrixXcd> out(Nt);
-    auto kernels = compute_triple_kernels(system, gamma_series, dt, /*nmax*/2, method);
+    auto kernels = compute_triple_kernels(system, gamma_series, dt, /*nmax*/2, method, exec);
     Tcl4Map map = build_map(system, /*time_grid*/{});
 
+    const bool use_omp = (exec.backend == Backend::Omp);
+
     #ifdef _OPENMP
-    #pragma omp parallel for schedule(static) if(!omp_in_parallel())
+    if (use_omp && exec.threads > 0 && !omp_in_parallel()) {
+        omp_set_num_threads(exec.threads);
+    }
+    #pragma omp parallel for schedule(static) if(use_omp && !omp_in_parallel())
     #endif
     for (std::ptrdiff_t tt = 0; tt < static_cast<std::ptrdiff_t>(Nt); ++tt) {
         const std::size_t t = static_cast<std::size_t>(tt);

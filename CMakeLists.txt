@@ -10,8 +10,22 @@ include(FetchContent)
 
 # Optional: OpenMP for CPU parallelization
 option(TACO_WITH_OPENMP "Enable OpenMP parallelization" ON)
+option(TACO_WITH_CUDA "Enable CUDA backend (requires NVIDIA CUDA Toolkit)" OFF)
 option(TACO_BUILD_PYTHON "Build Python extension module" ON)
 option(TACO_BUILD_GAMMA_TESTS "Build gamma_tests executable" ON)
+
+if (TACO_WITH_CUDA)
+  include(CheckLanguage)
+  check_language(CUDA)
+  if (CMAKE_CUDA_COMPILER)
+    enable_language(CUDA)
+    set(CMAKE_CUDA_STANDARD 17)
+    set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+    find_package(CUDAToolkit REQUIRED)
+  else()
+    message(WARNING "TACO_WITH_CUDA=ON but no CUDA compiler was found; install the CUDA Toolkit (nvcc) or set TACO_WITH_CUDA=OFF.")
+  endif()
+endif()
 
 # Fetch Eigen (header-only)
 FetchContent_Declare(
@@ -35,6 +49,15 @@ add_library(taco_tcl STATIC
 target_include_directories(taco_tcl PUBLIC
   cpp/include
 )
+
+if (TACO_WITH_CUDA AND CMAKE_CUDA_COMPILER)
+  target_sources(taco_tcl PRIVATE
+    cpp/src/backend/cuda/tcl4_fcr_kernels.cu
+    cpp/src/backend/cuda/tcl4_kernels_cuda.cu
+  )
+  target_compile_definitions(taco_tcl PUBLIC TACO_HAS_CUDA=1)
+  target_link_libraries(taco_tcl PUBLIC CUDA::cudart CUDA::cufft)
+endif()
 
 if (TACO_WITH_OPENMP)
   find_package(OpenMP QUIET)
@@ -121,6 +144,11 @@ add_executable(tcl4_tests tests/tcl4_tests.cpp)
 add_executable(tcl4_mikx_tests cpp/tests/tcl4_mikx_tests.cpp)
  target_link_libraries(tcl4_mikx_tests PRIVATE taco_tcl)
  target_include_directories(tcl4_mikx_tests PRIVATE cpp/include)
+
+if (TACO_WITH_CUDA AND CMAKE_CUDA_COMPILER)
+  add_executable(cuda_smoke tests/cuda_smoke.cu)
+  target_link_libraries(cuda_smoke PRIVATE CUDA::cudart)
+endif()
 
 if (TACO_BUILD_GAMMA_TESTS)
   add_executable(gamma_tests tests/gamma_tests.cpp)

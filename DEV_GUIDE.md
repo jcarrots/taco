@@ -27,9 +27,27 @@ GCC (MSYS2)
 
 CMake Options
 -------------
+- `TACO_WITH_OPENMP` (default ON): enable OpenMP when available (controls `_OPENMP` code paths).
+- `TACO_WITH_CUDA` (default OFF): enable CUDA targets when a CUDA Toolkit is available.
 - `TACO_BUILD_PYTHON` (default ON): build the pybind11 extension module.
   - If CMake cannot find Python, pass `-DPython_EXECUTABLE=...` (and, on Windows, `-DPython_INCLUDE_DIR=...`, `-DPython_LIBRARY=...`).
 - `TACO_BUILD_GAMMA_TESTS` (default ON): build `gamma_tests` (and only then look for Boost).
+
+CUDA (Optional)
+---------------
+CUDA is not installed via vcpkg. You need:
+- An NVIDIA GPU + driver (`nvidia-smi` works)
+- The NVIDIA CUDA Toolkit (`nvcc --version` works)
+
+Example configure/build (Windows + vcpkg):
+- Configure: `cmake -S . -B build-cuda -A x64 -DCMAKE_TOOLCHAIN_FILE=C:\Users\tiger\vcpkg\scripts\buildsystems\vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows -DTACO_WITH_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=native`
+  - For RTX 3070 Ti, `-DCMAKE_CUDA_ARCHITECTURES=86` also works.
+- Build: `cmake --build build-cuda --config Release --target cuda_smoke`
+- Run: `.\build-cuda\Release\cuda_smoke.exe`
+
+TCL4 CUDA scaffolding:
+- CUDA entry point stub: `cpp/src/backend/cuda/tcl4_kernels_cuda.cu` (`compute_triple_kernels_cuda`).
+- CPU path calls into CUDA when you pass `Exec{.backend=Backend::Cuda}` to `taco::tcl4::compute_triple_kernels`.
 
 Python Extension
 ----------------
