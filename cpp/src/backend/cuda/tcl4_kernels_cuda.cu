@@ -16,11 +16,14 @@ namespace taco::tcl4 {
 
 namespace {
 
+// Small helper to turn CUDA API failures into C++ exceptions.
 inline void cuda_check(cudaError_t status, const char* what) {
     if (status == cudaSuccess) return;
     throw std::runtime_error(std::string(what) + ": " + cudaGetErrorString(status));
 }
 
+// Local next_pow2 so the CUDA backend can match the CPU padding rule without
+// depending on the CPU FFT helper header.
 inline std::size_t next_pow2(std::size_t n) {
     if (n == 0) return 1;
     --n;
@@ -42,6 +45,14 @@ TripleKernelSeries compute_triple_kernels_cuda(const sys::System& system,
                                                FCRMethod method,
                                                const Exec& exec)
 {
+    // High-level CUDA driver:
+    // - Upload gamma_series (Nt×nf) and omega/mirror metadata once.
+    // - For each (i,j), compute all k in blocks of size Bplan using the batched CUDA kernels.
+    // - Copy each block of results back to host and store into TripleKernelSeries.
+    //
+    // NOTE: This is a straightforward driver (many kernel launches and D2H copies). It is meant as
+    // a correct end-to-end GPU implementation; further speedups typically come from overlapping
+    // transfers with compute (multiple streams), larger batching, and/or keeping results on GPU.
     (void)nmax;
     if (method != FCRMethod::Convolution) {
         throw std::invalid_argument("compute_triple_kernels_cuda: only FCRMethod::Convolution is supported");
@@ -67,6 +78,8 @@ TripleKernelSeries compute_triple_kernels_cuda(const sys::System& system,
     std::vector<double> h_omegas(nf);
     for (std::size_t b = 0; b < nf; ++b) h_omegas[b] = system.fidx.buckets[b].omega;
 
+    // mirror[j] gives the index of the bucket closest to -omega[j]. For F we use g2_mirror
+    // to match the CPU algorithm in `cpp/src/tcl/tcl4.cpp`.
     std::vector<int> h_mirror(nf, -1);
     const double tol = std::max(1e-12, system.fidx.tol);
     for (std::size_t j = 0; j < nf; ++j) {
@@ -93,10 +106,13 @@ TripleKernelSeries compute_triple_kernels_cuda(const sys::System& system,
     std::size_t Nfft = next_pow2(target);
     if (Nfft < 2) Nfft = 2;
 
-    // Choose a fixed plan batch to avoid per-chunk plan rebuilds.
+    // Choose a fixed plan batch to avoid per-chunk cuFFT plan rebuilds.
+    // Each call computes k = k0..k0+Bplan-1 for fixed (i,j).
     constexpr std::size_t kDefaultBatch = 64;
     const std::size_t Bplan = std::min(nf, kDefaultBatch);
 
+    // We treat device buffers as `cuDoubleComplex` and host staging as `std::complex<double>`.
+    // These have the same binary layout (two doubles) in practice, and this assertion enforces it.
     static_assert(sizeof(std::complex<double>) == sizeof(cuDoubleComplex),
                   "std::complex<double> must match cuDoubleComplex storage (2 doubles)");
 
@@ -120,6 +136,8 @@ TripleKernelSeries compute_triple_kernels_cuda(const sys::System& system,
     const std::size_t out_elems = Nt * Bplan;
     const std::size_t out_bytes = out_elems * sizeof(cuDoubleComplex);
 
+    // Reusable workspace for the inner batched kernel. It lazily allocates a cuFFT plan and
+    // scratch buffers the first time it is used, and reuses them across (i,j,k0) calls.
     cuda_fcr::FcrWorkspace ws;
 
     try {
@@ -161,6 +179,7 @@ TripleKernelSeries compute_triple_kernels_cuda(const sys::System& system,
 
         const Eigen::Index Nt_e = static_cast<Eigen::Index>(Nt);
 
+        // Outer loops: enumerate all (i,j). Inner loop: sweep k in blocks of size Bplan.
         for (std::size_t i = 0; i < nf; ++i) {
             for (std::size_t j = 0; j < nf; ++j) {
                 // Full chunks
@@ -178,6 +197,8 @@ TripleKernelSeries compute_triple_kernels_cuda(const sys::System& system,
 
                     cuda_fcr::compute_fcr_convolution_batched(inputs, b, ws, stream);
 
+                    // Copy [Nt, Bplan] back to host staging; lane `lane` is stored at
+                    // h_*[lane*Nt + t] == out[t + Nt*lane].
                     cuda_check(cudaMemcpyAsync(h_F, d_F, out_bytes, cudaMemcpyDeviceToHost, stream), "cudaMemcpyAsync(F)");
                     cuda_check(cudaMemcpyAsync(h_C, d_C, out_bytes, cudaMemcpyDeviceToHost, stream), "cudaMemcpyAsync(C)");
                     cuda_check(cudaMemcpyAsync(h_R, d_R, out_bytes, cudaMemcpyDeviceToHost, stream), "cudaMemcpyAsync(R)");
