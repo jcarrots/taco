@@ -4,6 +4,7 @@
 
 #include <Eigen/Dense>
 
+#include "taco/exec.hpp"
 #include "taco/system.hpp"
 #include "taco/tcl4_kernels.hpp"
 
@@ -37,7 +38,8 @@ TripleKernelSeries compute_triple_kernels(const sys::System& system,
                                           const Eigen::MatrixXcd& gamma_series,
                                           double dt,
                                           int nmax,
-                                          FCRMethod method = FCRMethod::Convolution);
+                                          FCRMethod method = FCRMethod::Convolution,
+                                          Exec exec = {});
 
 // ---------------- Convenience rebuild helpers ----------------
 
@@ -73,21 +75,23 @@ void build_FCR_6d_series(const Tcl4Map& map,
                          std::vector<std::vector<std::complex<double>>>& R_series);
 
 // Composition of TCL2 + TCL4 is intentionally left to application layer
-// (e.g., examples/tcl4_driver.cpp) to keep modules orthogonal.
+// (e.g., examples/tcl_driver.cpp) to keep modules orthogonal.
 
 // ---------------- High-level TCL4 wrappers ----------------
 
-// Build the TCL4 correction GW (generator) at a single time index using system's eigen-basis couplings.
+// Build the TCL4 Liouvillian superoperator L4 at a single time index (acts on vec(rho)).
 Eigen::MatrixXcd build_TCL4_generator(const sys::System& system,
                                       const Eigen::MatrixXcd& gamma_series,
                                       double dt,
                                       std::size_t time_index,
-                                      FCRMethod method = FCRMethod::Convolution);
+                                      FCRMethod method = FCRMethod::Convolution,
+                                      Exec exec = {});
 
-// Build the TCL4 correction GW for all time indices [0..Nt-1]. Returns a vector of length Nt.
+// Build the TCL4 Liouvillian superoperator L4 for all time indices [0..Nt-1]. Returns a vector of length Nt.
 std::vector<Eigen::MatrixXcd> build_correction_series(const sys::System& system,
                                                       const Eigen::MatrixXcd& gamma_series,
                                                       double dt,
-                                                      FCRMethod method = FCRMethod::Convolution);
+                                                      FCRMethod method = FCRMethod::Convolution,
+                                                      Exec exec = {});
 
 } // namespace taco::tcl4

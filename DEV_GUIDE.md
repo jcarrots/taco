@@ -14,7 +14,7 @@ Quick Build
 - Configure: `cmake -S . -B build`
 - Build Debug: `cmake --build build --config Debug -j 8`
 - Build Release: `cmake --build build --config Release -j 8`
-- Run demo (Win): `build\Release\tcl2_demo.exe`
+- Run driver (Win): `build\Release\tcl_driver.exe --config=configs\tcl_driver.yaml`
 
 GCC (MSYS2)
 -----------
@@ -27,9 +27,27 @@ GCC (MSYS2)
 
 CMake Options
 -------------
+- `TACO_WITH_OPENMP` (default ON): enable OpenMP when available (controls `_OPENMP` code paths).
+- `TACO_WITH_CUDA` (default OFF): enable CUDA targets when a CUDA Toolkit is available.
 - `TACO_BUILD_PYTHON` (default ON): build the pybind11 extension module.
   - If CMake cannot find Python, pass `-DPython_EXECUTABLE=...` (and, on Windows, `-DPython_INCLUDE_DIR=...`, `-DPython_LIBRARY=...`).
 - `TACO_BUILD_GAMMA_TESTS` (default ON): build `gamma_tests` (and only then look for Boost).
+
+CUDA (Optional)
+---------------
+CUDA is not installed via vcpkg. You need:
+- An NVIDIA GPU + driver (`nvidia-smi` works)
+- The NVIDIA CUDA Toolkit (`nvcc --version` works)
+
+Example configure/build (Windows + vcpkg):
+- Configure: `cmake -S . -B build-cuda -A x64 -DCMAKE_TOOLCHAIN_FILE=C:\Users\tiger\vcpkg\scripts\buildsystems\vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows -DTACO_WITH_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=native`
+  - For RTX 3070 Ti, `-DCMAKE_CUDA_ARCHITECTURES=86` also works.
+- Build: `cmake --build build-cuda --config Release --target cuda_smoke`
+- Run: `.\build-cuda\Release\cuda_smoke.exe`
+
+TCL4 CUDA scaffolding:
+- CUDA entry point stub: `cpp/src/backend/cuda/tcl4_kernels_cuda.cu` (`compute_triple_kernels_cuda`).
+- CPU path calls into CUDA when you pass `Exec{.backend=Backend::Cuda}` to `taco::tcl4::compute_triple_kernels`.
 
 Python Extension
 ----------------
@@ -40,7 +58,7 @@ Python Extension
 VS Code
 -------
 - Terminal -> Run Task (build/run Debug/Release)
-- Debug: select "Launch tcl2_demo (Debug)" and press F5
+- Debug: select "Launch tcl_driver (Debug)" and press F5
 
 FFT Backend
 -----------
@@ -65,7 +83,7 @@ Modules Overview
 - `taco/tcl2.hpp` + `cpp/src/tcl/tcl2_generator.cpp` â€” stateful TCL2 generator (reset/advance/apply) for time stepping.
 - `taco/spin_boson.hpp` â€” convenience builders and `Model` wrapper for the spin-boson Hamiltonian, bath, and generator.
 - `taco/tcl4_kernels.hpp`, `taco/tcl4.hpp` â€” TCL4 kernel builder and triple-series helper (Î“â†’F/C/R) [work-in-progress].
-- Executables: `examples/spin_boson.cpp` (CLI simulator), `examples/generator_demo.cpp` (L builder example), `examples/tcl2_demo.cpp` (legacy demo).
+- Executables: `examples/tcl_driver.cpp` (YAML driver), `examples/TCL4_spin_boson_example.cpp` (TCL4 example), `tests/tcl4_h5_compare.cpp` (MATLAB HDF5 compare).
 - Overall layout: see `docs/STRUCTURE.md` for a filesystem tree.
 
 Module Reference
@@ -126,9 +144,8 @@ Module Reference
 - `Model`: owns `TabulatedCorrelation` and `TCL2Generator` with proper lifetime management.
 
 ### Executables & Tests
-- `examples/spin_boson.cpp`: CLI simulator (parameterized via flags/config), writes observables and full Ï(t).
-- `examples/generator_demo.cpp`: showcases `tcl2::build_tcl2_components` for small systems.
-- `examples/tcl2_demo.cpp`: legacy fixed-step TCL2 demo (kept for reference).
+- `examples/tcl_driver.cpp`: YAML-driven driver for end-to-end TCL2/TCL4 runs.
+- `tests/tcl4_h5_compare.cpp`: compare against MATLAB HDF5 exports.
 - Tests: `tests/integrator_tests.cpp`, `tests/gamma_tests.cpp`, `tests/spin_boson_tests.cpp` (now a data dump for regression analysis).
 
 Propagation Helpers
@@ -159,21 +176,11 @@ Eigen::VectorXcd r = initial_state_vec; // size N^2
 taco::tcl::propagate_rk4_dense_serial(L_series, L_half_series, r, t0, dt);
 ```
 
-- Spin-Boson Simulator
-----------------------
-- Build: `cmake --build build --config Release --target spin_boson`
-- Run with defaults: `build/Release/spin_boson.exe`
-- Outputs (CSV):
-  - `spin_boson_observables.csv` â€” time, âŸ¨Ïƒ_zâŸ©, excited population
-  - `spin_boson_density.csv` â€” time, full density matrix entries (real/imag)
-- Override parameters via `--key=value` flags:
-  - System/bath: `--delta`, `--epsilon`, `--alpha`, `--omega_c`, `--beta`, `--rank`, `--coupling=sz|sx|sy|sm|sp`
-  - Spectral density: `--spectral=ohmic|subohmic|superohmic|custom`, `--s=<exponent>`, `--cutoff=exponential|drude`
-  - Simulation: `--t0`, `--tf`, `--dt`, `--sample_every`
-  - Correlation grid: `--ncorr`, `--dt_corr`
-- Output files: `--observables=...`, `--density=...`
-- Config template: `configs/spin_boson.yaml` (copy & override via CLI flags)
-- Example: `spin_boson.exe --delta=0.8 --epsilon=0.1 --tf=20 --dt=0.02 --coupling=sx`
+- TCL Driver (YAML)
+-------------------
+- Build: `cmake --build build --config Release --target tcl_driver`
+- Run: `build/Release/tcl_driver.exe --config=configs/tcl_driver.yaml`
+- Notes: requires `yaml-cpp` (CMake will skip `tcl_driver` if not found).
 
 Integration Utilities
 ---------------------
@@ -245,15 +252,29 @@ TCL4 Vector Path & Rebuild Helpers
 
 TCL4 Driver & Tests
 -------------------
-- Driver: `examples/tcl4_driver.cpp` runs the full TCL4 pipeline (Î“ via FFT â†’ F/C/R â†’ MIKX â†’ assemble) and prints diagnostics.
+- Spin-boson TCL4 example: `examples/TCL4_spin_boson_example.cpp` (MATLAB benchmark parameters by default) prints raw `GW` and reshuffled `L4` (Liouvillian on `vec(rho)`).
+  - `GW`: NAKZWAN indexing (row=(n,i), col=(m,j))
+  - `L4`: superoperator indexing (row=(n,m), col=(i,j)), via `L4(n,m,i,j)=GW(n,i,m,j)`
+  - Build: `cmake --build build-vcpkg-x64 --config Release --target tcl4_spin_boson_example`
+  - Run (defaults): `build-vcpkg-x64/Release/tcl4_spin_boson_example.exe` (N=262144; can be slow)
+  - Run (quick sanity): `build-vcpkg-x64/Release/tcl4_spin_boson_example.exe --N=1024 --tidx=last`
+  - Run (write CSV): `build-vcpkg-x64/Release/tcl4_spin_boson_example.exe --out=gw.csv` (writes raw `GW`; columns: `row,col,re,im`)
+  - Spectral density: `J(ω)=α·ω·exp(-ω/ωc)` via `--alpha=...` (default `α=1`)
+  - BCF resolution: use `--bcf_N=...` to build `C(t)` on a longer FFT grid (then slices to `N+1` samples)
+  - Timing: add `--profile` to print stage timings (BCF FFT, Gamma series, GW build).
+  - Propagate with dense RK4 on `vec(ρ)` (prints ⟨σ_z⟩ in lab basis):
+    - `build-vcpkg-x64/Release/tcl4_spin_boson_example.exe --N=1024 --tidx=1024 --propagate=1 --order=2 --rho0=0 --print_series=1 --sample_every=64`
+    - Use `--order=0` for unitary-only, `--order=2` for TCL2, and `--order=4` for TCL4 (`L0+L2+L4`, slower).
+- Driver: `examples/tcl_driver.cpp` loads a YAML config (matrix `H`, `A` and `J_expr`) and runs the full TCL4 pipeline (BCF FFT -> Gamma -> F/C/R -> MIKX -> GW/L4).
+  - Build: `cmake --build build-vcpkg-x64 --config Release --target tcl_driver` (requires `yaml-cpp`)
+  - Run: `build-vcpkg-x64/Release/tcl_driver.exe --config=configs/tcl_driver.yaml`
 - Test: `tests/tcl4_tests.cpp` compares Direct vs Convolution F/C/R across multiple (N, dt, T) cases and reports max relative errors.
-- Spinâ€‘Boson TCL4 demo: `examples/spin_boson_tcl4.cpp` composes `L_total = L2 + Î±Â²Â·GW` and propagates Ï(t) (frozenâ€‘L Euler) while printing âŸ¨Ïƒ_zâŸ©.
 
-Highâ€‘Level TCL4 Wrappers
+High-Level TCL4 Wrappers
 ------------------------
-- Build `GW` at a single time: `build_TCL4_generator(system, gamma_series, dt, time_index, method)`.
-- Build `GW` for all times: `build_correction_series(system, gamma_series, dt, method)`.
-- These call `compute_triple_kernels` internally (frequency space) and then `build_mikx_serial` + `assemble_liouvillian` with `system.A_eig`.
+- Build `L4` at a single time: `build_TCL4_generator(system, gamma_series, dt, time_index, method)`.
+- Build `L4` for all times: `build_correction_series(system, gamma_series, dt, method)`.
+- Internally these run: `compute_triple_kernels` -> `build_mikx_serial` -> `assemble_liouvillian` (raw `GW`) -> `gw_to_liouvillian` (reshuffled `L4`).
 
 Frequency Buckets Symmetry
 --------------------------
@@ -265,6 +286,7 @@ TCL4 HDF5 Compare (MATLAB Benchmarks)
 - Compare against MATLAB-exported HDF5: `tests/tcl4_h5_compare.cpp`.
 - Build: `cmake --build build-vcpkg-x64 --config Release --target tcl4_h5_compare`
 - List datasets: `build-vcpkg-x64/Release/tcl4_h5_compare.exe --file=tests/tcl_test.h5 --list`
+  - Timing: add `--profile` to print stage timings for read/compute/compare.
   - Recommended benchmark order:
     - BCF (C(t)): the file is the reference input (`/bath/C`) used to build Gt and kernels; use `--list` to confirm `/params/*`, `/time/t`, and `/bath/C` shapes.
     - Gt: benchmark reference (matrix mode over (j,k) using omegas from Bohr frequencies + `/map/ij`).
@@ -277,8 +299,9 @@ TCL4 HDF5 Compare (MATLAB Benchmarks)
         - Add `--print-fcr` to dump the full `F` slice at those time indices.
         - Use `--fcr-offset=1` (or another offset) if file kernels are shifted in time.
         - Use `--fcr-fft-pad=8` to match MATLAB convolution FFT padding (e.g., 8N).
-    - GW: end-to-end generator compare (Liouvillian assembled from computed MIKX).
+    - GW: end-to-end raw tensor compare (NAKZWAN indexing, matches `/out/GW_flat`).
       - `build-vcpkg-x64/Release/tcl4_h5_compare.exe --file=tests/tcl_test.h5 --compare-gw --tidx=0,1,10,100,1000,last`
+      - Note: use `gw_to_liouvillian` to convert raw `GW` to `L4` for propagation.
     - Final TCL tensors (MATLAB-only postprocessing): the file may also include `/out/RedT_flat` and `/out/TCL_flat` (your MATLAB `RedT` and `TCL4T` exports).
       - Inspect the raw matrices (4x4, printed in (row,col) order):
         - `build-vcpkg-x64/Release/tcl4_h5_compare.exe --file=tests/tcl_test.h5 --print-redt --tidx=0,100,last`

@@ -29,8 +29,8 @@ Eigen::VectorXcd prefix_int_left_vec(const Eigen::Ref<const Eigen::VectorXcd>& y
 }
 
 Eigen::VectorXcd causal_conv_fft(const Eigen::Ref<const Eigen::VectorXcd>& f,
-                                 const Eigen::Ref<const Eigen::VectorXcd>& g,
-                                 double dt)
+                                  const Eigen::Ref<const Eigen::VectorXcd>& g,
+                                  double dt)
 {
     const std::size_t N = static_cast<std::size_t>(f.size());
     Eigen::VectorXcd out(static_cast<Eigen::Index>(N));
@@ -65,6 +65,41 @@ Eigen::VectorXcd causal_conv_fft(const Eigen::Ref<const Eigen::VectorXcd>& f,
         out(static_cast<Eigen::Index>(k)) = dt * F[k];
     }
     return out;
+}
+
+inline void fft_time_axis_inplace(std::vector<cd>& data,
+                                  std::size_t Nfft,
+                                  std::size_t block_size,
+                                  bool forward,
+                                  std::vector<cd>& scratch,
+                                  bcf::FFTPlan& plan_1d,
+                                  std::vector<cd>& tmp_1d)
+{
+#if defined(TACO_POCKETFFT_HEADER)
+    (void)plan_1d;
+    (void)tmp_1d;
+    scratch.resize(Nfft * block_size);
+    pocketfft::shape_t shape{ static_cast<std::ptrdiff_t>(Nfft),
+                              static_cast<std::ptrdiff_t>(block_size) };
+    pocketfft::stride_t stride{ static_cast<std::ptrdiff_t>(block_size * sizeof(cd)),
+                                static_cast<std::ptrdiff_t>(sizeof(cd)) };
+    pocketfft::axes_t axes{ 0 };
+    pocketfft::c2c(shape, stride, stride, axes,
+                   /*forward=*/forward,
+                   reinterpret_cast<const cd*>(data.data()),
+                   scratch.data(),
+                   forward ? 1.0 : 1.0 / static_cast<double>(Nfft));
+    data.swap(scratch);
+#else
+    (void)scratch;
+    tmp_1d.resize(Nfft);
+    for (std::size_t e = 0; e < block_size; ++e) {
+        for (std::size_t n = 0; n < Nfft; ++n) tmp_1d[n] = data[n * block_size + e];
+        if (forward) plan_1d.exec_forward(tmp_1d);
+        else plan_1d.exec_inverse(tmp_1d);
+        for (std::size_t n = 0; n < Nfft; ++n) data[n * block_size + e] = tmp_1d[n];
+    }
+#endif
 }
 
 Eigen::VectorXcd compute_F_series_convolution_vec(const Eigen::Ref<const Eigen::VectorXcd>& g1,
@@ -431,8 +466,124 @@ FCRSeries compute_FCR_time_series_convolution(const std::vector<Matrix>& G1,
                                               SpectralOp op2)
 {
     (void)op2;
-    // TODO: full matrix convolution path (FFT + pagewise GEMM)
-    return compute_FCR_time_series_direct(G1, G2, omega, dt, op2);
+
+    const std::size_t Nt = G1.size();
+    if (Nt == 0 || G2.size() != Nt) {
+        throw std::invalid_argument("compute_FCR_time_series_convolution: mismatched time-series lengths");
+    }
+    const auto rows = G1.front().rows();
+    const auto cols = G1.front().cols();
+    for (std::size_t k = 0; k < Nt; ++k) {
+        if (G1[k].rows() != rows || G1[k].cols() != cols ||
+            G2[k].rows() != rows || G2[k].cols() != cols) {
+            throw std::invalid_argument("compute_FCR_time_series_convolution: inconsistent matrix dimensions");
+        }
+    }
+
+    const cd I{0.0, 1.0};
+    std::vector<cd> phase_plus(Nt), phase_minus(Nt);
+    for (std::size_t k = 0; k < Nt; ++k) {
+        const double tk = static_cast<double>(k) * dt;
+        phase_plus[k]  = std::exp(I * omega * tk);
+        phase_minus[k] = std::exp(-I * omega * tk);
+    }
+
+    const std::size_t L = 2 * Nt - 1;
+    std::size_t Nfft = 0;
+    if (g_fcr_fft_pad_factor > 0) {
+        std::size_t target = g_fcr_fft_pad_factor * Nt;
+        if (target < L) target = L;
+        Nfft = bcf::next_pow2(target);
+    } else {
+        Nfft = bcf::next_pow2(L);
+    }
+    if (Nfft < 2) Nfft = 2;
+
+    const std::size_t block_size = static_cast<std::size_t>(rows) * static_cast<std::size_t>(cols);
+    std::vector<cd> A(Nfft * block_size, cd{0.0, 0.0});
+    std::vector<cd> B(Nfft * block_size, cd{0.0, 0.0});
+    std::vector<cd> B_conj(Nfft * block_size, cd{0.0, 0.0});
+    for (std::size_t k = 0; k < Nt; ++k) {
+        cd* arow = A.data() + k * block_size;
+        cd* brow = B.data() + k * block_size;
+        cd* crow = B_conj.data() + k * block_size;
+        const cd* g1 = G1[k].data();
+        const cd* g2 = G2[k].data();
+        const cd sA = phase_minus[k];
+        for (std::size_t e = 0; e < block_size; ++e) {
+            arow[e] = g1[e] * sA;
+            brow[e] = g2[e];
+            crow[e] = std::conj(g2[e]);
+        }
+    }
+
+    bcf::FFTPlan plan(Nfft);
+    std::vector<cd> fft_scratch;
+    std::vector<cd> fft_tmp_1d;
+    fft_time_axis_inplace(A, Nfft, block_size, /*forward=*/true, fft_scratch, plan, fft_tmp_1d);
+    fft_time_axis_inplace(B, Nfft, block_size, /*forward=*/true, fft_scratch, plan, fft_tmp_1d);
+    fft_time_axis_inplace(B_conj, Nfft, block_size, /*forward=*/true, fft_scratch, plan, fft_tmp_1d);
+
+    std::vector<cd> P(Nfft * block_size, cd{0.0, 0.0});
+
+    // -------- F(t): convolution term via FFT + pagewise GEMM --------
+    for (std::size_t p = 0; p < Nfft; ++p) {
+        const cd* Ap = A.data() + p * block_size;
+        const cd* Bp = B.data() + p * block_size;
+        cd* Pp = P.data() + p * block_size;
+        Eigen::Map<const Matrix> Ahat(Ap, rows, cols);
+        Eigen::Map<const Matrix> Bhat(Bp, rows, cols);
+        Eigen::Map<Matrix> Phat(Pp, rows, cols);
+        Phat.noalias() = Ahat * Bhat;
+    }
+    fft_time_axis_inplace(P, Nfft, block_size, /*forward=*/false, fft_scratch, plan, fft_tmp_1d);
+
+    FCRSeries out;
+    out.F.assign(Nt, Matrix::Zero(rows, cols));
+    Matrix prefix_G2_op_phase = Matrix::Zero(rows, cols);
+    for (std::size_t k = 0; k < Nt; ++k) {
+        prefix_G2_op_phase += G2[k] * phase_plus[k] * dt;
+        out.F[k].noalias() = G1[k] * prefix_G2_op_phase;
+        out.F[k] *= phase_minus[k];
+        Eigen::Map<const Matrix> conv_k(P.data() + k * block_size, rows, cols);
+        out.F[k] -= conv_k * dt;
+    }
+
+    // -------- C(t): convolution term via FFT + pagewise GEMM --------
+    for (std::size_t p = 0; p < Nfft; ++p) {
+        const cd* Ap = A.data() + p * block_size;
+        const cd* Bp = B_conj.data() + p * block_size;
+        cd* Pp = P.data() + p * block_size;
+        Eigen::Map<const Matrix> Ahat(Ap, rows, cols);
+        Eigen::Map<const Matrix> Bhat(Bp, rows, cols);
+        Eigen::Map<Matrix> Phat(Pp, rows, cols);
+        Phat.noalias() = Ahat * Bhat;
+    }
+    fft_time_axis_inplace(P, Nfft, block_size, /*forward=*/false, fft_scratch, plan, fft_tmp_1d);
+
+    out.C.assign(Nt, Matrix::Zero(rows, cols));
+    Matrix prefix_G2_conj_phase = Matrix::Zero(rows, cols);
+    for (std::size_t k = 0; k < Nt; ++k) {
+        prefix_G2_conj_phase += G2[k].conjugate() * phase_plus[k] * dt;
+        out.C[k].noalias() = G1[k] * prefix_G2_conj_phase;
+        out.C[k] *= phase_minus[k];
+        Eigen::Map<const Matrix> conv_k(P.data() + k * block_size, rows, cols);
+        out.C[k] -= conv_k * dt;
+    }
+
+    // -------- R(t): prefix-integral form (already O(Nt)) --------
+    out.R.assign(Nt, Matrix::Zero(rows, cols));
+    Matrix prefix_G2_phase_minus = Matrix::Zero(rows, cols);
+    Matrix prefix_P_phase_minus  = Matrix::Zero(rows, cols);
+    for (std::size_t k = 0; k < Nt; ++k) {
+        const cd w = phase_minus[k] * dt;
+        prefix_G2_phase_minus += G2[k] * w;
+        out.R[k].noalias() = G1[k] * prefix_G2_phase_minus;
+        prefix_P_phase_minus.noalias() += (G1[k] * G2[k]) * w;
+        out.R[k] -= prefix_P_phase_minus;
+    }
+
+    return out;
 }
 
 FCRSeries compute_FCR_time_series(const std::vector<Matrix>& G1,

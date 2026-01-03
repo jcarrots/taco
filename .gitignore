@@ -30,6 +30,7 @@ compile_commands.json
 spin_boson_observables.csv
 spin_boson_density.csv
 rho_timeseries.csv
+gw.csv
 gamma_test_results.txt
 integrator_test_results.txt
 

@@ -121,6 +121,44 @@ compute_trapz_prefix_multi(const std::vector<cplx>& C,
     return G;
 }
 
+// Rectangle-rule prefix integrals (sample at grid points):
+//   G[k] = dt * sum_{m=0..k} exp(i*omega*(m*dt)) * C[m]
+// Returns an N x M column-major matrix (columns = omegas, rows = time index k).
+inline Eigen::MatrixXcd
+compute_rect_prefix_multi_matrix(const std::vector<cplx>& C,
+                                 double dt,
+                                 const std::vector<double>& omegas)
+{
+    const std::size_t N = C.size();
+    const std::size_t M = omegas.size();
+    if (N == 0 || M == 0 || !(dt > 0.0)) return Eigen::MatrixXcd();
+    Eigen::MatrixXcd G(static_cast<Eigen::Index>(N), static_cast<Eigen::Index>(M));
+    const bool parallel = (N * M >= 200'000);
+    auto fill_one = [&](std::size_t j) {
+        const cplx step = std::exp(cplx{0.0, omegas[j] * dt});
+        cplx phi = cplx{1.0, 0.0};
+        cplx acc = dt * phi * C[0];
+        G(static_cast<Eigen::Index>(0), static_cast<Eigen::Index>(j)) = acc;
+        for (std::size_t k = 1; k < N; ++k) {
+            phi *= step;
+            acc += dt * phi * C[k];
+            G(static_cast<Eigen::Index>(k), static_cast<Eigen::Index>(j)) = acc;
+        }
+    };
+
+    if (parallel) {
+        #ifdef _OPENMP
+        #pragma omp parallel for schedule(static)
+        #endif
+        for (std::ptrdiff_t jj = 0; jj < static_cast<std::ptrdiff_t>(M); ++jj) {
+            fill_one(static_cast<std::size_t>(jj));
+        }
+    } else {
+        for (std::size_t j = 0; j < M; ++j) fill_one(j);
+    }
+    return G;
+}
+
 // Omega-major batch path (cache-friendly when M << N):
 // Returns an N x M column-major matrix (columns = omegas, rows = time index k)
 // containing G(k,j) = ∫_0^{k·dt} e^{i ω_j t} C(t) dt with trapezoid updates.
@@ -137,7 +175,8 @@ compute_trapz_prefix_multi_matrix(const std::vector<cplx>& C,
     // Initialize first row (k=0) to zero; if N==1 we truncate at return
     G.row(0).setZero();
     const cplx half_dt(dt / 2.0, 0.0);
-    for (std::size_t j = 0; j < M; ++j) {
+    const bool parallel = (N * M >= 200'000);
+    auto fill_one = [&](std::size_t j) {
         const cplx step = std::exp(cplx{0.0, omegas[j] * dt});
         cplx phi = cplx{1.0, 0.0};
         cplx acc = cplx{0.0, 0.0};
@@ -146,13 +185,25 @@ compute_trapz_prefix_multi_matrix(const std::vector<cplx>& C,
             const cplx phi_next = phi * step;
             acc += half_dt * (phi * prev + phi_next * C[k]);
             G(static_cast<Eigen::Index>(k), static_cast<Eigen::Index>(j)) = acc;
-            phi = phi_next; prev = C[k];
+            phi = phi_next;
+            prev = C[k];
         }
         // If N == 1, we only set G(0,j)=0 above; for N>=2, rows [1..N-1] were set.
         for (std::size_t k = N; k < NN; ++k) {
             // pad (no extra info), keeps shape consistent if N==1
             G(static_cast<Eigen::Index>(k), static_cast<Eigen::Index>(j)) = acc;
         }
+    };
+
+    if (parallel) {
+        #ifdef _OPENMP
+        #pragma omp parallel for schedule(static)
+        #endif
+        for (std::ptrdiff_t jj = 0; jj < static_cast<std::ptrdiff_t>(M); ++jj) {
+            fill_one(static_cast<std::size_t>(jj));
+        }
+    } else {
+        for (std::size_t j = 0; j < M; ++j) fill_one(j);
     }
     // If N==1 return N x M (1 row). Otherwise return N x M.
     if (NN != N) {

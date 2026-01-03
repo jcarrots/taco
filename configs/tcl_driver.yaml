@@ -1,0 +1,64 @@
+# Generic TCL driver configuration (matrix system + expression J(w))
+
+system:
+  # Bucket frequency tolerance for grouping Bohr frequencies into unique omegas
+  freq_tol: 1.0e-9
+
+  # Hamiltonian in lab basis (complex matrix as {re, im})
+  # Example: H = sigma_x/2
+  H:
+    re: [[0.0, 0.5],
+         [0.5, 0.0]]
+    im: [[0.0, 0.0],
+         [0.0, 0.0]]
+
+  # Coupling operators in lab basis (one or more channels)
+  # Example: A = sigma_z/2
+  A:
+    - re: [[0.5, 0.0],
+           [0.0, -0.5]]
+      im: [[0.0, 0.0],
+           [0.0, 0.0]]
+
+bath:
+  beta: 0.5
+
+  # Spectral density J(w) as an expression in `w` with optional parameters.
+  # Supported operators: + - * / ^
+  # Supported functions: exp log sqrt abs sin cos tan step/heaviside pow max min
+  #
+  # Note: the BCF FFT path calls J(w) only for w>0, but you can still include step(w).
+  J_expr: "w * exp(-w/omega_c) * step(w)"
+  params:
+    omega_c: 10.0
+
+numerics:
+  # Correlation / generator time grid
+  dt: 0.001
+  N: 1024          # steps (Nt = N+1 samples)
+  bcf_N: 8192      # optional: build C(t) on a longer FFT grid, then slice to Nt
+
+  # Gamma(omega,t) quadrature: rect | trapz
+  gamma_rule: rect
+
+  tcl4:
+    method: convolution   # convolution | direct
+    nmax: 2               # triple-kernel truncation
+    fcr_fft_pad: 8        # match MATLAB's "pad_factor*N" for convolution (0 = default)
+
+  # OpenMP thread count (0 = leave default)
+  threads: 8
+
+output:
+  tidx: last
+  profile: true
+  # gw_csv: gw_raw.csv
+  # l4_csv: L4.csv
+
+simulation:
+  propagate: false
+  order: 4
+  rho0: "0"         # for qubits: 0|1|+x|-x|+y|-y; otherwise an integer basis index or a matrix {re,im}
+  print_series: false
+  sample_every: 64
+  # rho_out: rho_final.csv

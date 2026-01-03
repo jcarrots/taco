@@ -33,9 +33,9 @@ rt = tc.runtime.Engine(backend="cuda")  # "serial" | "omp" | "cuda" | "mpi_omp" 
 - Windows output: `_taco_native.pyd` lands under `python/taco/Release` or `python/taco/Debug`
 
 ## TCL4 Demo & Test
-- Demo driver: `tcl4_driver` builds Γ via FFT and runs TCL4 assembly
-  - Build: `cmake --build build --config Release --target tcl4_driver`
-  - Run (Win): `build\Release\tcl4_driver.exe --dt=0.000625 --nmax=2 --ns=2048`
+- Demo driver: `tcl_driver` loads a YAML config (matrix `H`, `A` and `J_expr`) and runs TCL4 assembly
+  - Build: `cmake --build build --config Release --target tcl_driver` (requires `yaml-cpp`)
+  - Run (Win): `build\Release\tcl_driver.exe --config=configs\tcl_driver.yaml`
 - Test: `tcl4_tests` compares Direct vs Convolution F/C/R
   - Build: `cmake --build build --config Release --target tcl4_tests`
   - Run: `build\Release\tcl4_tests.exe`

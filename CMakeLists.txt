@@ -10,8 +10,22 @@ include(FetchContent)
 
 # Optional: OpenMP for CPU parallelization
 option(TACO_WITH_OPENMP "Enable OpenMP parallelization" ON)
+option(TACO_WITH_CUDA "Enable CUDA backend (requires NVIDIA CUDA Toolkit)" OFF)
 option(TACO_BUILD_PYTHON "Build Python extension module" ON)
 option(TACO_BUILD_GAMMA_TESTS "Build gamma_tests executable" ON)
+
+if (TACO_WITH_CUDA)
+  include(CheckLanguage)
+  check_language(CUDA)
+  if (CMAKE_CUDA_COMPILER)
+    enable_language(CUDA)
+    set(CMAKE_CUDA_STANDARD 17)
+    set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+    find_package(CUDAToolkit REQUIRED)
+  else()
+    message(WARNING "TACO_WITH_CUDA=ON but no CUDA compiler was found; install the CUDA Toolkit (nvcc) or set TACO_WITH_CUDA=OFF.")
+  endif()
+endif()
 
 # Fetch Eigen (header-only)
 FetchContent_Declare(
@@ -36,10 +50,22 @@ target_include_directories(taco_tcl PUBLIC
   cpp/include
 )
 
+  if (TACO_WITH_CUDA AND CMAKE_CUDA_COMPILER)
+  target_sources(taco_tcl PRIVATE
+    cpp/src/backend/cuda/tcl4_fcr_kernels.cu
+    cpp/src/backend/cuda/tcl4_kernels_cuda.cu
+    cpp/src/backend/cuda/tcl4_mikx_cuda.cu
+  )
+  target_compile_definitions(taco_tcl PUBLIC TACO_HAS_CUDA=1)
+  target_link_libraries(taco_tcl PUBLIC CUDA::cudart CUDA::cufft)
+endif()
+
 if (TACO_WITH_OPENMP)
   find_package(OpenMP QUIET)
   if (OpenMP_CXX_FOUND)
-    target_link_libraries(taco_tcl PRIVATE OpenMP::OpenMP_CXX)
+    # Use PUBLIC so consumers (executables/pybind) also compile with OpenMP flags
+    # (needed for `_OPENMP` and omp_* API usage in those translation units).
+    target_link_libraries(taco_tcl PUBLIC OpenMP::OpenMP_CXX)
     message(STATUS "OpenMP enabled for taco_tcl")
   else()
     message(STATUS "OpenMP not found; building without OpenMP")
@@ -85,20 +111,16 @@ if (TACO_BUILD_PYTHON)
   )
 endif()
 
-add_executable(tcl2_demo examples/tcl2_demo.cpp)
-target_link_libraries(tcl2_demo PRIVATE taco_tcl)
+find_package(yaml-cpp CONFIG QUIET)
+if (yaml-cpp_FOUND)
+  add_executable(tcl_driver examples/tcl_driver.cpp)
+  target_link_libraries(tcl_driver PRIVATE taco_tcl yaml-cpp::yaml-cpp)
+else()
+  message(STATUS "yaml-cpp not found; skipping tcl_driver")
+endif()
 
-add_executable(generator_demo examples/generator_demo.cpp)
-target_link_libraries(generator_demo PRIVATE taco_tcl)
-
-add_executable(spin_boson examples/spin_boson.cpp)
-target_link_libraries(spin_boson PRIVATE taco_tcl)
-
-add_executable(tcl4_driver examples/tcl4_driver.cpp)
-target_link_libraries(tcl4_driver PRIVATE taco_tcl)
-
-add_executable(spin_boson_tcl4 examples/spin_boson_tcl4.cpp)
-target_link_libraries(spin_boson_tcl4 PRIVATE taco_tcl)
+add_executable(tcl4_spin_boson_example examples/TCL4_spin_boson_example.cpp)
+target_link_libraries(tcl4_spin_boson_example PRIVATE taco_tcl)
 
 add_executable(tcl4_bench examples/tcl4_bench.cpp)
 target_link_libraries(tcl4_bench PRIVATE taco_tcl)
@@ -123,6 +145,11 @@ add_executable(tcl4_tests tests/tcl4_tests.cpp)
 add_executable(tcl4_mikx_tests cpp/tests/tcl4_mikx_tests.cpp)
  target_link_libraries(tcl4_mikx_tests PRIVATE taco_tcl)
  target_include_directories(tcl4_mikx_tests PRIVATE cpp/include)
+
+if (TACO_WITH_CUDA AND CMAKE_CUDA_COMPILER)
+  add_executable(cuda_smoke tests/cuda_smoke.cu)
+  target_link_libraries(cuda_smoke PRIVATE CUDA::cudart)
+endif()
 
 if (TACO_BUILD_GAMMA_TESTS)
   add_executable(gamma_tests tests/gamma_tests.cpp)
