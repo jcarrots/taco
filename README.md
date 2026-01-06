@@ -1,12 +1,12 @@
-# TACO — TCL-Accelerated Compute Orchestrator 🌮
+# TACO - TCL-Accelerated Compute Orchestrator
 This is TCL = **Time-Convolutionless** master-equation solvers.
 A fast parallel and scalable time-convolutionless (TCL) runtime with C++ backend for open-quantum-system dynamics. TACO backends: serial, omp, cuda, mpi_omp, mpi_cuda.
 
 ## Features
 - Backends: serial, omp, cuda, mpi_omp, mpi_cuda
-- TCL2 generator (stateful) + Liouvillian builders
+- TCL2 generator + Liouvillian builders
 - TCL4 kernels and assembly in seconds
-- Higher‑order TCL (TCL6/TCL2n) planning in docs; symbolic road‑map.
+- Higher-order TCL (TCL6/TCL2n) planning in docs; symbolic road-map.
 
 ## Install
 pip install taco-qme
@@ -16,8 +16,7 @@ pip install taco-qme
 import taco as tc
 L = tc.kernels.tcl4.build_liouvillian(H, C_ops, bath, order=4)
 rt = tc.runtime.Engine(backend="cuda")  # "serial" | "omp" | "cuda" | "mpi_omp" | "mpi_cuda"
-ρt = rt.propagate(L, ρ0, tspan, dt_adapt=True)
-
+rho_t = rt.propagate(L, rho0, tspan, dt_adapt=True)
 ```
 
 ## Build from source (C++)

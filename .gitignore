@@ -34,6 +34,9 @@ gw.csv
 gamma_test_results.txt
 integrator_test_results.txt
 
+# Local third-party deps
+/third_party/
+
 # Python cache
 __pycache__/
 *.pyc

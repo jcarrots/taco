@@ -50,13 +50,14 @@ target_include_directories(taco_tcl PUBLIC
   cpp/include
 )
 
-  if (TACO_WITH_CUDA AND CMAKE_CUDA_COMPILER)
+if (TACO_WITH_CUDA AND CMAKE_CUDA_COMPILER)
   target_sources(taco_tcl PRIVATE
     cpp/src/backend/cuda/tcl4_fcr_kernels.cu
     cpp/src/backend/cuda/tcl4_kernels_cuda.cu
     cpp/src/backend/cuda/tcl4_mikx_cuda.cu
   )
   target_compile_definitions(taco_tcl PUBLIC TACO_HAS_CUDA=1)
+  target_compile_definitions(taco_tcl PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:EIGEN_NO_CUDA>)
   target_link_libraries(taco_tcl PUBLIC CUDA::cudart CUDA::cufft)
 endif()
 
@@ -81,9 +82,14 @@ else()
 endif()
 
 if (MSVC)
-  target_compile_options(taco_tcl PRIVATE /W4 /permissive-)
+  target_compile_options(taco_tcl PRIVATE
+    $<$<COMPILE_LANGUAGE:CXX>:/W4>
+    $<$<COMPILE_LANGUAGE:CXX>:/permissive->
+  )
 else()
-  target_compile_options(taco_tcl PRIVATE -Wall -Wextra -Wpedantic)
+  target_compile_options(taco_tcl PRIVATE
+    $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra -Wpedantic>
+  )
 endif()
 
 # FFT backend: built-in radix-2 FFT (pocketfft disabled)

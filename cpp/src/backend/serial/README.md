@@ -1,6 +1,8 @@
 Serial backend
 ==============
 
-Planned work:
-- Single-thread CPU reference path for deterministic debugging.
-- Keep kernels and assembly identical to Omp backend with threads=1.
+Status
+------
+- CPU reference path for deterministic debugging.
+- `compute_triple_kernels` runs single-threaded when `Exec.backend=Serial`.
+- `build_mikx_serial` and `assemble_liouvillian` provide the single-thread baseline.

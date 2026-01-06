@@ -1,5 +1,9 @@
 #include "taco/backend/cuda/tcl4_fcr_kernels_cuda.hpp"
 #include <cub/device/device_scan.cuh>
+#include <algorithm>
+#include <atomic>
+#include <cstdio>
+#include <cstdlib>
 #include <limits>
 #include <stdexcept>
 #include <string>
@@ -68,9 +72,69 @@ inline dim3 grid_1d(std::size_t n, int block) {
     return dim3(static_cast<unsigned>((n + static_cast<std::size_t>(block) - 1) / static_cast<std::size_t>(block)));
 }
 
-inline dim3 grid_2d(std::size_t n, std::size_t batch, int block) {
-    return dim3(static_cast<unsigned>((n + static_cast<std::size_t>(block) - 1) / static_cast<std::size_t>(block)),
-                static_cast<unsigned>(batch));
+inline dim3 grid_2d_tiled(std::size_t n, std::size_t batch, int block_t, int block_b) {
+    return dim3(static_cast<unsigned>((n + static_cast<std::size_t>(block_t) - 1) / static_cast<std::size_t>(block_t)),
+                static_cast<unsigned>((batch + static_cast<std::size_t>(block_b) - 1) / static_cast<std::size_t>(block_b)));
+}
+
+constexpr int kDefaultBlockT = 256;
+constexpr int kDefaultBlockB = 2;
+
+inline int round_up_warp(int v) {
+    return ((v + 31) / 32) * 32;
+}
+
+inline int read_env_int(const char* name, int fallback) {
+    const char* value = std::getenv(name);
+    if (!value || !*value) return fallback;
+    char* end = nullptr;
+    const long parsed = std::strtol(value, &end, 10);
+    if (end == value) return fallback;
+    if (parsed > std::numeric_limits<int>::max() || parsed < std::numeric_limits<int>::min()) return fallback;
+    return static_cast<int>(parsed);
+}
+
+inline int clamp_block_t(int v) {
+    if (v <= 0) v = kDefaultBlockT;
+    if (v > 1024) v = 1024;
+    v = round_up_warp(v);
+    if (v > 1024) v = 1024;
+    if (v < 32) v = 32;
+    return v;
+}
+
+inline int clamp_block_b(int v, int block_t) {
+    if (v <= 0) v = kDefaultBlockB;
+    if (v < 1) v = 1;
+    const int max_b = std::max(1, 1024 / block_t);
+    if (v > max_b) v = max_b;
+    return v;
+}
+
+struct FcrBlockConfig {
+    int block_t;
+    int block_b;
+    std::size_t smem1;
+    std::size_t smem2;
+};
+
+const FcrBlockConfig& get_fcr_block_config() {
+    static const FcrBlockConfig cfg = []() {
+        int block_t = clamp_block_t(read_env_int("TACO_CUDA_FCR_BLOCK_T", kDefaultBlockT));
+        int block_b = clamp_block_b(read_env_int("TACO_CUDA_FCR_BLOCK_B", kDefaultBlockB), block_t);
+        FcrBlockConfig out;
+        out.block_t = block_t;
+        out.block_b = block_b;
+        out.smem1 = static_cast<std::size_t>(block_t) * sizeof(cuDoubleComplex);
+        out.smem2 = static_cast<std::size_t>(block_t) * 2 * sizeof(cuDoubleComplex);
+        return out;
+    }();
+    return cfg;
+}
+
+inline bool fcr_profile_enabled() {
+    static const bool enabled = (read_env_int("TACO_CUDA_FCR_PROFILE", 0) != 0);
+    return enabled;
 }
 
 inline void cufft_check(cufftResult status, const char* what) {
@@ -90,16 +154,37 @@ __global__ void kernel_pack_conv_F(cuDoubleComplex* A,
                                    int i,
                                    int j,
                                    int k0,
+                                   int batch,
                                    std::size_t Nt,
                                    std::size_t Nfft,
                                    double dt)
 {
     const std::size_t t = static_cast<std::size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-    const std::size_t b = static_cast<std::size_t>(blockIdx.y);
-    if (t >= Nfft) return;
+    const std::size_t b = static_cast<std::size_t>(blockIdx.y) * blockDim.y + threadIdx.y;
+    const bool valid_t = (t < Nfft);
+    const bool valid_g = (t < Nt);
+    const bool valid_b = (b < static_cast<std::size_t>(batch));
+
+    extern __shared__ cuDoubleComplex smem[];
+    cuDoubleComplex* g1_sh = smem;
+    cuDoubleComplex* g2_sh = smem + blockDim.x;
+    if (threadIdx.y == 0) {
+        if (valid_g) {
+            const std::size_t t_idx = t;
+            g1_sh[threadIdx.x] = gamma[t_idx + Nt * static_cast<std::size_t>(i)];
+            int jm = mirror[j];
+            if (jm < 0) jm = j;
+            g2_sh[threadIdx.x] = gamma[t_idx + Nt * static_cast<std::size_t>(jm)];
+        } else {
+            g1_sh[threadIdx.x] = make_cuDoubleComplex(0.0, 0.0);
+            g2_sh[threadIdx.x] = make_cuDoubleComplex(0.0, 0.0);
+        }
+    }
+    __syncthreads();
+    if (!valid_t || !valid_b) return;
 
     const std::size_t base = b * Nfft;
-    if (t >= Nt) {
+    if (!valid_g) {
         A[base + t] = make_cuDoubleComplex(0.0, 0.0);
         B[base + t] = make_cuDoubleComplex(0.0, 0.0);
         return;
@@ -112,12 +197,8 @@ __global__ void kernel_pack_conv_F(cuDoubleComplex* A,
     sincos(theta, &s, &c);
     const cuDoubleComplex phase_minus = make_cuDoubleComplex(c, -s);
 
-    int jm = mirror[j];
-    if (jm < 0) jm = j;
-
-    const std::size_t t_idx = t;
-    const cuDoubleComplex g1  = gamma[t_idx + Nt * static_cast<std::size_t>(i)];
-    const cuDoubleComplex g2m = gamma[t_idx + Nt * static_cast<std::size_t>(jm)];
+    const cuDoubleComplex g1  = g1_sh[threadIdx.x];
+    const cuDoubleComplex g2m = g2_sh[threadIdx.x];
 
     A[base + t] = cd_mul(g1, phase_minus);
     B[base + t] = g2m;
@@ -134,16 +215,36 @@ __global__ void kernel_pack_conv_C(cuDoubleComplex* A,
                                    int i,
                                    int j,
                                    int k0,
+                                   int batch,
                                    std::size_t Nt,
                                    std::size_t Nfft,
                                    double dt)
 {
     const std::size_t t = static_cast<std::size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-    const std::size_t b = static_cast<std::size_t>(blockIdx.y);
-    if (t >= Nfft) return;
+    const std::size_t b = static_cast<std::size_t>(blockIdx.y) * blockDim.y + threadIdx.y;
+    const bool valid_t = (t < Nfft);
+    const bool valid_g = (t < Nt);
+    const bool valid_b = (b < static_cast<std::size_t>(batch));
+
+    extern __shared__ cuDoubleComplex smem[];
+    cuDoubleComplex* g1_sh = smem;
+    cuDoubleComplex* g2c_sh = smem + blockDim.x;
+    if (threadIdx.y == 0) {
+        if (valid_g) {
+            const std::size_t t_idx = t;
+            const cuDoubleComplex g2 = gamma[t_idx + Nt * static_cast<std::size_t>(j)];
+            g1_sh[threadIdx.x] = gamma[t_idx + Nt * static_cast<std::size_t>(i)];
+            g2c_sh[threadIdx.x] = cd_conj(g2);
+        } else {
+            g1_sh[threadIdx.x] = make_cuDoubleComplex(0.0, 0.0);
+            g2c_sh[threadIdx.x] = make_cuDoubleComplex(0.0, 0.0);
+        }
+    }
+    __syncthreads();
+    if (!valid_t || !valid_b) return;
 
     const std::size_t base = b * Nfft;
-    if (t >= Nt) {
+    if (!valid_g) {
         A[base + t] = make_cuDoubleComplex(0.0, 0.0);
         B[base + t] = make_cuDoubleComplex(0.0, 0.0);
         return;
@@ -156,10 +257,8 @@ __global__ void kernel_pack_conv_C(cuDoubleComplex* A,
     sincos(theta, &s, &c);
     const cuDoubleComplex phase_minus = make_cuDoubleComplex(c, -s);
 
-    const std::size_t t_idx = t;
-    const cuDoubleComplex g1 = gamma[t_idx + Nt * static_cast<std::size_t>(i)];
-    const cuDoubleComplex g2 = gamma[t_idx + Nt * static_cast<std::size_t>(j)];
-    const cuDoubleComplex g2c = cd_conj(g2);
+    const cuDoubleComplex g1 = g1_sh[threadIdx.x];
+    const cuDoubleComplex g2c = g2c_sh[threadIdx.x];
 
     A[base + t] = cd_mul(g1, phase_minus);
     B[base + t] = g2c;
@@ -175,12 +274,28 @@ __global__ void kernel_pack_prefix_F(cuDoubleComplex* out, // [Nt, batch]
                                      int i,
                                      int j,
                                      int k0,
+                                     int batch,
                                      std::size_t Nt,
                                      double dt)
 {
     const std::size_t t = static_cast<std::size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-    const std::size_t b = static_cast<std::size_t>(blockIdx.y);
-    if (t >= Nt) return;
+    const std::size_t b = static_cast<std::size_t>(blockIdx.y) * blockDim.y + threadIdx.y;
+    const bool valid_t = (t < Nt);
+    const bool valid_b = (b < static_cast<std::size_t>(batch));
+
+    extern __shared__ cuDoubleComplex smem[];
+    cuDoubleComplex* g2m_sh = smem;
+    if (threadIdx.y == 0) {
+        if (valid_t) {
+            int jm = mirror[j];
+            if (jm < 0) jm = j;
+            g2m_sh[threadIdx.x] = gamma[t + Nt * static_cast<std::size_t>(jm)];
+        } else {
+            g2m_sh[threadIdx.x] = make_cuDoubleComplex(0.0, 0.0);
+        }
+    }
+    __syncthreads();
+    if (!valid_t || !valid_b) return;
 
     const int k = k0 + static_cast<int>(b);
     const double omega = omegas[i] + omegas[j] + omegas[k];
@@ -189,10 +304,7 @@ __global__ void kernel_pack_prefix_F(cuDoubleComplex* out, // [Nt, batch]
     sincos(theta, &s, &c);
     const cuDoubleComplex phase_plus = make_cuDoubleComplex(c, s);
 
-    int jm = mirror[j];
-    if (jm < 0) jm = j;
-    const cuDoubleComplex g2m = gamma[t + Nt * static_cast<std::size_t>(jm)];
-
+    const cuDoubleComplex g2m = g2m_sh[threadIdx.x];
     out[t + Nt * b] = cd_scale(cd_mul(g2m, phase_plus), dt);
 }
 
@@ -204,12 +316,27 @@ __global__ void kernel_pack_prefix_C(cuDoubleComplex* out, // [Nt, batch]
                                      int i,
                                      int j,
                                      int k0,
+                                     int batch,
                                      std::size_t Nt,
                                      double dt)
 {
     const std::size_t t = static_cast<std::size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-    const std::size_t b = static_cast<std::size_t>(blockIdx.y);
-    if (t >= Nt) return;
+    const std::size_t b = static_cast<std::size_t>(blockIdx.y) * blockDim.y + threadIdx.y;
+    const bool valid_t = (t < Nt);
+    const bool valid_b = (b < static_cast<std::size_t>(batch));
+
+    extern __shared__ cuDoubleComplex smem[];
+    cuDoubleComplex* g2c_sh = smem;
+    if (threadIdx.y == 0) {
+        if (valid_t) {
+            const cuDoubleComplex g2 = gamma[t + Nt * static_cast<std::size_t>(j)];
+            g2c_sh[threadIdx.x] = cd_conj(g2);
+        } else {
+            g2c_sh[threadIdx.x] = make_cuDoubleComplex(0.0, 0.0);
+        }
+    }
+    __syncthreads();
+    if (!valid_t || !valid_b) return;
 
     const int k = k0 + static_cast<int>(b);
     const double omega = omegas[i] + omegas[j] + omegas[k];
@@ -218,8 +345,7 @@ __global__ void kernel_pack_prefix_C(cuDoubleComplex* out, // [Nt, batch]
     sincos(theta, &s, &c);
     const cuDoubleComplex phase_plus = make_cuDoubleComplex(c, s);
 
-    const cuDoubleComplex g2  = gamma[t + Nt * static_cast<std::size_t>(j)];
-    const cuDoubleComplex g2c = cd_conj(g2);
+    const cuDoubleComplex g2c = g2c_sh[threadIdx.x];
     out[t + Nt * b] = cd_scale(cd_mul(g2c, phase_plus), dt);
 }
 
@@ -235,13 +361,27 @@ __global__ void kernel_assemble_FC(cuDoubleComplex* out, // [Nt, batch] prefix i
                                    int i,
                                    int j,
                                    int k0,
+                                   int batch,
                                    std::size_t Nt,
                                    std::size_t Nfft,
                                    double dt)
 {
     const std::size_t t = static_cast<std::size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-    const std::size_t b = static_cast<std::size_t>(blockIdx.y);
-    if (t >= Nt) return;
+    const std::size_t b = static_cast<std::size_t>(blockIdx.y) * blockDim.y + threadIdx.y;
+    const bool valid_t = (t < Nt);
+    const bool valid_b = (b < static_cast<std::size_t>(batch));
+
+    extern __shared__ cuDoubleComplex smem[];
+    cuDoubleComplex* g1_sh = smem;
+    if (threadIdx.y == 0) {
+        if (valid_t) {
+            g1_sh[threadIdx.x] = gamma[t + Nt * static_cast<std::size_t>(i)];
+        } else {
+            g1_sh[threadIdx.x] = make_cuDoubleComplex(0.0, 0.0);
+        }
+    }
+    __syncthreads();
+    if (!valid_t || !valid_b) return;
 
     const int k = k0 + static_cast<int>(b);
     const double omega = omegas[i] + omegas[j] + omegas[k];
@@ -250,7 +390,7 @@ __global__ void kernel_assemble_FC(cuDoubleComplex* out, // [Nt, batch] prefix i
     sincos(theta, &s, &c);
     const cuDoubleComplex phase_minus = make_cuDoubleComplex(c, -s);
 
-    const cuDoubleComplex g1 = gamma[t + Nt * static_cast<std::size_t>(i)];
+    const cuDoubleComplex g1 = g1_sh[threadIdx.x];
     const cuDoubleComplex g1_phase = cd_mul(g1, phase_minus);
     const cuDoubleComplex prefix = out[t + Nt * b];
     const cuDoubleComplex term1 = cd_mul(g1_phase, prefix);
@@ -268,12 +408,29 @@ __global__ void kernel_pack_R_integrands(cuDoubleComplex* out_g2, // [Nt, batch]
                                         int i,
                                         int j,
                                         int k0,
+                                        int batch,
                                         std::size_t Nt,
                                         double dt)
 {
     const std::size_t t = static_cast<std::size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-    const std::size_t b = static_cast<std::size_t>(blockIdx.y);
-    if (t >= Nt) return;
+    const std::size_t b = static_cast<std::size_t>(blockIdx.y) * blockDim.y + threadIdx.y;
+    const bool valid_t = (t < Nt);
+    const bool valid_b = (b < static_cast<std::size_t>(batch));
+
+    extern __shared__ cuDoubleComplex smem[];
+    cuDoubleComplex* g1_sh = smem;
+    cuDoubleComplex* g2_sh = smem + blockDim.x;
+    if (threadIdx.y == 0) {
+        if (valid_t) {
+            g1_sh[threadIdx.x] = gamma[t + Nt * static_cast<std::size_t>(i)];
+            g2_sh[threadIdx.x] = gamma[t + Nt * static_cast<std::size_t>(j)];
+        } else {
+            g1_sh[threadIdx.x] = make_cuDoubleComplex(0.0, 0.0);
+            g2_sh[threadIdx.x] = make_cuDoubleComplex(0.0, 0.0);
+        }
+    }
+    __syncthreads();
+    if (!valid_t || !valid_b) return;
 
     const int k = k0 + static_cast<int>(b);
     const double omega = omegas[i] + omegas[j] + omegas[k];
@@ -282,8 +439,8 @@ __global__ void kernel_pack_R_integrands(cuDoubleComplex* out_g2, // [Nt, batch]
     sincos(theta, &s, &c);
     const cuDoubleComplex phase_minus = make_cuDoubleComplex(c, -s);
 
-    const cuDoubleComplex g1 = gamma[t + Nt * static_cast<std::size_t>(i)];
-    const cuDoubleComplex g2 = gamma[t + Nt * static_cast<std::size_t>(j)];
+    const cuDoubleComplex g1 = g1_sh[threadIdx.x];
+    const cuDoubleComplex g2 = g2_sh[threadIdx.x];
 
     const std::size_t idx = t + Nt * b;
     out_g2[idx] = cd_scale(cd_mul(g2, phase_minus), dt);
@@ -297,14 +454,28 @@ __global__ void kernel_assemble_R(cuDoubleComplex* out_R, // [Nt, batch] prefix_
                                   const cuDoubleComplex* prefix_P, // [Nt, batch]
                                   const cuDoubleComplex* gamma,
                                   int i,
+                                  int batch,
                                   std::size_t Nt)
 {
     const std::size_t t = static_cast<std::size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-    const std::size_t b = static_cast<std::size_t>(blockIdx.y);
-    if (t >= Nt) return;
+    const std::size_t b = static_cast<std::size_t>(blockIdx.y) * blockDim.y + threadIdx.y;
+    const bool valid_t = (t < Nt);
+    const bool valid_b = (b < static_cast<std::size_t>(batch));
+
+    extern __shared__ cuDoubleComplex smem[];
+    cuDoubleComplex* g1_sh = smem;
+    if (threadIdx.y == 0) {
+        if (valid_t) {
+            g1_sh[threadIdx.x] = gamma[t + Nt * static_cast<std::size_t>(i)];
+        } else {
+            g1_sh[threadIdx.x] = make_cuDoubleComplex(0.0, 0.0);
+        }
+    }
+    __syncthreads();
+    if (!valid_t || !valid_b) return;
 
     const std::size_t idx = t + Nt * b;
-    const cuDoubleComplex g1 = gamma[t + Nt * static_cast<std::size_t>(i)];
+    const cuDoubleComplex g1 = g1_sh[threadIdx.x];
     const cuDoubleComplex term1 = cd_mul(g1, out_R[idx]);
     const cuDoubleComplex term2 = prefix_P[idx];
     out_R[idx] = make_cuDoubleComplex(term1.x - term2.x, term1.y - term2.y);
@@ -467,22 +638,42 @@ void compute_fcr_convolution_batched(const FcrDeviceInputs& inputs,
         }
     }
 
-    constexpr int block = 256;
-    const dim3 grid_conv = grid_2d(Nfft, B, block);
-    const dim3 grid_time = grid_2d(Nt, B, block);
+    const FcrBlockConfig cfg = get_fcr_block_config();
+    const int block_t = cfg.block_t;
+    int block_b = cfg.block_b;
+    if (block_b > static_cast<int>(B)) block_b = static_cast<int>(B);
+    if (block_b < 1) block_b = 1;
+    const dim3 block(block_t, block_b);
+    const dim3 grid_conv = grid_2d_tiled(Nfft, B, block_t, block_b);
+    const dim3 grid_time = grid_2d_tiled(Nt, B, block_t, block_b);
+
+    const bool want_profile = fcr_profile_enabled();
+    static std::atomic<int> profile_once{0};
+    const bool profile_this = want_profile && (profile_once.fetch_add(1) == 0);
+    cudaEvent_t ev_start = nullptr;
+    cudaEvent_t ev_f = nullptr;
+    cudaEvent_t ev_c = nullptr;
+    cudaEvent_t ev_r = nullptr;
+    if (profile_this) {
+        cuda_check(cudaEventCreate(&ev_start), "cudaEventCreate(start)");
+        cuda_check(cudaEventCreate(&ev_f), "cudaEventCreate(F)");
+        cuda_check(cudaEventCreate(&ev_c), "cudaEventCreate(C)");
+        cuda_check(cudaEventCreate(&ev_r), "cudaEventCreate(R)");
+        cuda_check(cudaEventRecord(ev_start, stream), "cudaEventRecord(start)");
+    }
 
     // ---- F: g2m (mirror[j]) ----
     // Compute convF(t) = dt * causal_conv( g1(t)*e^{-iωt}, g2_mirror(t) )
-    kernel_pack_conv_F<<<grid_conv, block, 0, stream>>>(ws.A, ws.B,
+    kernel_pack_conv_F<<<grid_conv, block, cfg.smem2, stream>>>(ws.A, ws.B,
                                                         inputs.gamma, inputs.omegas, inputs.mirror,
-                                                        batch.i, batch.j, batch.k0,
+                                                        batch.i, batch.j, batch.k0, static_cast<int>(B),
                                                         Nt, Nfft, inputs.dt);
     cuda_check(cudaGetLastError(), "kernel_pack_conv_F launch");
     convolution_cufft(ws.plan, ws.A, ws.B, B, Nfft, inputs.dt, stream);
 
-    kernel_pack_prefix_F<<<grid_time, block, 0, stream>>>(ws.B,
+    kernel_pack_prefix_F<<<grid_time, block, cfg.smem1, stream>>>(ws.B,
                                                            inputs.gamma, inputs.omegas, inputs.mirror,
-                                                           batch.i, batch.j, batch.k0,
+                                                           batch.i, batch.j, batch.k0, static_cast<int>(B),
                                                            Nt, inputs.dt);
     cuda_check(cudaGetLastError(), "kernel_pack_prefix_F launch");
     for (std::size_t b = 0; b < B; ++b) {
@@ -492,24 +683,27 @@ void compute_fcr_convolution_batched(const FcrDeviceInputs& inputs,
                                        in, out,
                                        Cadd{}, static_cast<int>(Nt), stream);
     }
-    kernel_assemble_FC<<<grid_time, block, 0, stream>>>(batch.F, ws.A,
+    kernel_assemble_FC<<<grid_time, block, cfg.smem1, stream>>>(batch.F, ws.A,
                                                         inputs.gamma, inputs.omegas,
-                                                        batch.i, batch.j, batch.k0,
+                                                        batch.i, batch.j, batch.k0, static_cast<int>(B),
                                                         Nt, Nfft, inputs.dt);
     cuda_check(cudaGetLastError(), "kernel_assemble_FC(F) launch");
+    if (profile_this) {
+        cuda_check(cudaEventRecord(ev_f, stream), "cudaEventRecord(F)");
+    }
 
     // ---- C: conj(g2) ----
     // Compute convC(t) = dt * causal_conv( g1(t)*e^{-iωt}, conj(g2(t)) )
-    kernel_pack_conv_C<<<grid_conv, block, 0, stream>>>(ws.A, ws.B,
+    kernel_pack_conv_C<<<grid_conv, block, cfg.smem2, stream>>>(ws.A, ws.B,
                                                         inputs.gamma, inputs.omegas,
-                                                        batch.i, batch.j, batch.k0,
+                                                        batch.i, batch.j, batch.k0, static_cast<int>(B),
                                                         Nt, Nfft, inputs.dt);
     cuda_check(cudaGetLastError(), "kernel_pack_conv_C launch");
     convolution_cufft(ws.plan, ws.A, ws.B, B, Nfft, inputs.dt, stream);
 
-    kernel_pack_prefix_C<<<grid_time, block, 0, stream>>>(ws.B,
+    kernel_pack_prefix_C<<<grid_time, block, cfg.smem1, stream>>>(ws.B,
                                                           inputs.gamma, inputs.omegas,
-                                                          batch.i, batch.j, batch.k0,
+                                                          batch.i, batch.j, batch.k0, static_cast<int>(B),
                                                           Nt, inputs.dt);
     cuda_check(cudaGetLastError(), "kernel_pack_prefix_C launch");
     for (std::size_t b = 0; b < B; ++b) {
@@ -519,16 +713,19 @@ void compute_fcr_convolution_batched(const FcrDeviceInputs& inputs,
                                        in, out,
                                        Cadd{}, static_cast<int>(Nt), stream);
     }
-    kernel_assemble_FC<<<grid_time, block, 0, stream>>>(batch.C, ws.A,
+    kernel_assemble_FC<<<grid_time, block, cfg.smem1, stream>>>(batch.C, ws.A,
                                                         inputs.gamma, inputs.omegas,
-                                                        batch.i, batch.j, batch.k0,
+                                                        batch.i, batch.j, batch.k0, static_cast<int>(B),
                                                         Nt, Nfft, inputs.dt);
     cuda_check(cudaGetLastError(), "kernel_assemble_FC(C) launch");
+    if (profile_this) {
+        cuda_check(cudaEventRecord(ev_c, stream), "cudaEventRecord(C)");
+    }
 
     // ---- R: prefix(g2*e^{-iwt}) and prefix((g1*g2)*e^{-iwt}) ----
-    kernel_pack_R_integrands<<<grid_time, block, 0, stream>>>(ws.A, ws.B,
+    kernel_pack_R_integrands<<<grid_time, block, cfg.smem2, stream>>>(ws.A, ws.B,
                                                               inputs.gamma, inputs.omegas,
-                                                              batch.i, batch.j, batch.k0,
+                                                              batch.i, batch.j, batch.k0, static_cast<int>(B),
                                                               Nt, inputs.dt);
     cuda_check(cudaGetLastError(), "kernel_pack_R_integrands launch");
     for (std::size_t b = 0; b < B; ++b) {
@@ -545,9 +742,26 @@ void compute_fcr_convolution_batched(const FcrDeviceInputs& inputs,
                                        in, out,
                                        Cadd{}, static_cast<int>(Nt), stream);
     }
-    kernel_assemble_R<<<grid_time, block, 0, stream>>>(batch.R, ws.A,
+    kernel_assemble_R<<<grid_time, block, cfg.smem1, stream>>>(batch.R, ws.A,
                                                        inputs.gamma,
-                                                       batch.i, Nt);
+                                                       batch.i, static_cast<int>(B), Nt);
     cuda_check(cudaGetLastError(), "kernel_assemble_R launch");
+    if (profile_this) {
+        cuda_check(cudaEventRecord(ev_r, stream), "cudaEventRecord(R)");
+        cuda_check(cudaEventSynchronize(ev_r), "cudaEventSynchronize(R)");
+        float ms_f = 0.0f;
+        float ms_c = 0.0f;
+        float ms_r = 0.0f;
+        cuda_check(cudaEventElapsedTime(&ms_f, ev_start, ev_f), "cudaEventElapsedTime(F)");
+        cuda_check(cudaEventElapsedTime(&ms_c, ev_f, ev_c), "cudaEventElapsedTime(C)");
+        cuda_check(cudaEventElapsedTime(&ms_r, ev_c, ev_r), "cudaEventElapsedTime(R)");
+        std::fprintf(stderr,
+                     "cuda_fcr profile: block=%dx%d B=%zu Nt=%zu Nfft=%zu ms_F=%.3f ms_C=%.3f ms_R=%.3f\n",
+                     block_t, block_b, B, Nt, Nfft, ms_f, ms_c, ms_r);
+        cuda_check(cudaEventDestroy(ev_start), "cudaEventDestroy(start)");
+        cuda_check(cudaEventDestroy(ev_f), "cudaEventDestroy(F)");
+        cuda_check(cudaEventDestroy(ev_c), "cudaEventDestroy(C)");
+        cuda_check(cudaEventDestroy(ev_r), "cudaEventDestroy(R)");
+    }
 }
 } // namespace taco::tcl4::cuda_fcr

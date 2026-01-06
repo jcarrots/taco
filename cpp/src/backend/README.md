@@ -1,12 +1,14 @@
 Backend scaffolding
 ===================
 
-This folder will host implementation files for execution backends.
+This folder hosts implementation files for execution backends.
 
 - serial/: single-thread CPU reference path.
 - omp/: shared-memory CPU parallelism (OpenMP/TBB).
-- cuda/: single-node GPU kernels (cuFFT/cuBLAS/hipFFT/rocBLAS).
-- mpi_omp/: distributed CPU (MPI + OpenMP).
-- mpi_cuda/: distributed GPU (MPI + CUDA).
+- cuda/: single-node GPU kernels (cuFFT today).
+- mpi_omp/: distributed CPU (MPI + OpenMP) planning notes.
+- mpi_cuda/: distributed GPU (MPI + CUDA) planning notes.
 
-No code here yet - this is a placeholder to stage work without impacting the core.
+Implementation status:
+- serial/omp/cuda contain working code.
+- mpi_omp/mpi_cuda are placeholders with design notes only.
