@@ -318,9 +318,19 @@ int main(int argc, char** argv) {
         Eigen::MatrixXcd L4;
         {
             auto sec = prof.section("Build GW/L4");
-            const taco::tcl4::MikxTensors mikx = taco::tcl4::build_mikx_serial(map, kernels, tidx);
-            GW_raw = taco::tcl4::assemble_liouvillian(mikx, system.A_eig); // (n,i;m,j)
-            L4 = taco::tcl4::gw_to_liouvillian(GW_raw, dim);               // (n,m;i,j)
+            taco::tcl4::MikxTensors mikx;
+            {
+                auto sec_mikx = prof.section("MIKX");
+                mikx = taco::tcl4::build_mikx_serial(map, kernels, tidx);
+            }
+            {
+                auto sec_gw = prof.section("Assemble GW");
+                GW_raw = taco::tcl4::assemble_liouvillian(mikx, system.A_eig); // (n,i;m,j)
+            }
+            {
+                auto sec_l4 = prof.section("Assemble L4");
+                L4 = taco::tcl4::gw_to_liouvillian(GW_raw, dim);               // (n,m;i,j)
+            }
         }
 
         std::cout << "GW_raw: " << GW_raw.rows() << "x" << GW_raw.cols()
@@ -383,9 +393,20 @@ int main(int argc, char** argv) {
                 const taco::tcl2::TCL2Components comps2 = taco::tcl2::build_tcl2_components(system, K2, /*cutoff=*/0.0);
                 Matrix L = comps2.total();
                 if (order == 4) {
-                    const taco::tcl4::MikxTensors mikx = taco::tcl4::build_mikx_serial(map, kernels, time_index);
-                    const Matrix GWt = taco::tcl4::assemble_liouvillian(mikx, system.A_eig); // (n,i;m,j)
-                    L.noalias() += taco::tcl4::gw_to_liouvillian(GWt, dim);                   // (n,m;i,j)
+                    taco::tcl4::MikxTensors mikx;
+                    {
+                        auto sec_mikx = prof.section("MIKX");
+                        mikx = taco::tcl4::build_mikx_serial(map, kernels, time_index);
+                    }
+                    Matrix GWt;
+                    {
+                        auto sec_gw = prof.section("Assemble GW");
+                        GWt = taco::tcl4::assemble_liouvillian(mikx, system.A_eig); // (n,i;m,j)
+                    }
+                    {
+                        auto sec_l4 = prof.section("Assemble L4");
+                        L.noalias() += taco::tcl4::gw_to_liouvillian(GWt, dim);     // (n,m;i,j)
+                    }
                 }
                 return L;
             };

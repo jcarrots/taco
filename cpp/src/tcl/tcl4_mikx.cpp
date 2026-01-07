@@ -135,4 +135,13 @@ MikxTensors build_mikx_serial(const Tcl4Map& map,
     return tensors;
 }
 
+#ifdef _OPENMP
+MikxTensors build_mikx_omp(const Tcl4Map& map,
+                           const TripleKernelSeries& kernels,
+                           std::size_t time_index)
+{
+    return build_mikx_serial(map, kernels, time_index);
+}
+#endif
+
 } // namespace taco::tcl4

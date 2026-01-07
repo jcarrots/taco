@@ -17,6 +17,10 @@
 #include "taco/correlation_fft.hpp"
 #include "taco/gamma.hpp"
 #include "taco/tcl4.hpp"
+#include "taco/tcl4_mikx.hpp"
+#ifdef TACO_HAS_CUDA
+#include "taco/backend/cuda/tcl4_mikx_cuda.hpp"
+#endif
 
 static inline double rel_err(std::complex<double> a, std::complex<double> b) {
     const double den = std::max(1.0, std::abs(b));
@@ -64,6 +68,10 @@ int main(int argc, char** argv) {
     bool force_serial = false;
     bool force_omp = false;
     bool run_direct = true;
+    bool run_mikx = false;
+    bool mikx_serial = false;
+    bool mikx_omp = false;
+    bool mikx_cuda = false;
     int threads = 0;
     int gpu_id = 0;
     std::size_t tidx = std::numeric_limits<std::size_t>::max();
@@ -75,6 +83,10 @@ int main(int argc, char** argv) {
         else if (arg == "--serial") force_serial = true;
         else if (arg == "--omp") force_omp = true;
         else if (arg == "--no-direct") run_direct = false;
+        else if (arg == "--mikx") run_mikx = true;
+        else if (arg == "--mikx-serial") { run_mikx = true; mikx_serial = true; }
+        else if (arg == "--mikx-omp") { run_mikx = true; mikx_omp = true; }
+        else if (arg == "--mikx-cuda") { run_mikx = true; mikx_cuda = true; }
         else if (arg.rfind("--backend=",0)==0) {
             const std::string v = arg.substr(10);
             if (v == "cuda") use_cuda = true;
@@ -152,6 +164,59 @@ int main(int argc, char** argv) {
 
         k_cpu_conv_last = std::move(k_conv);
         have_cpu_conv = true;
+    }
+
+    if (run_mikx) {
+        if (!have_cpu_conv) {
+            std::cout << "mikx requested but no CPU kernels are available\n";
+        } else {
+            tcl4::Tcl4Map map = tcl4::build_map(system, t);
+            const bool run_cpu_default = (!mikx_serial && !mikx_omp && !mikx_cuda);
+            bool want_serial = mikx_serial;
+            bool want_omp = mikx_omp;
+            if (run_cpu_default) {
+#ifdef _OPENMP
+                want_omp = true;
+#else
+                want_serial = true;
+#endif
+            }
+            if (want_serial) {
+                auto t0 = std::chrono::high_resolution_clock::now();
+                auto mikx = tcl4::build_mikx_serial(map, k_cpu_conv_last, tidx);
+                auto t1 = std::chrono::high_resolution_clock::now();
+                double t_mikx = std::chrono::duration<double>(t1 - t0).count();
+                std::cout << "mikx serial t=" << t_mikx << "s (N=" << mikx.N << ")\n";
+            }
+#ifdef _OPENMP
+            if (want_omp) {
+                for (int th : thread_cases) {
+                    if (th > 0 && !omp_in_parallel()) omp_set_num_threads(th);
+                    auto t0 = std::chrono::high_resolution_clock::now();
+                    auto mikx = tcl4::build_mikx_omp(map, k_cpu_conv_last, tidx);
+                    auto t1 = std::chrono::high_resolution_clock::now();
+                    double t_mikx = std::chrono::duration<double>(t1 - t0).count();
+                    std::cout << "mikx omp threads=" << th << ", t=" << t_mikx
+                              << "s (N=" << mikx.N << ")\n";
+                }
+            }
+#endif
+            if (mikx_cuda) {
+#ifdef TACO_HAS_CUDA
+                Exec exec;
+                exec.backend = Backend::Cuda;
+                exec.gpu_id = gpu_id;
+                auto t0 = std::chrono::high_resolution_clock::now();
+                auto mikx = tcl4::build_mikx_cuda(map, k_cpu_conv_last, tidx, exec);
+                auto t1 = std::chrono::high_resolution_clock::now();
+                double t_mikx = std::chrono::duration<double>(t1 - t0).count();
+                std::cout << "mikx cuda gpu_id=" << gpu_id << ", t=" << t_mikx
+                          << "s (N=" << mikx.N << ")\n";
+#else
+                std::cout << "mikx cuda requested but TACO_HAS_CUDA is not enabled in this build\n";
+#endif
+            }
+        }
     }
 
     if (use_cuda) {

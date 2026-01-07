@@ -131,6 +131,9 @@ target_link_libraries(tcl4_spin_boson_example PRIVATE taco_tcl)
 add_executable(tcl4_bench examples/tcl4_bench.cpp)
 target_link_libraries(tcl4_bench PRIVATE taco_tcl)
 
+add_executable(tcl4_mikx_bench examples/tcl4_mikx_bench.cpp)
+target_link_libraries(tcl4_mikx_bench PRIVATE taco_tcl)
+
 add_executable(integrator_tests tests/integrator_tests.cpp)
  target_link_libraries(integrator_tests PRIVATE taco_tcl)
  target_include_directories(integrator_tests PRIVATE cpp/src)
