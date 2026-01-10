@@ -53,6 +53,8 @@ target_include_directories(taco_tcl PUBLIC
 if (TACO_WITH_CUDA AND CMAKE_CUDA_COMPILER)
   target_sources(taco_tcl PRIVATE
     cpp/src/backend/cuda/tcl4_fcr_kernels.cu
+    cpp/src/backend/cuda/tcl4_assemble_cuda.cu
+    cpp/src/backend/cuda/tcl4_fused_cuda.cu
     cpp/src/backend/cuda/tcl4_kernels_cuda.cu
     cpp/src/backend/cuda/tcl4_mikx_cuda.cu
   )

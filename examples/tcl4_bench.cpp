@@ -1,6 +1,8 @@
-#include <iostream>
-#include <iomanip>
+#include <algorithm>
 #include <chrono>
+#include <cctype>
+#include <iomanip>
+#include <iostream>
 #include <vector>
 #include <complex>
 #include <cmath>
@@ -25,6 +27,78 @@
 static inline double rel_err(std::complex<double> a, std::complex<double> b) {
     const double den = std::max(1.0, std::abs(b));
     return std::abs(a - b) / den;
+}
+
+static std::string lower_copy(std::string s) {
+    std::transform(s.begin(), s.end(), s.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return s;
+}
+
+static std::size_t parse_tidx_token(const std::string& token, std::size_t Nt) {
+    const std::string t = lower_copy(token);
+    if (t == "last") return (Nt > 0 ? Nt - 1 : 0);
+    if (t == "mid") return (Nt > 0 ? Nt / 2 : 0);
+    return static_cast<std::size_t>(std::stoull(token));
+}
+
+static void append_tidx_list(std::vector<std::size_t>& out,
+                             const std::string& spec,
+                             std::size_t Nt) {
+    std::size_t pos = 0;
+    while (pos <= spec.size()) {
+        const std::size_t comma = spec.find(',', pos);
+        const std::string token = (comma == std::string::npos)
+            ? spec.substr(pos)
+            : spec.substr(pos, comma - pos);
+        if (!token.empty()) out.push_back(parse_tidx_token(token, Nt));
+        if (comma == std::string::npos) break;
+        pos = comma + 1;
+    }
+}
+
+static void append_tidx_range(std::vector<std::size_t>& out,
+                              const std::string& spec,
+                              std::size_t Nt) {
+    const std::size_t c1 = spec.find(':');
+    if (c1 == std::string::npos) return;
+    const std::size_t c2 = spec.find(':', c1 + 1);
+    const std::string s_start = spec.substr(0, c1);
+    const std::string s_stop = (c2 == std::string::npos)
+        ? spec.substr(c1 + 1)
+        : spec.substr(c1 + 1, c2 - c1 - 1);
+    const std::string s_step = (c2 == std::string::npos) ? "" : spec.substr(c2 + 1);
+    std::size_t start = static_cast<std::size_t>(std::stoull(s_start));
+    std::size_t stop = static_cast<std::size_t>(std::stoull(s_stop));
+    std::size_t step = s_step.empty() ? 1 : static_cast<std::size_t>(std::stoull(s_step));
+    if (step == 0) step = 1;
+    if (start > stop) std::swap(start, stop);
+    for (std::size_t v = start; v <= stop; v += step) {
+        out.push_back(v);
+        if (stop - v < step) break;
+    }
+}
+
+static std::vector<std::size_t> resolve_tidx_list(std::size_t Nt,
+                                                  const std::string& single_spec,
+                                                  const std::string& list_spec,
+                                                  const std::string& range_spec) {
+    std::vector<std::size_t> out;
+    if (!list_spec.empty()) append_tidx_list(out, list_spec, Nt);
+    if (!range_spec.empty()) append_tidx_range(out, range_spec, Nt);
+    if (out.empty()) {
+        if (!single_spec.empty()) out.push_back(parse_tidx_token(single_spec, Nt));
+        else out.push_back(Nt > 0 ? Nt - 1 : 0);
+    }
+    if (Nt == 0) return std::vector<std::size_t>{0};
+    bool clamped = false;
+    for (auto& idx : out) {
+        if (idx >= Nt) { idx = Nt - 1; clamped = true; }
+    }
+    if (clamped) {
+        std::cout << "tidx list clamped to last index " << (Nt - 1) << "\n";
+    }
+    return out;
 }
 
 struct ErrTriple {
@@ -74,7 +148,9 @@ int main(int argc, char** argv) {
     bool mikx_cuda = false;
     int threads = 0;
     int gpu_id = 0;
-    std::size_t tidx = std::numeric_limits<std::size_t>::max();
+    std::string tidx_spec;
+    std::string tidx_list_spec;
+    std::string tidx_range_spec;
     for (int i = 1; i < argc; ++i) {
         std::string arg(argv[i]);
         if (arg.rfind("--dt=",0)==0) dt = std::stod(arg.substr(5));
@@ -97,7 +173,11 @@ int main(int argc, char** argv) {
         } else if (arg.rfind("--gpu_id=",0)==0) {
             gpu_id = std::stoi(arg.substr(9));
         } else if (arg.rfind("--tidx=",0)==0) {
-            tidx = static_cast<std::size_t>(std::stoull(arg.substr(7)));
+            tidx_spec = arg.substr(7);
+        } else if (arg.rfind("--tidx-list=",0)==0) {
+            tidx_list_spec = arg.substr(12);
+        } else if (arg.rfind("--tidx-range=",0)==0) {
+            tidx_range_spec = arg.substr(13);
         }
     }
     std::vector<double> t; std::vector<std::complex<double>> C;
@@ -124,7 +204,8 @@ int main(int argc, char** argv) {
     tcl4::TripleKernelSeries k_cpu_conv_last;
     bool have_cpu_conv = false;
     const std::size_t Nt = static_cast<std::size_t>(gamma_series.rows());
-    if (tidx == std::numeric_limits<std::size_t>::max()) tidx = (Nt > 0 ? Nt - 1 : 0);
+    const std::vector<std::size_t> tidx_list =
+        resolve_tidx_list(Nt, tidx_spec, tidx_list_spec, tidx_range_spec);
 
     for (int th : thread_cases) {
         Exec exec;
@@ -149,7 +230,12 @@ int main(int argc, char** argv) {
             auto k_dir = tcl4::compute_triple_kernels(system, gamma_series, dt, /*nmax*/2, tcl4::FCRMethod::Direct, exec);
             auto t3 = std::chrono::high_resolution_clock::now();
             t_dir = std::chrono::duration<double>(t3 - t2).count();
-            err_direct = max_rel_err(k_conv, k_dir, tidx);
+            for (std::size_t ti : tidx_list) {
+                ErrTriple e = max_rel_err(k_conv, k_dir, ti);
+                err_direct.F = std::max(err_direct.F, e.F);
+                err_direct.C = std::max(err_direct.C, e.C);
+                err_direct.R = std::max(err_direct.R, e.R);
+            }
         }
 
         std::cout << "cpu threads=" << th
@@ -166,7 +252,7 @@ int main(int argc, char** argv) {
         have_cpu_conv = true;
     }
 
-    if (run_mikx) {
+        if (run_mikx) {
         if (!have_cpu_conv) {
             std::cout << "mikx requested but no CPU kernels are available\n";
         } else {
@@ -182,22 +268,34 @@ int main(int argc, char** argv) {
 #endif
             }
             if (want_serial) {
-                auto t0 = std::chrono::high_resolution_clock::now();
-                auto mikx = tcl4::build_mikx_serial(map, k_cpu_conv_last, tidx);
-                auto t1 = std::chrono::high_resolution_clock::now();
-                double t_mikx = std::chrono::duration<double>(t1 - t0).count();
-                std::cout << "mikx serial t=" << t_mikx << "s (N=" << mikx.N << ")\n";
+                double total = 0.0;
+                taco::tcl4::MikxTensors mikx;
+                for (std::size_t ti : tidx_list) {
+                    auto t0 = std::chrono::high_resolution_clock::now();
+                    mikx = tcl4::build_mikx_serial(map, k_cpu_conv_last, ti);
+                    auto t1 = std::chrono::high_resolution_clock::now();
+                    total += std::chrono::duration<double>(t1 - t0).count();
+                }
+                const double avg = total / static_cast<double>(tidx_list.size());
+                std::cout << "mikx serial t_total=" << total << "s, avg=" << avg
+                          << "s, n=" << tidx_list.size() << " (N=" << mikx.N << ")\n";
             }
 #ifdef _OPENMP
             if (want_omp) {
                 for (int th : thread_cases) {
                     if (th > 0 && !omp_in_parallel()) omp_set_num_threads(th);
-                    auto t0 = std::chrono::high_resolution_clock::now();
-                    auto mikx = tcl4::build_mikx_omp(map, k_cpu_conv_last, tidx);
-                    auto t1 = std::chrono::high_resolution_clock::now();
-                    double t_mikx = std::chrono::duration<double>(t1 - t0).count();
-                    std::cout << "mikx omp threads=" << th << ", t=" << t_mikx
-                              << "s (N=" << mikx.N << ")\n";
+                    double total = 0.0;
+                    taco::tcl4::MikxTensors mikx;
+                    for (std::size_t ti : tidx_list) {
+                        auto t0 = std::chrono::high_resolution_clock::now();
+                        mikx = tcl4::build_mikx_omp(map, k_cpu_conv_last, ti);
+                        auto t1 = std::chrono::high_resolution_clock::now();
+                        total += std::chrono::duration<double>(t1 - t0).count();
+                    }
+                    const double avg = total / static_cast<double>(tidx_list.size());
+                    std::cout << "mikx omp threads=" << th << ", t_total=" << total
+                              << "s, avg=" << avg << "s, n=" << tidx_list.size()
+                              << " (N=" << mikx.N << ")\n";
                 }
             }
 #endif
@@ -206,12 +304,33 @@ int main(int argc, char** argv) {
                 Exec exec;
                 exec.backend = Backend::Cuda;
                 exec.gpu_id = gpu_id;
-                auto t0 = std::chrono::high_resolution_clock::now();
-                auto mikx = tcl4::build_mikx_cuda(map, k_cpu_conv_last, tidx, exec);
-                auto t1 = std::chrono::high_resolution_clock::now();
-                double t_mikx = std::chrono::duration<double>(t1 - t0).count();
-                std::cout << "mikx cuda gpu_id=" << gpu_id << ", t=" << t_mikx
-                          << "s (N=" << mikx.N << ")\n";
+                double total = 0.0;
+                double kernel_ms_total = 0.0;
+                int N_out = map.N;
+                if (tidx_list.size() > 1) {
+                    auto t0 = std::chrono::high_resolution_clock::now();
+                    auto mikx_list = tcl4::build_mikx_cuda_batch(map, k_cpu_conv_last, tidx_list, exec, 0, &kernel_ms_total);
+                    auto t1 = std::chrono::high_resolution_clock::now();
+                    total = std::chrono::duration<double>(t1 - t0).count();
+                    if (!mikx_list.empty()) N_out = mikx_list.back().N;
+                    const double avg = total / static_cast<double>(tidx_list.size());
+                    const double kernel_total = kernel_ms_total * 1e-3;
+                    const double kernel_avg = kernel_total / static_cast<double>(tidx_list.size());
+                    std::cout << "mikx cuda batch gpu_id=" << gpu_id << ", t_total=" << total
+                              << "s, t_kernel_total=" << kernel_total << "s, avg=" << avg
+                              << "s, avg_kernel=" << kernel_avg << "s, n=" << tidx_list.size()
+                              << " (N=" << N_out << ")\n";
+                } else {
+                    auto t0 = std::chrono::high_resolution_clock::now();
+                    double kernel_ms = 0.0;
+                    auto mikx = tcl4::build_mikx_cuda(map, k_cpu_conv_last, tidx_list.front(), exec, &kernel_ms);
+                    auto t1 = std::chrono::high_resolution_clock::now();
+                    total = std::chrono::duration<double>(t1 - t0).count();
+                    const double kernel_total = kernel_ms * 1e-3;
+                    std::cout << "mikx cuda gpu_id=" << gpu_id << ", t_total=" << total
+                              << "s, t_kernel_total=" << kernel_total << "s, avg=" << total
+                              << "s, avg_kernel=" << kernel_total << "s, n=1 (N=" << mikx.N << ")\n";
+                }
 #else
                 std::cout << "mikx cuda requested but TACO_HAS_CUDA is not enabled in this build\n";
 #endif
@@ -230,7 +349,13 @@ int main(int argc, char** argv) {
         double t_gpu = std::chrono::duration<double>(t1 - t0).count();
         std::cout << "gpu id=" << gpu_id << ", t_fft=" << t_gpu << "s";
         if (have_cpu_conv) {
-            ErrTriple err_gpu = max_rel_err(k_cpu_conv_last, k_gpu, tidx);
+            ErrTriple err_gpu;
+            for (std::size_t ti : tidx_list) {
+                ErrTriple e = max_rel_err(k_cpu_conv_last, k_gpu, ti);
+                err_gpu.F = std::max(err_gpu.F, e.F);
+                err_gpu.C = std::max(err_gpu.C, e.C);
+                err_gpu.R = std::max(err_gpu.R, e.R);
+            }
             std::cout << ", errF=" << err_gpu.F
                       << ", errC=" << err_gpu.C
                       << ", errR=" << err_gpu.R;

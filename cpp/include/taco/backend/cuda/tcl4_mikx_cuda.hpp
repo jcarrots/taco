@@ -57,6 +57,26 @@ MikxTensors build_mikx_cuda(const Tcl4Map& map,
                             const TripleKernelSeries& kernels,
                             std::size_t time_index,
                             const Exec& exec);
+MikxTensors build_mikx_cuda(const Tcl4Map& map,
+                            const TripleKernelSeries& kernels,
+                            std::size_t time_index,
+                            const Exec& exec,
+                            double* kernel_ms);
+
+// Batched CUDA helper: upload F/C/R for multiple time indices once, then build M/I/K/X per time index.
+// Returns host-side MikxTensors for each requested time index (same order as input).
+// batch_size==0 means process all time indices in one upload (may be clamped internally).
+std::vector<MikxTensors> build_mikx_cuda_batch(const Tcl4Map& map,
+                                               const TripleKernelSeries& kernels,
+                                               const std::vector<std::size_t>& time_indices,
+                                               const Exec& exec,
+                                               std::size_t batch_size = 0);
+std::vector<MikxTensors> build_mikx_cuda_batch(const Tcl4Map& map,
+                                               const TripleKernelSeries& kernels,
+                                               const std::vector<std::size_t>& time_indices,
+                                               const Exec& exec,
+                                               std::size_t batch_size,
+                                               double* kernel_ms_total);
 
 } // namespace taco::tcl4
 
