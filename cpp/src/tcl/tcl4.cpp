@@ -1,9 +1,7 @@
 #include "taco/tcl4.hpp"
 
-#include <chrono>
 #include <cmath>
 #include <cstddef>
-#include <cstdlib>
 #include <iostream>
 #include <limits>
 #include <stdexcept>
@@ -25,33 +23,17 @@
 namespace taco::tcl4 {
 
 namespace {
-inline int read_env_int(const char* name, int fallback) {
-#ifdef _MSC_VER
-    char* buf = nullptr;
-    size_t len = 0;
-    if (_dupenv_s(&buf, &len, name) != 0 || !buf) return fallback;
-    char* end = nullptr;
-    const long parsed = std::strtol(buf, &end, 10);
-    std::free(buf);
-#else
-    const char* value = std::getenv(name);
-    if (!value || !*value) return fallback;
-    char* end = nullptr;
-    const long parsed = std::strtol(value, &end, 10);
-    if (end == value) return fallback;
+MikxTensors build_mikx_cpu(const Tcl4Map& map,
+                           const TripleKernelSeries& kernels,
+                           std::size_t time_index,
+                           const Exec& exec)
+{
+#ifdef _OPENMP
+    if (exec.backend == Backend::Omp) {
+        return build_mikx_omp(map, kernels, time_index);
+    }
 #endif
-    if (parsed > std::numeric_limits<int>::max() || parsed < std::numeric_limits<int>::min()) return fallback;
-    return static_cast<int>(parsed);
-}
-
-inline bool tcl4_cuda_profile_enabled() {
-    static const bool enabled = (read_env_int("TACO_CUDA_TCL4_PROFILE", 0) != 0);
-    return enabled;
-}
-
-inline bool tcl4_cuda_fused_enabled() {
-    static const bool enabled = (read_env_int("TACO_CUDA_TCL4_FUSED", 1) != 0);
-    return enabled;
+    return build_mikx_serial(map, kernels, time_index);
 }
 } // namespace
 
@@ -321,9 +303,7 @@ Eigen::MatrixXcd build_TCL4_generator(const sys::System& system,
 
     if (exec.backend == Backend::Cuda) {
         #ifdef TACO_HAS_CUDA
-        if (tcl4_cuda_fused_enabled()) {
-            return build_TCL4_generator_cuda_fused(system, gamma_series, dt, time_index, method, exec);
-        }
+        return build_TCL4_generator_cuda_fused(system, gamma_series, dt, time_index, method, exec);
         #else
         throw std::invalid_argument("build_TCL4_generator: CUDA backend requested but taco_tcl was built without CUDA");
         #endif
@@ -331,58 +311,11 @@ Eigen::MatrixXcd build_TCL4_generator(const sys::System& system,
 
     auto kernels = compute_triple_kernels(system, gamma_series, dt, /*nmax*/2, method, exec);
     Tcl4Map map = build_map(system, /*time_grid*/{});
-    const bool profile = tcl4_cuda_profile_enabled();
-    const auto total_start = profile ? std::chrono::high_resolution_clock::now()
-                                     : std::chrono::high_resolution_clock::time_point{};
 
     MikxTensors mikx;
     Eigen::MatrixXcd GW;
-    if (exec.backend == Backend::Cuda) {
-        #ifdef TACO_HAS_CUDA
-        const auto t_mikx_start = profile ? std::chrono::high_resolution_clock::now()
-                                          : std::chrono::high_resolution_clock::time_point{};
-        mikx = build_mikx_cuda(map, kernels, time_index, exec);
-        const auto t_mikx_end = profile ? std::chrono::high_resolution_clock::now()
-                                        : std::chrono::high_resolution_clock::time_point{};
-
-        const auto t_gw_start = profile ? std::chrono::high_resolution_clock::now()
-                                        : std::chrono::high_resolution_clock::time_point{};
-        GW = assemble_liouvillian_cuda(mikx, system.A_eig, exec); // (n,i;m,j)
-        const auto t_gw_end = profile ? std::chrono::high_resolution_clock::now()
-                                      : std::chrono::high_resolution_clock::time_point{};
-
-        const auto t_l4_start = profile ? std::chrono::high_resolution_clock::now()
-                                        : std::chrono::high_resolution_clock::time_point{};
-        const Eigen::MatrixXcd L4 = gw_to_liouvillian(GW, system.eig.dim); // (n,m;i,j)
-        const auto t_l4_end = profile ? std::chrono::high_resolution_clock::now()
-                                      : std::chrono::high_resolution_clock::time_point{};
-
-        if (profile) {
-            const auto total_end = std::chrono::high_resolution_clock::now();
-            const double mikx_ms =
-                std::chrono::duration<double, std::milli>(t_mikx_end - t_mikx_start).count();
-            const double gw_ms =
-                std::chrono::duration<double, std::milli>(t_gw_end - t_gw_start).count();
-            const double l4_ms =
-                std::chrono::duration<double, std::milli>(t_l4_end - t_l4_start).count();
-            const double total_ms =
-                std::chrono::duration<double, std::milli>(total_end - total_start).count();
-            std::cout.setf(std::ios::fixed);
-            std::cout.precision(3);
-            std::cout << "tcl4_cuda: tidx=" << time_index
-                      << " mikx_ms=" << mikx_ms
-                      << " gw_ms=" << gw_ms
-                      << " l4_ms=" << l4_ms
-                      << " total_ms=" << total_ms << "\n";
-        }
-        return L4;
-        #else
-        throw std::invalid_argument("build_TCL4_generator: CUDA backend requested but taco_tcl was built without CUDA");
-        #endif
-    } else {
-        mikx = build_mikx_serial(map, kernels, time_index);
-        GW = assemble_liouvillian(mikx, system.A_eig); // (n,i;m,j)
-    }
+    mikx = build_mikx_cpu(map, kernels, time_index, exec);
+    GW = assemble_liouvillian(mikx, system.A_eig); // (n,i;m,j)
     return gw_to_liouvillian(GW, system.eig.dim);                         // (n,m;i,j)
 }
 
@@ -416,7 +349,7 @@ std::vector<Eigen::MatrixXcd> build_correction_series(const sys::System& system,
             throw std::invalid_argument("build_correction_series: CUDA backend requested but taco_tcl was built without CUDA");
             #endif
         } else {
-            auto mikx = build_mikx_serial(map, kernels, t);
+            auto mikx = build_mikx_cpu(map, kernels, t, exec);
             const Eigen::MatrixXcd GW = assemble_liouvillian(mikx, system.A_eig); // (n,i;m,j)
             out[t] = gw_to_liouvillian(GW, system.eig.dim);                       // (n,m;i,j)
         }

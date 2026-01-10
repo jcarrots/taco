@@ -37,31 +37,48 @@ inline std::size_t next_pow2(std::size_t n) {
     return ++n;
 }
 
-__global__ void kernel_extract_time_slice(const cuDoubleComplex* __restrict__ F_batch,
-                                          const cuDoubleComplex* __restrict__ C_batch,
-                                          const cuDoubleComplex* __restrict__ R_batch,
-                                          cuDoubleComplex* __restrict__ F_out,
-                                          cuDoubleComplex* __restrict__ C_out,
-                                          cuDoubleComplex* __restrict__ R_out,
-                                          std::size_t Nt,
-                                          std::size_t nf,
-                                          int i,
-                                          int j,
-                                          int k0,
-                                          int lane_start,
-                                          int lane_end,
-                                          std::size_t time_index)
+__global__ void kernel_extract_time_slice_offset(const cuDoubleComplex* __restrict__ F_batch,
+                                                 const cuDoubleComplex* __restrict__ C_batch,
+                                                 const cuDoubleComplex* __restrict__ R_batch,
+                                                 cuDoubleComplex* __restrict__ F_out,
+                                                 cuDoubleComplex* __restrict__ C_out,
+                                                 cuDoubleComplex* __restrict__ R_out,
+                                                 std::size_t Nt,
+                                                 std::size_t base_idx,
+                                                 std::size_t lane_count,
+                                                 std::size_t time_index)
 {
-    const int lane = static_cast<int>(blockIdx.x) * blockDim.x + threadIdx.x;
-    if (lane < lane_start || lane >= lane_end) return;
-    const std::size_t lane_u = static_cast<std::size_t>(lane);
-    const std::size_t idx =
-        (static_cast<std::size_t>(i) * nf + static_cast<std::size_t>(j)) * nf +
-        static_cast<std::size_t>(k0) + lane_u;
-    const std::size_t src = time_index + Nt * lane_u;
-    F_out[idx] = F_batch[src];
-    C_out[idx] = C_batch[src];
-    R_out[idx] = R_batch[src];
+    const std::size_t lane = static_cast<std::size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    if (lane >= lane_count) return;
+    const std::size_t dst = base_idx + lane;
+    const std::size_t src = time_index + Nt * lane;
+    F_out[dst] = F_batch[src];
+    C_out[dst] = C_batch[src];
+    R_out[dst] = R_batch[src];
+}
+
+__global__ void kernel_extract_time_slices_offset(const cuDoubleComplex* __restrict__ F_batch,
+                                                  const cuDoubleComplex* __restrict__ C_batch,
+                                                  const cuDoubleComplex* __restrict__ R_batch,
+                                                  cuDoubleComplex* __restrict__ F_out,
+                                                  cuDoubleComplex* __restrict__ C_out,
+                                                  cuDoubleComplex* __restrict__ R_out,
+                                                  const unsigned int* __restrict__ time_indices,
+                                                  std::size_t num_times,
+                                                  std::size_t Nt,
+                                                  std::size_t base_idx,
+                                                  std::size_t lane_count,
+                                                  std::size_t nf3)
+{
+    const std::size_t lane = static_cast<std::size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    const std::size_t tpos = static_cast<std::size_t>(blockIdx.y) * blockDim.y + threadIdx.y;
+    if (lane >= lane_count || tpos >= num_times) return;
+    const std::size_t time_index = static_cast<std::size_t>(time_indices[tpos]);
+    const std::size_t dst = tpos * nf3 + base_idx + lane;
+    const std::size_t src = time_index + Nt * lane;
+    F_out[dst] = F_batch[src];
+    C_out[dst] = C_batch[src];
+    R_out[dst] = R_batch[src];
 }
 
 __global__ void kernel_gw_to_liouvillian(const cuDoubleComplex* __restrict__ GW,
@@ -70,12 +87,9 @@ __global__ void kernel_gw_to_liouvillian(const cuDoubleComplex* __restrict__ GW,
 {
     const std::size_t N_u = static_cast<std::size_t>(N);
     const std::size_t N2 = N_u * N_u;
-    const std::size_t idx = static_cast<std::size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-    const std::size_t total = N2 * N2;
-    if (idx >= total) return;
-
-    const std::size_t col_L = idx / N2;
-    const std::size_t row_L = idx - col_L * N2;
+    const std::size_t row_L = static_cast<std::size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    const std::size_t col_L = static_cast<std::size_t>(blockIdx.y) * blockDim.y + threadIdx.y;
+    if (row_L >= N2 || col_L >= N2) return;
 
     const std::size_t n = row_L % N_u;
     const std::size_t m = row_L / N_u;
@@ -84,7 +98,7 @@ __global__ void kernel_gw_to_liouvillian(const cuDoubleComplex* __restrict__ GW,
 
     const std::size_t row_G = n + i * N_u;
     const std::size_t col_G = m + j * N_u;
-    L4[idx] = GW[row_G + col_G * N2];
+    L4[row_L + col_L * N2] = GW[row_G + col_G * N2];
 }
 
 } // namespace
@@ -236,9 +250,6 @@ Eigen::MatrixXcd build_TCL4_generator_cuda_fused(const sys::System& system,
         inputs.nf = nf;
         inputs.dt = dt;
 
-        constexpr int block_extract = 256;
-        const dim3 grid_extract(static_cast<unsigned>((Bplan + block_extract - 1) / block_extract));
-
         for (std::size_t i = 0; i < nf; ++i) {
             for (std::size_t j = 0; j < nf; ++j) {
                 std::size_t k0 = 0;
@@ -255,39 +266,39 @@ Eigen::MatrixXcd build_TCL4_generator_cuda_fused(const sys::System& system,
 
                     cuda_fcr::compute_fcr_convolution_batched(inputs, b, ws, stream);
 
-                    kernel_extract_time_slice<<<grid_extract, block_extract, 0, stream>>>(
+                    const std::size_t base_idx = (i * nf + j) * nf + k0;
+                    constexpr int block_extract = 256;
+                    const dim3 grid_extract(static_cast<unsigned>((Bplan + block_extract - 1) / block_extract));
+                    kernel_extract_time_slice_offset<<<grid_extract, block_extract, 0, stream>>>(
                         d_Ftmp, d_Ctmp, d_Rtmp,
                         d_F, d_C, d_R,
-                        Nt, nf,
-                        static_cast<int>(i), static_cast<int>(j), static_cast<int>(k0),
-                        0, static_cast<int>(Bplan), time_index);
-                    cuda_check(cudaGetLastError(), "kernel_extract_time_slice launch");
+                        Nt, base_idx, Bplan, time_index);
+                    cuda_check(cudaGetLastError(), "kernel_extract_time_slice_offset launch");
                 }
 
                 if (k0 < nf) {
                     const std::size_t rem = nf - k0;
-                    const std::size_t k0_last = nf - Bplan;
-                    const std::size_t lane0 = Bplan - rem;
 
                     cuda_fcr::FcrBatch b;
-                    b.batch = Bplan;
+                    b.batch = rem;
                     b.Nfft = Nfft;
                     b.i = static_cast<int>(i);
                     b.j = static_cast<int>(j);
-                    b.k0 = static_cast<int>(k0_last);
+                    b.k0 = static_cast<int>(k0);
                     b.F = d_Ftmp;
                     b.C = d_Ctmp;
                     b.R = d_Rtmp;
 
                     cuda_fcr::compute_fcr_convolution_batched(inputs, b, ws, stream);
 
-                    kernel_extract_time_slice<<<grid_extract, block_extract, 0, stream>>>(
+                    const std::size_t base_idx = (i * nf + j) * nf + k0;
+                    constexpr int block_extract = 256;
+                    const dim3 grid_extract(static_cast<unsigned>((rem + block_extract - 1) / block_extract));
+                    kernel_extract_time_slice_offset<<<grid_extract, block_extract, 0, stream>>>(
                         d_Ftmp, d_Ctmp, d_Rtmp,
                         d_F, d_C, d_R,
-                        Nt, nf,
-                        static_cast<int>(i), static_cast<int>(j), static_cast<int>(k0_last),
-                        static_cast<int>(lane0), static_cast<int>(Bplan), time_index);
-                    cuda_check(cudaGetLastError(), "kernel_extract_time_slice tail launch");
+                        Nt, base_idx, rem, time_index);
+                    cuda_check(cudaGetLastError(), "kernel_extract_time_slice_offset tail launch");
                 }
             }
         }
@@ -319,10 +330,10 @@ Eigen::MatrixXcd build_TCL4_generator_cuda_fused(const sys::System& system,
         assemble_liouvillian_cuda_device(dM, dI, dK, dX, d_ops,
                                          map.N, static_cast<int>(num_ops), dGW, stream);
 
-        constexpr int block = 256;
-        const std::size_t total = N2 * N2;
-        const dim3 grid(static_cast<unsigned>((total + block - 1) / block));
-        kernel_gw_to_liouvillian<<<grid, block, 0, stream>>>(dGW, dL4, map.N);
+        const dim3 block_l4(16, 16);
+        const dim3 grid_l4(static_cast<unsigned>((N2 + block_l4.x - 1) / block_l4.x),
+                           static_cast<unsigned>((N2 + block_l4.y - 1) / block_l4.y));
+        kernel_gw_to_liouvillian<<<grid_l4, block_l4, 0, stream>>>(dGW, dL4, map.N);
         cuda_check(cudaGetLastError(), "kernel_gw_to_liouvillian launch");
 
         Eigen::MatrixXcd L4(static_cast<Eigen::Index>(N2), static_cast<Eigen::Index>(N2));
@@ -382,6 +393,363 @@ Eigen::MatrixXcd build_TCL4_generator_cuda_fused(const sys::System& system,
         if (stream) cudaStreamDestroy(stream);
         throw;
     }
+}
+
+std::vector<Eigen::MatrixXcd> build_TCL4_generator_cuda_fused_batch(const sys::System& system,
+                                                                    const Eigen::MatrixXcd& gamma_series,
+                                                                    double dt,
+                                                                    const std::vector<std::size_t>& time_indices,
+                                                                    FCRMethod method,
+                                                                    const Exec& exec)
+{
+    if (method != FCRMethod::Convolution) {
+        throw std::invalid_argument("build_TCL4_generator_cuda_fused_batch: only FCRMethod::Convolution is supported");
+    }
+
+    const std::size_t Nt = static_cast<std::size_t>(gamma_series.rows());
+    const std::size_t nf = static_cast<std::size_t>(gamma_series.cols());
+    if (nf != system.fidx.buckets.size()) {
+        throw std::invalid_argument("build_TCL4_generator_cuda_fused_batch: gamma_series column count does not match frequency buckets");
+    }
+    if (nf == 0 || Nt == 0) {
+        throw std::invalid_argument("build_TCL4_generator_cuda_fused_batch: empty gamma_series");
+    }
+    if (nf > static_cast<std::size_t>(std::numeric_limits<int>::max())) {
+        throw std::invalid_argument("build_TCL4_generator_cuda_fused_batch: nf too large for CUDA kernels");
+    }
+
+    std::vector<std::size_t> tids = time_indices;
+    if (tids.empty()) {
+        tids.resize(Nt);
+        for (std::size_t t = 0; t < Nt; ++t) tids[t] = t;
+    }
+    for (std::size_t tidx : tids) {
+        if (tidx >= Nt) {
+            throw std::out_of_range("build_TCL4_generator_cuda_fused_batch: time_index out of range");
+        }
+    }
+    const std::size_t num_times = tids.size();
+    if (num_times == 0) {
+        return {};
+    }
+    if (Nt > static_cast<std::size_t>(std::numeric_limits<unsigned int>::max())) {
+        throw std::invalid_argument("build_TCL4_generator_cuda_fused_batch: Nt too large for time index list");
+    }
+    std::vector<unsigned int> h_time_indices(num_times);
+    for (std::size_t i = 0; i < num_times; ++i) {
+        if (tids[i] > static_cast<std::size_t>(std::numeric_limits<unsigned int>::max())) {
+            throw std::invalid_argument("build_TCL4_generator_cuda_fused_batch: time index too large");
+        }
+        h_time_indices[i] = static_cast<unsigned int>(tids[i]);
+    }
+
+    Tcl4Map map = build_map(system, /*time_grid*/{});
+    if (map.N <= 0) throw std::invalid_argument("build_TCL4_generator_cuda_fused_batch: map.N must be > 0");
+    if (map.nf <= 0) throw std::invalid_argument("build_TCL4_generator_cuda_fused_batch: map.nf must be > 0");
+    if (map.pair_to_freq.rows() != static_cast<Eigen::Index>(map.N) ||
+        map.pair_to_freq.cols() != static_cast<Eigen::Index>(map.N)) {
+        throw std::invalid_argument("build_TCL4_generator_cuda_fused_batch: map.pair_to_freq has wrong shape");
+    }
+    if (map.pair_to_freq.minCoeff() < 0) {
+        throw std::runtime_error("build_TCL4_generator_cuda_fused_batch: map.pair_to_freq contains -1 (missing frequency buckets)");
+    }
+    if (system.A_eig.empty()) {
+        throw std::invalid_argument("build_TCL4_generator_cuda_fused_batch: coupling_ops must be non-empty");
+    }
+
+    static_assert(sizeof(std::complex<double>) == sizeof(cuDoubleComplex),
+                  "std::complex<double> must match cuDoubleComplex storage (2 doubles)");
+
+    const std::size_t N = static_cast<std::size_t>(map.N);
+    const std::size_t N2 = N * N;
+    const std::size_t N6 = N * N * N * N * N * N;
+    const std::size_t nf3 = nf * nf * nf;
+
+    std::vector<double> h_omegas = map.omegas;
+    std::vector<int> h_mirror = map.mirror_index;
+    if (h_omegas.size() != nf || h_mirror.size() != nf) {
+        throw std::invalid_argument("build_TCL4_generator_cuda_fused_batch: map frequency metadata has wrong size");
+    }
+
+    // Match CPU padding rule: Nfft = next_pow2(max(2*Nt-1, pad_factor*Nt))
+    std::size_t L = 2 * Nt - 1;
+    std::size_t target = L;
+    const std::size_t pad_factor = get_fcr_fft_pad_factor();
+    if (pad_factor > 0) {
+        const std::size_t pf = pad_factor * Nt;
+        if (pf > target) target = pf;
+    }
+    std::size_t Nfft = next_pow2(target);
+    if (Nfft < 2) Nfft = 2;
+
+    constexpr std::size_t kDefaultBatch = 64;
+    const std::size_t Bplan = std::min(nf, kDefaultBatch);
+
+    const std::size_t num_ops = system.A_eig.size();
+    if (num_ops > static_cast<std::size_t>(std::numeric_limits<int>::max())) {
+        throw std::invalid_argument("build_TCL4_generator_cuda_fused_batch: coupling_ops too large for CUDA kernel");
+    }
+
+    std::vector<std::complex<double>> h_ops(num_ops * N2);
+    for (std::size_t op = 0; op < num_ops; ++op) {
+        const auto& A = system.A_eig[op];
+        if (A.rows() != static_cast<Eigen::Index>(N) || A.cols() != static_cast<Eigen::Index>(N)) {
+            throw std::invalid_argument("build_TCL4_generator_cuda_fused_batch: coupling operator has wrong shape");
+        }
+        std::copy(A.data(), A.data() + N2, h_ops.data() + op * N2);
+    }
+
+    const std::size_t elems_per = N2 * N2;
+    if (elems_per > 0 && tids.size() > (std::numeric_limits<std::size_t>::max() / elems_per)) {
+        throw std::overflow_error("build_TCL4_generator_cuda_fused_batch: output too large");
+    }
+    const std::size_t total_out_elems = elems_per * tids.size();
+    if (nf3 > 0 && num_times > (std::numeric_limits<std::size_t>::max() / nf3)) {
+        throw std::overflow_error("build_TCL4_generator_cuda_fused_batch: FCR buffer too large");
+    }
+    const std::size_t total_fcr_elems = nf3 * num_times;
+
+    cuda_check(cudaSetDevice(exec.gpu_id), "cudaSetDevice");
+    cudaStream_t stream = nullptr;
+    cuda_check(cudaStreamCreate(&stream), "cudaStreamCreate");
+
+    cuDoubleComplex* d_gamma = nullptr;
+    double* d_omegas = nullptr;
+    int* d_mirror = nullptr;
+    int* d_pair_to_freq = nullptr;
+    cuDoubleComplex* d_ops = nullptr;
+    unsigned int* d_time_indices = nullptr;
+
+    cuDoubleComplex* d_F_all = nullptr;
+    cuDoubleComplex* d_C_all = nullptr;
+    cuDoubleComplex* d_R_all = nullptr;
+    cuDoubleComplex* d_Ftmp = nullptr;
+    cuDoubleComplex* d_Ctmp = nullptr;
+    cuDoubleComplex* d_Rtmp = nullptr;
+
+    cuDoubleComplex* dM = nullptr;
+    cuDoubleComplex* dI = nullptr;
+    cuDoubleComplex* dK = nullptr;
+    cuDoubleComplex* dX = nullptr;
+    cuDoubleComplex* dGW = nullptr;
+    cuDoubleComplex* dL4_all = nullptr;
+
+    cuda_fcr::FcrWorkspace ws;
+
+    try {
+        cuda_check(cudaMalloc(reinterpret_cast<void**>(&d_gamma), Nt * nf * sizeof(cuDoubleComplex)), "cudaMalloc(d_gamma)");
+        cuda_check(cudaMalloc(reinterpret_cast<void**>(&d_omegas), nf * sizeof(double)), "cudaMalloc(d_omegas)");
+        cuda_check(cudaMalloc(reinterpret_cast<void**>(&d_mirror), nf * sizeof(int)), "cudaMalloc(d_mirror)");
+        cuda_check(cudaMalloc(reinterpret_cast<void**>(&d_pair_to_freq), N2 * sizeof(int)), "cudaMalloc(d_pair_to_freq)");
+        cuda_check(cudaMalloc(reinterpret_cast<void**>(&d_ops), num_ops * N2 * sizeof(cuDoubleComplex)), "cudaMalloc(d_ops)");
+        cuda_check(cudaMalloc(reinterpret_cast<void**>(&d_time_indices), num_times * sizeof(unsigned int)), "cudaMalloc(d_time_indices)");
+
+        cuda_check(cudaMemcpyAsync(d_gamma,
+                                   gamma_series.data(),
+                                   Nt * nf * sizeof(cuDoubleComplex),
+                                   cudaMemcpyHostToDevice,
+                                   stream),
+                   "cudaMemcpyAsync(gamma)");
+        cuda_check(cudaMemcpyAsync(d_omegas, h_omegas.data(), nf * sizeof(double),
+                                   cudaMemcpyHostToDevice, stream), "cudaMemcpyAsync(omegas)");
+        cuda_check(cudaMemcpyAsync(d_mirror, h_mirror.data(), nf * sizeof(int),
+                                   cudaMemcpyHostToDevice, stream), "cudaMemcpyAsync(mirror)");
+        cuda_check(cudaMemcpyAsync(d_pair_to_freq, map.pair_to_freq.data(), N2 * sizeof(int),
+                                   cudaMemcpyHostToDevice, stream), "cudaMemcpyAsync(pair_to_freq)");
+        cuda_check(cudaMemcpyAsync(d_ops, h_ops.data(), num_ops * N2 * sizeof(cuDoubleComplex),
+                                   cudaMemcpyHostToDevice, stream), "cudaMemcpyAsync(coupling_ops)");
+        cuda_check(cudaMemcpyAsync(d_time_indices, h_time_indices.data(), num_times * sizeof(unsigned int),
+                                   cudaMemcpyHostToDevice, stream), "cudaMemcpyAsync(time_indices)");
+
+        cuda_check(cudaMalloc(reinterpret_cast<void**>(&d_F_all), total_fcr_elems * sizeof(cuDoubleComplex)), "cudaMalloc(d_F_all)");
+        cuda_check(cudaMalloc(reinterpret_cast<void**>(&d_C_all), total_fcr_elems * sizeof(cuDoubleComplex)), "cudaMalloc(d_C_all)");
+        cuda_check(cudaMalloc(reinterpret_cast<void**>(&d_R_all), total_fcr_elems * sizeof(cuDoubleComplex)), "cudaMalloc(d_R_all)");
+
+        const std::size_t out_elems = Nt * Bplan;
+        cuda_check(cudaMalloc(reinterpret_cast<void**>(&d_Ftmp), out_elems * sizeof(cuDoubleComplex)), "cudaMalloc(d_Ftmp)");
+        cuda_check(cudaMalloc(reinterpret_cast<void**>(&d_Ctmp), out_elems * sizeof(cuDoubleComplex)), "cudaMalloc(d_Ctmp)");
+        cuda_check(cudaMalloc(reinterpret_cast<void**>(&d_Rtmp), out_elems * sizeof(cuDoubleComplex)), "cudaMalloc(d_Rtmp)");
+
+        cuda_check(cudaMalloc(reinterpret_cast<void**>(&dM), N2 * N2 * sizeof(cuDoubleComplex)), "cudaMalloc(dM)");
+        cuda_check(cudaMalloc(reinterpret_cast<void**>(&dI), N2 * N2 * sizeof(cuDoubleComplex)), "cudaMalloc(dI)");
+        cuda_check(cudaMalloc(reinterpret_cast<void**>(&dK), N2 * N2 * sizeof(cuDoubleComplex)), "cudaMalloc(dK)");
+        cuda_check(cudaMalloc(reinterpret_cast<void**>(&dX), N6 * sizeof(cuDoubleComplex)), "cudaMalloc(dX)");
+        cuda_check(cudaMalloc(reinterpret_cast<void**>(&dGW), N2 * N2 * sizeof(cuDoubleComplex)), "cudaMalloc(dGW)");
+        cuda_check(cudaMalloc(reinterpret_cast<void**>(&dL4_all), total_out_elems * sizeof(cuDoubleComplex)), "cudaMalloc(dL4_all)");
+
+        cuda_fcr::FcrDeviceInputs inputs;
+        inputs.gamma = d_gamma;
+        inputs.omegas = d_omegas;
+        inputs.mirror = d_mirror;
+        inputs.Nt = Nt;
+        inputs.nf = nf;
+        inputs.dt = dt;
+
+        cuda_mikx::MikxDeviceInputs in;
+        in.pair_to_freq = d_pair_to_freq;
+        in.N = map.N;
+        in.nf = static_cast<int>(nf);
+
+        cuda_mikx::MikxDeviceOutputs out;
+        out.M = dM;
+        out.I = dI;
+        out.K = dK;
+        out.X = dX;
+
+        const std::size_t total = N2 * N2;
+        constexpr int block_extract_x = 256;
+        constexpr int block_extract_y = 4;
+        const dim3 block_extract(block_extract_x, block_extract_y);
+
+        for (std::size_t i = 0; i < nf; ++i) {
+            for (std::size_t j = 0; j < nf; ++j) {
+                std::size_t k0 = 0;
+                for (; k0 + Bplan <= nf; k0 += Bplan) {
+                    cuda_fcr::FcrBatch b;
+                    b.batch = Bplan;
+                    b.Nfft = Nfft;
+                    b.i = static_cast<int>(i);
+                    b.j = static_cast<int>(j);
+                    b.k0 = static_cast<int>(k0);
+                    b.F = d_Ftmp;
+                    b.C = d_Ctmp;
+                    b.R = d_Rtmp;
+
+                    cuda_fcr::compute_fcr_convolution_batched(inputs, b, ws, stream);
+
+                    const std::size_t base_idx = (i * nf + j) * nf + k0;
+                    const dim3 grid_extract(static_cast<unsigned>((Bplan + block_extract_x - 1) / block_extract_x),
+                                            static_cast<unsigned>((num_times + block_extract_y - 1) / block_extract_y));
+                    kernel_extract_time_slices_offset<<<grid_extract, block_extract, 0, stream>>>(
+                        d_Ftmp, d_Ctmp, d_Rtmp,
+                        d_F_all, d_C_all, d_R_all,
+                        d_time_indices, num_times, Nt, base_idx, Bplan, nf3);
+                    cuda_check(cudaGetLastError(), "kernel_extract_time_slices_offset launch");
+                }
+
+                if (k0 < nf) {
+                    const std::size_t rem = nf - k0;
+
+                    cuda_fcr::FcrBatch b;
+                    b.batch = rem;
+                    b.Nfft = Nfft;
+                    b.i = static_cast<int>(i);
+                    b.j = static_cast<int>(j);
+                    b.k0 = static_cast<int>(k0);
+                    b.F = d_Ftmp;
+                    b.C = d_Ctmp;
+                    b.R = d_Rtmp;
+
+                    cuda_fcr::compute_fcr_convolution_batched(inputs, b, ws, stream);
+
+                    const std::size_t base_idx = (i * nf + j) * nf + k0;
+                    const dim3 grid_extract(static_cast<unsigned>((rem + block_extract_x - 1) / block_extract_x),
+                                            static_cast<unsigned>((num_times + block_extract_y - 1) / block_extract_y));
+                    kernel_extract_time_slices_offset<<<grid_extract, block_extract, 0, stream>>>(
+                        d_Ftmp, d_Ctmp, d_Rtmp,
+                        d_F_all, d_C_all, d_R_all,
+                        d_time_indices, num_times, Nt, base_idx, rem, nf3);
+                    cuda_check(cudaGetLastError(), "kernel_extract_time_slices_offset tail launch");
+                }
+            }
+        }
+
+        const dim3 block_l4(16, 16);
+        const dim3 grid_l4(static_cast<unsigned>((N2 + block_l4.x - 1) / block_l4.x),
+                           static_cast<unsigned>((N2 + block_l4.y - 1) / block_l4.y));
+
+        for (std::size_t out_idx = 0; out_idx < num_times; ++out_idx) {
+            in.F = d_F_all + out_idx * nf3;
+            in.C = d_C_all + out_idx * nf3;
+            in.R = d_R_all + out_idx * nf3;
+
+            cuda_mikx::build_mikx_device(in, out, stream);
+
+            assemble_liouvillian_cuda_device(dM, dI, dK, dX, d_ops,
+                                             map.N, static_cast<int>(num_ops), dGW, stream);
+
+            cuDoubleComplex* dL4_out = dL4_all + out_idx * total;
+            kernel_gw_to_liouvillian<<<grid_l4, block_l4, 0, stream>>>(dGW, dL4_out, map.N);
+            cuda_check(cudaGetLastError(), "kernel_gw_to_liouvillian launch");
+        }
+
+        std::vector<std::complex<double>> hL4(total_out_elems);
+        cuda_check(cudaMemcpyAsync(hL4.data(), dL4_all, total_out_elems * sizeof(cuDoubleComplex),
+                                   cudaMemcpyDeviceToHost, stream), "cudaMemcpyAsync(L4_all)");
+        cuda_check(cudaStreamSynchronize(stream), "cudaStreamSynchronize");
+
+        std::vector<Eigen::MatrixXcd> out_series;
+        out_series.resize(tids.size());
+        for (std::size_t idx = 0; idx < tids.size(); ++idx) {
+            Eigen::MatrixXcd L4(static_cast<Eigen::Index>(N2), static_cast<Eigen::Index>(N2));
+            const std::complex<double>* src = hL4.data() + idx * total;
+            std::copy(src, src + total, L4.data());
+            out_series[idx] = std::move(L4);
+        }
+
+        if (ws.plan) cufftDestroy(ws.plan);
+        if (ws.A) cudaFree(ws.A);
+        if (ws.B) cudaFree(ws.B);
+        if (ws.B_conj) cudaFree(ws.B_conj);
+        if (ws.scan_tmp) cudaFree(ws.scan_tmp);
+
+        cudaFree(dL4_all);
+        cudaFree(dGW);
+        cudaFree(dX);
+        cudaFree(dK);
+        cudaFree(dI);
+        cudaFree(dM);
+        cudaFree(d_Rtmp);
+        cudaFree(d_Ctmp);
+        cudaFree(d_Ftmp);
+        cudaFree(d_R_all);
+        cudaFree(d_C_all);
+        cudaFree(d_F_all);
+        cudaFree(d_time_indices);
+        cudaFree(d_ops);
+        cudaFree(d_pair_to_freq);
+        cudaFree(d_mirror);
+        cudaFree(d_omegas);
+        cudaFree(d_gamma);
+        cudaStreamDestroy(stream);
+        return out_series;
+    } catch (...) {
+        if (ws.plan) cufftDestroy(ws.plan);
+        if (ws.A) cudaFree(ws.A);
+        if (ws.B) cudaFree(ws.B);
+        if (ws.B_conj) cudaFree(ws.B_conj);
+        if (ws.scan_tmp) cudaFree(ws.scan_tmp);
+
+        if (dL4_all) cudaFree(dL4_all);
+        if (dGW) cudaFree(dGW);
+        if (dX) cudaFree(dX);
+        if (dK) cudaFree(dK);
+        if (dI) cudaFree(dI);
+        if (dM) cudaFree(dM);
+        if (d_Rtmp) cudaFree(d_Rtmp);
+        if (d_Ctmp) cudaFree(d_Ctmp);
+        if (d_Ftmp) cudaFree(d_Ftmp);
+        if (d_R_all) cudaFree(d_R_all);
+        if (d_C_all) cudaFree(d_C_all);
+        if (d_F_all) cudaFree(d_F_all);
+        if (d_time_indices) cudaFree(d_time_indices);
+        if (d_ops) cudaFree(d_ops);
+        if (d_pair_to_freq) cudaFree(d_pair_to_freq);
+        if (d_mirror) cudaFree(d_mirror);
+        if (d_omegas) cudaFree(d_omegas);
+        if (d_gamma) cudaFree(d_gamma);
+        if (stream) cudaStreamDestroy(stream);
+        throw;
+    }
+}
+
+std::vector<Eigen::MatrixXcd> build_correction_series_cuda_fused(const sys::System& system,
+                                                                 const Eigen::MatrixXcd& gamma_series,
+                                                                 double dt,
+                                                                 FCRMethod method,
+                                                                 const Exec& exec)
+{
+    return build_TCL4_generator_cuda_fused_batch(system, gamma_series, dt, {}, method, exec);
 }
 
 } // namespace taco::tcl4

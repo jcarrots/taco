@@ -157,6 +157,10 @@ add_executable(tcl4_mikx_tests cpp/tests/tcl4_mikx_tests.cpp)
  target_link_libraries(tcl4_mikx_tests PRIVATE taco_tcl)
  target_include_directories(tcl4_mikx_tests PRIVATE cpp/include)
 
+add_executable(tcl4_e2e_cuda_compare tests/tcl4_e2e_cuda_compare.cpp)
+ target_link_libraries(tcl4_e2e_cuda_compare PRIVATE taco_tcl)
+ target_include_directories(tcl4_e2e_cuda_compare PRIVATE cpp/include)
+
 if (TACO_WITH_CUDA AND CMAKE_CUDA_COMPILER)
   add_executable(cuda_smoke tests/cuda_smoke.cu)
   target_link_libraries(cuda_smoke PRIVATE CUDA::cudart)
