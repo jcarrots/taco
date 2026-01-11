@@ -10,6 +10,7 @@ include(FetchContent)
 
 # Optional: OpenMP for CPU parallelization
 option(TACO_WITH_OPENMP "Enable OpenMP parallelization" ON)
+option(TACO_WITH_MPI "Enable MPI distributed backend" OFF)
 option(TACO_WITH_CUDA "Enable CUDA backend (requires NVIDIA CUDA Toolkit)" OFF)
 option(TACO_BUILD_PYTHON "Build Python extension module" ON)
 option(TACO_BUILD_GAMMA_TESTS "Build gamma_tests executable" ON)
@@ -40,6 +41,7 @@ add_library(taco_tcl STATIC
   cpp/src/tcl/tcl4_mikx.cpp
   cpp/src/tcl/tcl4_assemble.cpp
   cpp/src/tcl/tcl4.cpp
+  cpp/src/backend/cpu/tcl4_mpi_omp.cpp
   cpp/src/tcl/tcl2_generator.cpp
   cpp/src/tcl/generator.cpp
   cpp/src/core/correlation.cpp
@@ -72,6 +74,17 @@ if (TACO_WITH_OPENMP)
     message(STATUS "OpenMP enabled for taco_tcl")
   else()
     message(STATUS "OpenMP not found; building without OpenMP")
+  endif()
+endif()
+
+if (TACO_WITH_MPI)
+  find_package(MPI QUIET COMPONENTS CXX)
+  if (MPI_CXX_FOUND)
+    target_link_libraries(taco_tcl PUBLIC MPI::MPI_CXX)
+    target_compile_definitions(taco_tcl PUBLIC TACO_HAS_MPI=1)
+    message(STATUS "MPI enabled for taco_tcl")
+  else()
+    message(WARNING "TACO_WITH_MPI=ON but MPI was not found; building without MPI")
   endif()
 endif()
 
@@ -152,6 +165,10 @@ add_executable(spin_boson_tests tests/spin_boson_tests.cpp)
 add_executable(tcl4_tests tests/tcl4_tests.cpp)
  target_link_libraries(tcl4_tests PRIVATE taco_tcl)
  target_include_directories(tcl4_tests PRIVATE cpp/include)
+
+add_executable(tcl4_mpi_omp_tests tests/tcl4_mpi_omp_tests.cpp)
+ target_link_libraries(tcl4_mpi_omp_tests PRIVATE taco_tcl)
+ target_include_directories(tcl4_mpi_omp_tests PRIVATE cpp/include)
 
 add_executable(tcl4_mikx_tests cpp/tests/tcl4_mikx_tests.cpp)
  target_link_libraries(tcl4_mikx_tests PRIVATE taco_tcl)

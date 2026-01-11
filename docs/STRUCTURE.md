@@ -14,7 +14,9 @@ taco/
 |   |-- gamma_tests.cpp         # Gamma(omega,t) integrator accuracy check
 |   |-- spin_boson_tests.cpp    # dumps rho(t) + Liouvillian for regression analysis
 |   |-- tcl4_tests.cpp          # compares Direct vs Convolution F/C/R builders
-|   `-- tcl4_h5_compare.cpp     # MATLAB HDF5 compare tool (requires HDF5)
+|   |-- tcl4_h5_compare.cpp     # MATLAB HDF5 compare tool (requires HDF5)
+|   |-- tcl4_mpi_omp_tests.cpp  # MPI+OpenMP TCL4 smoke test (requires MPI build)
+|   `-- tcl4_e2e_cuda_compare.cpp  # CPU vs CUDA end-to-end compare
 |-- cpp/
 |   |-- include/taco/
 |   |   |-- bath.hpp             # correlation-function interface (abstract)
@@ -35,6 +37,7 @@ taco/
 |   |   |-- tcl4_kernels.hpp     # TCL4 kernel builders (F, C, R)
 |   |   |-- tcl4_mikx.hpp        # TCL4 M/I/K/X tensor builder
 |   |   `-- backend/
+|   |       |-- cpu/             # CPU backend headers (MPI+OpenMP)
 |   |       `-- cuda/            # CUDA TCL4 headers
 |   |-- src/
 |   |   |-- core/
@@ -42,10 +45,11 @@ taco/
 |   |   |   `-- integrator.hpp    # implementation of quadrature / convolution helpers
 |   |   |-- backend/
 |   |   |   |-- README.md         # backend overview
+|   |   |   |-- cpu/              # CPU backend implementation (MPI+OpenMP TCL4 batch)
 |   |   |   |-- serial/           # serial backend notes
 |   |   |   |-- omp/              # OpenMP backend notes
 |   |   |   |-- cuda/             # CUDA backend implementation
-|   |   |   |-- mpi_omp/           # MPI+OpenMP placeholders
+|   |   |   |-- mpi_omp/           # MPI+OpenMP planning notes
 |   |   |   `-- mpi_cuda/          # MPI+CUDA placeholders
 |   |   `-- tcl/
 |   |       |-- generator.cpp      # TCL2 builder implementation (L unitary/dissipator)
@@ -70,6 +74,8 @@ tcl4_tests.exe          # Direct vs Convolution consistency check
 tcl4_bench.exe          # kernel builder benchmark / quick OpenMP sanity
 tcl4_spin_boson_example.exe  # Spin-boson TCL4 example (GW->L4 reshuffle + propagation)
 tcl4_h5_compare.exe     # (optional) MATLAB HDF5 compare tool (requires HDF5)
+tcl4_e2e_cuda_compare.exe  # CPU vs CUDA end-to-end compare
+tcl4_mpi_omp_tests.exe  # (optional) MPI+OpenMP TCL4 smoke test (requires MPI)
 ```
 
 Generated artifacts

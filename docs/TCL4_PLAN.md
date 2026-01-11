@@ -110,17 +110,20 @@ Headers
 - `taco/tcl4_mikx.hpp`
 - `taco/tcl4_assemble.hpp`
 - `taco/tcl4.hpp`
+- `taco/backend/cpu/tcl4_mpi_omp.hpp` (optional MPI+OpenMP TCL4 batch API)
 
 Sources
 - `cpp/src/tcl/tcl4.cpp`
 - `cpp/src/tcl/tcl4_kernels.cpp`
 - `cpp/src/tcl/tcl4_mikx.cpp`
 - `cpp/src/tcl/tcl4_assemble.cpp`
+- `cpp/src/backend/cpu/tcl4_mpi_omp.cpp` (optional MPI+OpenMP TCL4 batch implementation)
 
 Tests & Examples
 - `tests/tcl4_tests.cpp`
 - `tests/tcl4_h5_compare.cpp`
+- `tests/tcl4_mpi_omp_tests.cpp` (optional MPI+OpenMP smoke test)
 - `examples/tcl4_bench.cpp`
 - `examples/TCL4_spin_boson_example.cpp`
 
-Status: phases 0-4 implemented; validation ongoing; performance and MPI backends in progress.
+Status: phases 0-4 implemented; validation ongoing; performance work in progress; initial MPI+OpenMP TCL4 batch builder implemented (Exec-based dispatch still TODO).

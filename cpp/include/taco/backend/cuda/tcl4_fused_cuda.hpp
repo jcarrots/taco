@@ -29,6 +29,17 @@ std::vector<Eigen::MatrixXcd> build_TCL4_generator_cuda_fused_batch(const sys::S
                                                                     FCRMethod method,
                                                                     const Exec& exec);
 
+// Same as build_TCL4_generator_cuda_fused_batch, but returns device-side time (CUDA events) spent
+// in the F/C/R construction + extraction stage (i.e., the loop that calls
+// cuda_fcr::compute_fcr_convolution_batched and extracts time slices).
+std::vector<Eigen::MatrixXcd> build_TCL4_generator_cuda_fused_batch(const sys::System& system,
+                                                                    const Eigen::MatrixXcd& gamma_series,
+                                                                    double dt,
+                                                                    const std::vector<std::size_t>& time_indices,
+                                                                    FCRMethod method,
+                                                                    const Exec& exec,
+                                                                    double* cuda_fcr_ms);
+
 // Convenience: compute L4 for all time indices.
 std::vector<Eigen::MatrixXcd> build_correction_series_cuda_fused(const sys::System& system,
                                                                  const Eigen::MatrixXcd& gamma_series,

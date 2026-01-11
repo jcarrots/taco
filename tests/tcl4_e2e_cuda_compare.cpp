@@ -5,6 +5,7 @@
 #include <complex>
 #include <iostream>
 #include <limits>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -32,6 +33,60 @@ std::size_t clamp_tidx(std::size_t tidx, std::size_t Nt) {
     return std::min(tidx, Nt - 1);
 }
 
+std::vector<std::size_t> parse_tidx_spec(const std::string& spec, std::size_t Nt) {
+    if (spec.empty()) return {};
+
+    std::vector<std::size_t> parts;
+    parts.reserve(3);
+    std::size_t pos = 0;
+    while (pos <= spec.size()) {
+        const std::size_t next = spec.find(':', pos);
+        const std::size_t len = (next == std::string::npos) ? (spec.size() - pos) : (next - pos);
+        const std::string token = spec.substr(pos, len);
+        if (token.empty()) {
+            throw std::invalid_argument("invalid --tidx spec (empty token)");
+        }
+        parts.push_back(static_cast<std::size_t>(std::stoull(token)));
+        if (next == std::string::npos) break;
+        pos = next + 1;
+    }
+
+    if (parts.size() == 1) {
+        return {clamp_tidx(parts[0], Nt)};
+    }
+
+    std::size_t start = 0;
+    std::size_t step = 1;
+    std::size_t end = 0;
+    if (parts.size() == 2) {
+        start = parts[0];
+        end = parts[1];
+    } else if (parts.size() == 3) {
+        start = parts[0];
+        step = parts[1];
+        end = parts[2];
+    } else {
+        throw std::invalid_argument("invalid --tidx spec (expected k or a:b or a:step:b)");
+    }
+
+    if (step == 0) {
+        throw std::invalid_argument("invalid --tidx spec (step must be > 0)");
+    }
+
+    start = clamp_tidx(start, Nt);
+    end = clamp_tidx(end, Nt);
+    if (start > end) {
+        throw std::invalid_argument("invalid --tidx spec (start must be <= end)");
+    }
+
+    std::vector<std::size_t> out;
+    out.reserve((end - start) / step + 1);
+    for (std::size_t t = start; t <= end; t += step) {
+        out.push_back(t);
+    }
+    return out;
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -43,10 +98,12 @@ int main(int argc, char** argv) {
     double dt = 0.000625;
     double beta = 0.5;
     double omega_c = 10.0;
-    std::size_t tidx_override = std::numeric_limits<std::size_t>::max();
+    std::string tidx_spec;
+    bool has_tidx_spec = false;
     bool run_series = false;
     int gpu_id = 0;
     int threads = 0;
+    int gpu_warmup = 0;
 
     for (int i = 1; i < argc; ++i) {
         const std::string arg(argv[i]);
@@ -54,10 +111,14 @@ int main(int argc, char** argv) {
         else if (arg.rfind("--dt=", 0) == 0) dt = std::stod(arg.substr(5));
         else if (arg.rfind("--beta=", 0) == 0) beta = std::stod(arg.substr(7));
         else if (arg.rfind("--omega_c=", 0) == 0) omega_c = std::stod(arg.substr(10));
-        else if (arg.rfind("--tidx=", 0) == 0) tidx_override = static_cast<std::size_t>(std::stoull(arg.substr(7)));
+        else if (arg.rfind("--tidx=", 0) == 0) {
+            tidx_spec = arg.substr(7);
+            has_tidx_spec = true;
+        }
         else if (arg == "--series") run_series = true;
         else if (arg.rfind("--gpu_id=", 0) == 0) gpu_id = std::stoi(arg.substr(9));
         else if (arg.rfind("--threads=", 0) == 0) threads = std::stoi(arg.substr(10));
+        else if (arg.rfind("--gpu_warmup=", 0) == 0) gpu_warmup = std::stoi(arg.substr(13));
     }
 
     Eigen::MatrixXcd H = 0.5 * ops::sigma_x();
@@ -84,8 +145,8 @@ int main(int argc, char** argv) {
     if (run_series) {
         tidx_list.resize(Nt);
         for (std::size_t t = 0; t < Nt; ++t) tidx_list[t] = t;
-    } else if (tidx_override != std::numeric_limits<std::size_t>::max()) {
-        tidx_list.push_back(clamp_tidx(tidx_override, Nt));
+    } else if (has_tidx_spec) {
+        tidx_list = parse_tidx_spec(tidx_spec, Nt);
     } else {
         tidx_list = {0, Nt / 2, Nt - 1};
         std::sort(tidx_list.begin(), tidx_list.end());
@@ -113,6 +174,7 @@ int main(int argc, char** argv) {
     double cpu_total_ms = 0.0;
     double cpu_kernel_ms = 0.0;
     double gpu_total_ms = 0.0;
+    double gpu_fcr_ms = 0.0;
     const double count = static_cast<double>(tidx_list.size());
 
     std::vector<Eigen::MatrixXcd> L4_cpu_list;
@@ -139,10 +201,14 @@ int main(int argc, char** argv) {
         L4_cpu_list.push_back(L4_cpu);
     }
 
+    for (int w = 0; w < gpu_warmup; ++w) {
+        (void)tcl4::build_TCL4_generator_cuda_fused_batch(system, gamma_series, dt, tidx_list,
+                                                          tcl4::FCRMethod::Convolution, exec_gpu, nullptr);
+    }
     const auto t_gpu_start = std::chrono::high_resolution_clock::now();
     const auto L4_gpu_list =
         tcl4::build_TCL4_generator_cuda_fused_batch(system, gamma_series, dt, tidx_list,
-                                                    tcl4::FCRMethod::Convolution, exec_gpu);
+                                                    tcl4::FCRMethod::Convolution, exec_gpu, &gpu_fcr_ms);
     const auto t_gpu_end = std::chrono::high_resolution_clock::now();
     const double gpu_total =
         std::chrono::duration<double, std::milli>(t_gpu_end - t_gpu_start).count();
@@ -162,6 +228,8 @@ int main(int argc, char** argv) {
     const double cpu_end_to_end = cpu_kernel_ms + cpu_total_ms;
     std::cout << "E2E L4 compare: max_abs=" << max_err
               << " max_rel=" << max_rel_err
+              << " cpu_fcr_ms=" << cpu_kernel_ms
+              << " gpu_fcr_ms=" << gpu_fcr_ms
               << " cpu_total_ms=" << cpu_end_to_end
               << " cpu_avg_ms=" << (cpu_end_to_end / count)
               << " gpu_total_ms=" << gpu_total_ms

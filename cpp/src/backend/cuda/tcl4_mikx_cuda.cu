@@ -29,89 +29,83 @@ __device__ __forceinline__ std::size_t idx3(std::size_t nf, int i, int j, int k)
     return (static_cast<std::size_t>(i) * nf + static_cast<std::size_t>(j)) * nf + static_cast<std::size_t>(k);
 }
 
-__global__ void kernel_build_mik(const cuDoubleComplex* __restrict__ F,
-                                 const cuDoubleComplex* __restrict__ R,
-                                 const int* __restrict__ pair_to_freq,
-                                 int N,
-                                 int nf,
-                                 cuDoubleComplex* __restrict__ M,
-                                 cuDoubleComplex* __restrict__ I,
-                                 cuDoubleComplex* __restrict__ K)
+__global__ void kernel_build_mikx_fused(const cuDoubleComplex* __restrict__ F,
+                                        const cuDoubleComplex* __restrict__ C,
+                                        const cuDoubleComplex* __restrict__ R,
+                                        const int* __restrict__ pair_to_freq,
+                                        int N,
+                                        int nf,
+                                        cuDoubleComplex* __restrict__ M,
+                                        cuDoubleComplex* __restrict__ I,
+                                        cuDoubleComplex* __restrict__ K,
+                                        cuDoubleComplex* __restrict__ X)
 {
-    // Column-major linearization over (row=(j,k), col=(p,q)):
-    //   idx = row + col*N2
-    const std::size_t N_u = static_cast<std::size_t>(N);
-    const std::size_t N2 = N_u * N_u;
-    const std::size_t idx = static_cast<std::size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-    if (idx >= N2 * N2) return;
+    const std::size_t tid = static_cast<std::size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    const std::size_t stride = static_cast<std::size_t>(blockDim.x) * gridDim.x;
 
-    const std::size_t row_u = idx % N2;
-    const std::size_t col_u = idx / N2;
-
-    const std::size_t j_u = row_u % N_u;
-    const std::size_t k_u = row_u / N_u;
-    const std::size_t p_u = col_u % N_u;
-    const std::size_t q_u = col_u / N_u;
-
-    const std::size_t jk = row_u;
-    const std::size_t jq = j_u + N_u * q_u;
-    const std::size_t pj = p_u + N_u * j_u;
-    const std::size_t pq = col_u;
-    const std::size_t qk = q_u + N_u * k_u;
-    const std::size_t kq = k_u + N_u * q_u;
-    const std::size_t qp = q_u + N_u * p_u;
-    const std::size_t qj = q_u + N_u * j_u;
-
-    const int f_jk = pair_to_freq[jk];
-    const int f_jq = pair_to_freq[jq];
-    const int f_pj = pair_to_freq[pj];
-    const int f_pq = pair_to_freq[pq];
-    const int f_qk = pair_to_freq[qk];
-    const int f_kq = pair_to_freq[kq];
-    const int f_qp = pair_to_freq[qp];
-    const int f_qj = pair_to_freq[qj];
-
-    const std::size_t nf_u = static_cast<std::size_t>(nf);
-
-    // M = F[f(j,q)][f(j,k)][f(p,j)] - R[f(j,q)][f(p,q)][f(q,k)]
-    const cuDoubleComplex M1 = F[idx3(nf_u, f_jq, f_jk, f_pj)];
-    const cuDoubleComplex M2 = R[idx3(nf_u, f_jq, f_pq, f_qk)];
-    M[idx] = cd_sub(M1, M2);
-
-    // I = F[f(j,k)][f(q,p)][f(k,q)]
-    I[idx] = F[idx3(nf_u, f_jk, f_qp, f_kq)];
-
-    // K = R[f(j,k)][f(p,q)][f(q,j)]
-    K[idx] = R[idx3(nf_u, f_jk, f_pq, f_qj)];
-}
-
-__global__ void kernel_build_x(const cuDoubleComplex* __restrict__ C,
-                               const cuDoubleComplex* __restrict__ R,
-                               const int* __restrict__ pair_to_freq,
-                               int N,
-                               int nf,
-                               cuDoubleComplex* __restrict__ X)
-{
-    // flat6(N,j,k,p,q,r,s) = j + N*(k + N*(p + N*(q + N*(r + N*s))))
-    // so j is the fast/contiguous index.
     const std::size_t N_u = static_cast<std::size_t>(N);
     const std::size_t N2 = N_u * N_u;
     const std::size_t N4 = N2 * N2;
-    const std::size_t idx = static_cast<std::size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
     const std::size_t N6 = N4 * N2;
-    if (idx >= N6) return;
-
-    const std::size_t jk = idx % N2;
-    const std::size_t pq = (idx / N2) % N2;
-    const std::size_t rs = idx / N4;
-
-    const int f_jk = pair_to_freq[jk];
-    const int f_pq = pair_to_freq[pq];
-    const int f_rs = pair_to_freq[rs];
-
     const std::size_t nf_u = static_cast<std::size_t>(nf);
-    const std::size_t fidx = idx3(nf_u, f_jk, f_pq, f_rs);
-    X[idx] = cd_add(C[fidx], R[fidx]);
+
+    // ---- M/I/K: [N^4] ----
+    for (std::size_t idx = tid; idx < N4; idx += stride) {
+        // Column-major linearization over (row=(j,k), col=(p,q)):
+        //   idx = row + col*N2
+        const std::size_t row_u = idx % N2;
+        const std::size_t col_u = idx / N2;
+
+        const std::size_t j_u = row_u % N_u;
+        const std::size_t k_u = row_u / N_u;
+        const std::size_t p_u = col_u % N_u;
+        const std::size_t q_u = col_u / N_u;
+
+        const std::size_t jk = row_u;
+        const std::size_t jq = j_u + N_u * q_u;
+        const std::size_t pj = p_u + N_u * j_u;
+        const std::size_t pq = col_u;
+        const std::size_t qk = q_u + N_u * k_u;
+        const std::size_t kq = k_u + N_u * q_u;
+        const std::size_t qp = q_u + N_u * p_u;
+        const std::size_t qj = q_u + N_u * j_u;
+
+        const int f_jk = pair_to_freq[jk];
+        const int f_jq = pair_to_freq[jq];
+        const int f_pj = pair_to_freq[pj];
+        const int f_pq = pair_to_freq[pq];
+        const int f_qk = pair_to_freq[qk];
+        const int f_kq = pair_to_freq[kq];
+        const int f_qp = pair_to_freq[qp];
+        const int f_qj = pair_to_freq[qj];
+
+        // M = F[f(j,q)][f(j,k)][f(p,j)] - R[f(j,q)][f(p,q)][f(q,k)]
+        const cuDoubleComplex M1 = F[idx3(nf_u, f_jq, f_jk, f_pj)];
+        const cuDoubleComplex M2 = R[idx3(nf_u, f_jq, f_pq, f_qk)];
+        M[idx] = cd_sub(M1, M2);
+
+        // I = F[f(j,k)][f(q,p)][f(k,q)]
+        I[idx] = F[idx3(nf_u, f_jk, f_qp, f_kq)];
+
+        // K = R[f(j,k)][f(p,q)][f(q,j)]
+        K[idx] = R[idx3(nf_u, f_jk, f_pq, f_qj)];
+    }
+
+    // ---- X: [N^6] ----
+    for (std::size_t idx = tid; idx < N6; idx += stride) {
+        // flat6(N,j,k,p,q,r,s) = j + N*(k + N*(p + N*(q + N*(r + N*s))))
+        // so j is the fast/contiguous index.
+        const std::size_t jk = idx % N2;
+        const std::size_t pq = (idx / N2) % N2;
+        const std::size_t rs = idx / N4;
+
+        const int f_jk = pair_to_freq[jk];
+        const int f_pq = pair_to_freq[pq];
+        const int f_rs = pair_to_freq[rs];
+
+        const std::size_t fidx = idx3(nf_u, f_jk, f_pq, f_rs);
+        X[idx] = cd_add(C[fidx], R[fidx]);
+    }
 }
 
 } // namespace
@@ -131,18 +125,22 @@ void build_mikx_device(const MikxDeviceInputs& inputs,
     const std::size_t N_u = static_cast<std::size_t>(inputs.N);
     const std::size_t N2 = N_u * N_u;
     const std::size_t N4 = N2 * N2;
-    const std::size_t N6 = N_u * N_u * N_u * N_u * N_u * N_u;
+    const std::size_t N6 = N4 * N2;
+    const std::size_t total = (N6 > N4) ? N6 : N4;
 
-    const dim3 grid_MIK(static_cast<unsigned>((N4 + block - 1) / block));
-    const dim3 grid_X(static_cast<unsigned>((N6 + block - 1) / block));
-
-    kernel_build_mik<<<grid_MIK, block, 0, stream>>>(
-        inputs.F, inputs.R, inputs.pair_to_freq, inputs.N, inputs.nf, outputs.M, outputs.I, outputs.K);
-    cuda_check(cudaGetLastError(), "kernel_build_mik launch");
-
-    kernel_build_x<<<grid_X, block, 0, stream>>>(
-        inputs.C, inputs.R, inputs.pair_to_freq, inputs.N, inputs.nf, outputs.X);
-    cuda_check(cudaGetLastError(), "kernel_build_x launch");
+    const dim3 grid(static_cast<unsigned>((total + block - 1) / block));
+    kernel_build_mikx_fused<<<grid, block, 0, stream>>>(
+        inputs.F,
+        inputs.C,
+        inputs.R,
+        inputs.pair_to_freq,
+        inputs.N,
+        inputs.nf,
+        outputs.M,
+        outputs.I,
+        outputs.K,
+        outputs.X);
+    cuda_check(cudaGetLastError(), "kernel_build_mikx_fused launch");
 }
 
 } // namespace taco::tcl4::cuda_mikx

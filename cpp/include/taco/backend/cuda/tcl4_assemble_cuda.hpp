@@ -30,6 +30,18 @@ void assemble_liouvillian_cuda_device(const cuDoubleComplex* dM,
                                       int num_ops,
                                       cuDoubleComplex* dGW,
                                       cudaStream_t stream);
+
+// Device-side helper: assemble the raw (unsymmetrized) GW matrix directly on the GPU.
+// The fused TCL4 CUDA path can then symmetrize + permute into L4 in a single kernel.
+void assemble_liouvillian_cuda_device_raw(const cuDoubleComplex* dM,
+                                          const cuDoubleComplex* dI,
+                                          const cuDoubleComplex* dK,
+                                          const cuDoubleComplex* dX,
+                                          const cuDoubleComplex* d_ops,
+                                          int N,
+                                          int num_ops,
+                                          cuDoubleComplex* dGW_raw,
+                                          cudaStream_t stream);
 #endif
 
 } // namespace taco::tcl4

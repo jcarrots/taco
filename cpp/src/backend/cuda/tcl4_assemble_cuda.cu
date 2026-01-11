@@ -226,14 +226,14 @@ __device__ __forceinline__ cuDoubleComplex compute_gw_sum(const cuDoubleComplex*
     return res;
 }
 
-__global__ void kernel_assemble_gw_offdiag(const cuDoubleComplex* __restrict__ M,
-                                           const cuDoubleComplex* __restrict__ I,
-                                           const cuDoubleComplex* __restrict__ K,
-                                           const cuDoubleComplex* __restrict__ X,
-                                           const cuDoubleComplex* __restrict__ coupling,
-                                           int N,
-                                           int num_ops,
-                                           cuDoubleComplex* __restrict__ GW)
+__global__ void kernel_assemble_gw_raw(const cuDoubleComplex* __restrict__ M,
+                                      const cuDoubleComplex* __restrict__ I,
+                                      const cuDoubleComplex* __restrict__ K,
+                                      const cuDoubleComplex* __restrict__ X,
+                                      const cuDoubleComplex* __restrict__ coupling,
+                                      int N,
+                                      int num_ops,
+                                      cuDoubleComplex* __restrict__ GW)
 {
     const std::size_t N_u = static_cast<std::size_t>(N);
     const std::size_t N2 = N_u * N_u;
@@ -252,43 +252,41 @@ __global__ void kernel_assemble_gw_offdiag(const cuDoubleComplex* __restrict__ M
     const std::size_t j_u = col_u / N_u;
     const std::size_t m_u = col_u - j_u * N_u;
 
-    if (j_u == m_u) return;
-
-    const cuDoubleComplex res = compute_gw_sum<false>(
-        M, I, K, X, coupling, N, num_ops, N_u, N2, N3, N4, N5, n_u, i_u, j_u, m_u);
+    const bool is_diag = (j_u == m_u);
+    const cuDoubleComplex res = is_diag
+                                    ? compute_gw_sum<true>(M,
+                                                          I,
+                                                          K,
+                                                          X,
+                                                          coupling,
+                                                          N,
+                                                          num_ops,
+                                                          N_u,
+                                                          N2,
+                                                          N3,
+                                                          N4,
+                                                          N5,
+                                                          n_u,
+                                                          i_u,
+                                                          j_u,
+                                                          m_u)
+                                    : compute_gw_sum<false>(M,
+                                                           I,
+                                                           K,
+                                                           X,
+                                                           coupling,
+                                                           N,
+                                                           num_ops,
+                                                           N_u,
+                                                           N2,
+                                                           N3,
+                                                           N4,
+                                                           N5,
+                                                           n_u,
+                                                           i_u,
+                                                           j_u,
+                                                           m_u);
     GW[idx] = res;
-}
-
-__global__ void kernel_assemble_gw_diag(const cuDoubleComplex* __restrict__ M,
-                                        const cuDoubleComplex* __restrict__ I,
-                                        const cuDoubleComplex* __restrict__ K,
-                                        const cuDoubleComplex* __restrict__ X,
-                                        const cuDoubleComplex* __restrict__ coupling,
-                                        int N,
-                                        int num_ops,
-                                        cuDoubleComplex* __restrict__ GW)
-{
-    const std::size_t N_u = static_cast<std::size_t>(N);
-    const std::size_t N2 = N_u * N_u;
-    const std::size_t N3 = N2 * N_u;
-    const std::size_t N4 = N2 * N2;
-    const std::size_t N5 = N4 * N_u;
-    const std::size_t idx = static_cast<std::size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
-    const std::size_t total = N2 * N_u;
-    if (idx >= total) return;
-
-    const std::size_t j_u = idx / N2;
-    const std::size_t row_u = idx - j_u * N2;
-    const std::size_t i_u = row_u / N_u;
-    const std::size_t n_u = row_u - i_u * N_u;
-    const std::size_t m_u = j_u;
-
-    const cuDoubleComplex res = compute_gw_sum<true>(
-        M, I, K, X, coupling, N, num_ops, N_u, N2, N3, N4, N5, n_u, i_u, j_u, m_u);
-
-    const std::size_t col_u = j_u + j_u * N_u;
-    const std::size_t out_idx = row_u + col_u * N2;
-    GW[out_idx] = res;
 }
 
 __global__ void kernel_symmetrize_gw(cuDoubleComplex* __restrict__ GW, std::size_t N2) {
@@ -310,6 +308,16 @@ __global__ void kernel_symmetrize_gw(cuDoubleComplex* __restrict__ GW, std::size
 
 } // namespace
 
+void assemble_liouvillian_cuda_device_raw(const cuDoubleComplex* dM,
+                                          const cuDoubleComplex* dI,
+                                          const cuDoubleComplex* dK,
+                                          const cuDoubleComplex* dX,
+                                          const cuDoubleComplex* d_ops,
+                                          int N,
+                                          int num_ops,
+                                          cuDoubleComplex* dGW_raw,
+                                          cudaStream_t stream);
+
 void assemble_liouvillian_cuda_device(const cuDoubleComplex* dM,
                                       const cuDoubleComplex* dI,
                                       const cuDoubleComplex* dK,
@@ -320,34 +328,45 @@ void assemble_liouvillian_cuda_device(const cuDoubleComplex* dM,
                                       cuDoubleComplex* dGW,
                                       cudaStream_t stream)
 {
+    assemble_liouvillian_cuda_device_raw(dM, dI, dK, dX, d_ops, N, num_ops, dGW, stream);
+
+    const std::size_t N_u = static_cast<std::size_t>(N);
+    const std::size_t N2 = N_u * N_u;
+    constexpr int block = 128;
+    const std::size_t total = N2 * N2;
+    const dim3 grid(static_cast<unsigned>((total + block - 1) / block));
+    kernel_symmetrize_gw<<<grid, block, 0, stream>>>(dGW, N2);
+    cuda_check(cudaGetLastError(), "kernel_symmetrize_gw launch");
+}
+
+void assemble_liouvillian_cuda_device_raw(const cuDoubleComplex* dM,
+                                          const cuDoubleComplex* dI,
+                                          const cuDoubleComplex* dK,
+                                          const cuDoubleComplex* dX,
+                                          const cuDoubleComplex* d_ops,
+                                          int N,
+                                          int num_ops,
+                                          cuDoubleComplex* dGW_raw,
+                                          cudaStream_t stream)
+{
     if (N <= 0) {
-        throw std::invalid_argument("assemble_liouvillian_cuda_device: N must be > 0");
+        throw std::invalid_argument("assemble_liouvillian_cuda_device_raw: N must be > 0");
     }
     if (num_ops <= 0) {
-        throw std::invalid_argument("assemble_liouvillian_cuda_device: num_ops must be > 0");
+        throw std::invalid_argument("assemble_liouvillian_cuda_device_raw: num_ops must be > 0");
     }
-    if (!dM || !dI || !dK || !dX || !d_ops || !dGW) {
-        throw std::invalid_argument("assemble_liouvillian_cuda_device: null device pointer");
+    if (!dM || !dI || !dK || !dX || !d_ops || !dGW_raw) {
+        throw std::invalid_argument("assemble_liouvillian_cuda_device_raw: null device pointer");
     }
 
     const std::size_t N_u = static_cast<std::size_t>(N);
     const std::size_t N2 = N_u * N_u;
 
     constexpr int block = 128;
-    const std::size_t total_off = N2 * N2;
-    const dim3 grid_off(static_cast<unsigned>((total_off + block - 1) / block));
-    kernel_assemble_gw_offdiag<<<grid_off, block, 0, stream>>>(
-        dM, dI, dK, dX, d_ops, N, num_ops, dGW);
-    cuda_check(cudaGetLastError(), "kernel_assemble_gw_offdiag launch");
-
-    const std::size_t total_diag = N2 * N_u;
-    const dim3 grid_diag(static_cast<unsigned>((total_diag + block - 1) / block));
-    kernel_assemble_gw_diag<<<grid_diag, block, 0, stream>>>(
-        dM, dI, dK, dX, d_ops, N, num_ops, dGW);
-    cuda_check(cudaGetLastError(), "kernel_assemble_gw_diag launch");
-
-    kernel_symmetrize_gw<<<grid_off, block, 0, stream>>>(dGW, N2);
-    cuda_check(cudaGetLastError(), "kernel_symmetrize_gw launch");
+    const std::size_t total = N2 * N2;
+    const dim3 grid(static_cast<unsigned>((total + block - 1) / block));
+    kernel_assemble_gw_raw<<<grid, block, 0, stream>>>(dM, dI, dK, dX, d_ops, N, num_ops, dGW_raw);
+    cuda_check(cudaGetLastError(), "kernel_assemble_gw_raw launch");
 }
 
 Eigen::MatrixXcd assemble_liouvillian_cuda(const MikxTensors& tensors,
@@ -406,8 +425,7 @@ Eigen::MatrixXcd assemble_liouvillian_cuda(const MikxTensors& tensors,
     cuDoubleComplex* dGW = nullptr;
 
     cudaEvent_t ev_start = nullptr;
-    cudaEvent_t ev_after_off = nullptr;
-    cudaEvent_t ev_after_diag = nullptr;
+    cudaEvent_t ev_after_raw = nullptr;
     cudaEvent_t ev_after_sym = nullptr;
 
     try {
@@ -431,32 +449,22 @@ Eigen::MatrixXcd assemble_liouvillian_cuda(const MikxTensors& tensors,
 
         if (profile) {
             cuda_check(cudaEventCreate(&ev_start), "cudaEventCreate(start)");
-            cuda_check(cudaEventCreate(&ev_after_off), "cudaEventCreate(after_off)");
-            cuda_check(cudaEventCreate(&ev_after_diag), "cudaEventCreate(after_diag)");
+            cuda_check(cudaEventCreate(&ev_after_raw), "cudaEventCreate(after_raw)");
             cuda_check(cudaEventCreate(&ev_after_sym), "cudaEventCreate(after_sym)");
             cuda_check(cudaEventRecord(ev_start, stream), "cudaEventRecord(start)");
         }
 
         constexpr int block = 128;
-        const std::size_t total_off = N2 * N2;
-        const dim3 grid_off(static_cast<unsigned>((total_off + block - 1) / block));
-        kernel_assemble_gw_offdiag<<<grid_off, block, 0, stream>>>(
+        const std::size_t total = N2 * N2;
+        const dim3 grid(static_cast<unsigned>((total + block - 1) / block));
+        kernel_assemble_gw_raw<<<grid, block, 0, stream>>>(
             dM, dI, dK, dX, d_ops, static_cast<int>(N), static_cast<int>(num_ops), dGW);
-        cuda_check(cudaGetLastError(), "kernel_assemble_gw_offdiag launch");
+        cuda_check(cudaGetLastError(), "kernel_assemble_gw_raw launch");
         if (profile) {
-            cuda_check(cudaEventRecord(ev_after_off, stream), "cudaEventRecord(after_off)");
+            cuda_check(cudaEventRecord(ev_after_raw, stream), "cudaEventRecord(after_raw)");
         }
 
-        const std::size_t total_diag = N2 * N;
-        const dim3 grid_diag(static_cast<unsigned>((total_diag + block - 1) / block));
-        kernel_assemble_gw_diag<<<grid_diag, block, 0, stream>>>(
-            dM, dI, dK, dX, d_ops, static_cast<int>(N), static_cast<int>(num_ops), dGW);
-        cuda_check(cudaGetLastError(), "kernel_assemble_gw_diag launch");
-        if (profile) {
-            cuda_check(cudaEventRecord(ev_after_diag, stream), "cudaEventRecord(after_diag)");
-        }
-
-        kernel_symmetrize_gw<<<grid_off, block, 0, stream>>>(dGW, N2);
+        kernel_symmetrize_gw<<<grid, block, 0, stream>>>(dGW, N2);
         cuda_check(cudaGetLastError(), "kernel_symmetrize_gw launch");
         if (profile) {
             cuda_check(cudaEventRecord(ev_after_sym, stream), "cudaEventRecord(after_sym)");
@@ -469,13 +477,11 @@ Eigen::MatrixXcd assemble_liouvillian_cuda(const MikxTensors& tensors,
 
         if (profile) {
             cuda_check(cudaEventSynchronize(ev_after_sym), "cudaEventSynchronize(after_sym)");
-            float ms_off = 0.0f;
-            float ms_diag = 0.0f;
+            float ms_raw = 0.0f;
             float ms_sym = 0.0f;
             float ms_total = 0.0f;
-            cuda_check(cudaEventElapsedTime(&ms_off, ev_start, ev_after_off), "cudaEventElapsedTime(off)");
-            cuda_check(cudaEventElapsedTime(&ms_diag, ev_after_off, ev_after_diag), "cudaEventElapsedTime(diag)");
-            cuda_check(cudaEventElapsedTime(&ms_sym, ev_after_diag, ev_after_sym), "cudaEventElapsedTime(sym)");
+            cuda_check(cudaEventElapsedTime(&ms_raw, ev_start, ev_after_raw), "cudaEventElapsedTime(raw)");
+            cuda_check(cudaEventElapsedTime(&ms_sym, ev_after_raw, ev_after_sym), "cudaEventElapsedTime(sym)");
             cuda_check(cudaEventElapsedTime(&ms_total, ev_start, ev_after_sym), "cudaEventElapsedTime(total)");
 
             const auto wall_end = std::chrono::high_resolution_clock::now();
@@ -483,17 +489,15 @@ Eigen::MatrixXcd assemble_liouvillian_cuda(const MikxTensors& tensors,
                 std::chrono::duration<double, std::milli>(wall_end - wall_start).count();
 
             std::fprintf(stdout,
-                         "cuda_gw: wall_ms=%.3f kernel_ms=%.3f offdiag_ms=%.3f diag_ms=%.3f sym_ms=%.3f\n",
+                         "cuda_gw: wall_ms=%.3f kernel_ms=%.3f raw_ms=%.3f sym_ms=%.3f\n",
                          wall_ms,
                          static_cast<double>(ms_total),
-                         static_cast<double>(ms_off),
-                         static_cast<double>(ms_diag),
+                         static_cast<double>(ms_raw),
                          static_cast<double>(ms_sym));
         }
 
         if (ev_after_sym) cudaEventDestroy(ev_after_sym);
-        if (ev_after_diag) cudaEventDestroy(ev_after_diag);
-        if (ev_after_off) cudaEventDestroy(ev_after_off);
+        if (ev_after_raw) cudaEventDestroy(ev_after_raw);
         if (ev_start) cudaEventDestroy(ev_start);
 
         cudaFree(dGW);
@@ -506,8 +510,7 @@ Eigen::MatrixXcd assemble_liouvillian_cuda(const MikxTensors& tensors,
         return GW;
     } catch (...) {
         if (ev_after_sym) cudaEventDestroy(ev_after_sym);
-        if (ev_after_diag) cudaEventDestroy(ev_after_diag);
-        if (ev_after_off) cudaEventDestroy(ev_after_off);
+        if (ev_after_raw) cudaEventDestroy(ev_after_raw);
         if (ev_start) cudaEventDestroy(ev_start);
         if (dGW) cudaFree(dGW);
         if (d_ops) cudaFree(d_ops);

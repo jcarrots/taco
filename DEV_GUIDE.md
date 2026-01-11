@@ -28,6 +28,7 @@ GCC (MSYS2)
 CMake Options
 -------------
 - `TACO_WITH_OPENMP` (default ON): enable OpenMP when available (controls `_OPENMP` code paths).
+- `TACO_WITH_MPI` (default OFF): enable MPI (distributed CPU) support (`TACO_HAS_MPI=1`).
 - `TACO_WITH_CUDA` (default OFF): enable CUDA targets when a CUDA Toolkit is available.
 - `TACO_BUILD_PYTHON` (default ON): build the pybind11 extension module.
   - If CMake cannot find Python, pass `-DPython_EXECUTABLE=...` (and, on Windows, `-DPython_INCLUDE_DIR=...`, `-DPython_LIBRARY=...`).
@@ -49,7 +50,32 @@ TCL4 CUDA backend:
 - CUDA entry point: `cpp/src/backend/cuda/tcl4_kernels_cuda.cu` (`compute_triple_kernels_cuda`) implements the scalar F/C/R convolution path with cuFFT + CUB scans.
 - CPU path calls into CUDA when you pass `Exec{.backend=Backend::Cuda}` to `taco::tcl4::compute_triple_kernels` (supports `FCRMethod::Convolution`).
 - `cpp/src/backend/cuda/tcl4_mikx_cuda.cu` provides `build_mikx_cuda` for M/I/K/X at a single time index.
+- `cpp/src/backend/cuda/tcl4_fused_cuda.cu` provides fused end-to-end L4 builders:
+  - `build_TCL4_generator_cuda_fused` (single time index).
+  - `build_TCL4_generator_cuda_fused_batch` (multiple time indices; one H2D for inputs and one D2H for all L4 outputs).
+- Fused path optimizations: reuse a persistent stream + FCR workspace, `cudaMemcpy2DAsync` for single-time extraction,
+  transpose kernel for full-series extraction, and a tiled GW->L4 reshuffle kernel.
 - Benchmark note: `examples/tcl4_bench.cpp` shows GPU speedups only once N is large enough to amortize launch/transfer overhead; small N tends to favor CPU. FFT sizes round up to the next power of two, so timings jump at those boundaries.
+- Large time-series runs can be bandwidth-bound: F/C/R extraction and D2H of the full L4 series dominate, so GPU can be slower than CPU for very large Nt unless you limit outputs or overlap transfers.
+
+MPI (Optional)
+--------------
+- Configure: `cmake -S . -B build-mpi -DTACO_WITH_MPI=ON`
+- The current MPI+OpenMP CPU entry point is `taco/backend/cpu/tcl4_mpi_omp.hpp` (`build_TCL4_generator_cpu_mpi_omp_batch`).
+- Test: `tcl4_mpi_omp_tests` (run with `mpiexec -n <ranks> ...`).
+
+Profiling CUDA (Nsight)
+-----------------------
+- Nsight Compute (`ncu`): kernel-level metrics.
+  - PowerShell line continuation is the backtick (`` ` ``) and it must be the last character on the line (no trailing spaces).
+  - On Windows, `where ncu` may resolve to `ncu.bat` (a `cmd.exe` wrapper). If your `--kernel-name` regex contains `|`, `cmd.exe` can treat it as a pipe; prefer running `ncu.exe` directly from the same folder.
+  - If you see `ERR_NVGPUCTRPERM`, your driver is restricting access to GPU performance counters.
+    - Quick fixes: run PowerShell as Administrator, or in NVIDIA Control Panel enable Developer Settings and allow access to GPU performance counters for your user / all users (exact wording varies by driver).
+  - Benchmarking note: `ncu --set full` can replay kernels and adds large overhead; do not trust end-to-end timings measured inside the app while profiling. Reduce the problem size (or time indices) when collecting metrics.
+  - Example (PowerShell):
+    - `& "C:\Program Files\NVIDIA Corporation\Nsight Compute 2025.4.0\target\windows-desktop-win7-x64\ncu.exe" --set full --target-processes all --kernel-name "regex:kernel_.*" -o ncu_report .\build-cuda\Release\tcl4_e2e_cuda_compare.exe --series`
+- Nsight Systems (`nsys`): whole-program timeline (CPU/GPU overlap, memcpy, kernel launch gaps).
+  - `nsys` is installed with Nsight Systems (separate from Nsight Compute). If `nsys` is not found, install Nsight Systems and/or call `nsys.exe` via its full path.
 
 Python Extension
 ----------------
@@ -85,7 +111,8 @@ Modules Overview
 - `taco/tcl2.hpp` + `cpp/src/tcl/tcl2_generator.cpp` - stateful TCL2 generator (reset/advance/apply) for time stepping.
 - `taco/spin_boson.hpp` - convenience builders and `Model` wrapper for the spin-boson Hamiltonian, bath, and generator.
 - `taco/tcl4_kernels.hpp`, `taco/tcl4.hpp` - TCL4 kernel builder and triple-series helpers (Gamma -> F/C/R).
-- Executables: `examples/tcl_driver.cpp` (YAML driver), `examples/TCL4_spin_boson_example.cpp` (TCL4 example), `tests/tcl4_h5_compare.cpp` (MATLAB HDF5 compare).
+- Executables: `examples/tcl_driver.cpp` (YAML driver), `examples/TCL4_spin_boson_example.cpp` (TCL4 example),
+  `tests/tcl4_h5_compare.cpp` (MATLAB HDF5 compare), `tests/tcl4_e2e_cuda_compare.cpp` (CPU vs CUDA end-to-end compare).
 - Overall layout: see `docs/STRUCTURE.md` for a filesystem tree.
 
 Module Reference
@@ -273,12 +300,19 @@ TCL4 Driver & Tests
   - Build: `cmake --build build-vcpkg-x64 --config Release --target tcl_driver` (requires `yaml-cpp`)
   - Run: `build-vcpkg-x64/Release/tcl_driver.exe --config=configs/tcl_driver.yaml`
 - Test: `tests/tcl4_tests.cpp` compares Direct vs Convolution F/C/R across multiple (N, dt, T) cases and reports max relative errors.
+- Test: `tests/tcl4_e2e_cuda_compare.cpp` compares CPU vs CUDA end-to-end L4 results and reports total time.
+  - Build: `cmake --build build-cuda --config Release --target tcl4_e2e_cuda_compare`
+  - Run: `build-cuda/Release/tcl4_e2e_cuda_compare.exe --series --gpu_id=0 --threads=8 --N=100000`
+  - Notes:
+    - Without `--series`, it compares a small list of time indices (default: {0, Nt/2, Nt-1}); averages divide by that count.
+    - With `--series`, it builds all time steps via the fused batch path; this is often dominated by extraction + D2H of L4.
 
 High-Level TCL4 Wrappers
 ------------------------
 - Build `L4` at a single time: `build_TCL4_generator(system, gamma_series, dt, time_index, method)`.
 - Build `L4` for all times: `build_correction_series(system, gamma_series, dt, method)`.
 - Internally these run: `compute_triple_kernels` -> `build_mikx_serial` -> `assemble_liouvillian` (raw `GW`) -> `gw_to_liouvillian` (reshuffled `L4`).
+- When `Exec.backend=Backend::Cuda`, `build_TCL4_generator` routes to the fused CUDA path.
 
 Frequency Buckets Symmetry
 --------------------------

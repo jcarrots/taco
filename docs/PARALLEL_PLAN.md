@@ -36,7 +36,11 @@ Phase 2 - CUDA (single-node)
   - Batched FFTs for `causal_conv_fft`.
   - Kernels for phase multiply, prefix scan, elementwise ops.
 - Entry point: `compute_triple_kernels_cuda` (supports `FCRMethod::Convolution`).
-- `build_mikx_cuda` is available as a helper; assembly remains on CPU.
+- `build_mikx_cuda` is available as a helper.
+- Fused CUDA path builds MIKX -> GW -> L4 on device for single or batched time indices
+  (`cpp/src/backend/cuda/tcl4_fused_cuda.cu`).
+- Fused path optimizations: persistent stream + FCR workspace, `cudaMemcpy2DAsync` extraction for single time,
+  transpose kernel for full-series extraction, and tiled GW->L4 reshuffle.
 
 Phase 3 - CUDA overlap
 - TODO: overlap GPU F/C/R with CPU MIKX/assembly using streams and pinned host buffers.
@@ -45,10 +49,14 @@ Phase 3 - CUDA overlap
 Phase 4 - MPI backends
 - `mpi_omp`: distributed CPU (MPI + OpenMP).
 - `mpi_cuda`: distributed GPU (MPI + CUDA), one rank per GPU.
+- Status:
+  - Initial MPI+OpenMP CPU implementation exists for TCL4 batched L4 construction:
+    `taco/backend/cpu/tcl4_mpi_omp.hpp` (`build_TCL4_generator_cpu_mpi_omp_batch`).
+  - Exec-based dispatch (`Exec{backend=MpiOmp,...}`) is still TODO.
 
 Phase 5 - Optional GPU MIKX/Assemble
-- Only if profiling shows clear wins; otherwise keep on CPU.
-- Implement 2D/3D kernels to accumulate T, respecting column-major mapping.
+- Implemented for the fused CUDA path (MIKX, GW, L4 on device).
+- Future work: tune kernel layouts and overlap with F/C/R for better throughput.
 
 Numerics & Testing
 - Use complex<double> throughout.
@@ -58,12 +66,13 @@ Numerics & Testing
   - End-to-end spin-boson TCL4: <sigma_z> agreement within tolerance.
 
 Build Flags
-- CMake options (future): `TACO_WITH_OPENMP`, `TACO_WITH_CUDA` (or HIP/SYCL variants).
+- CMake options: `TACO_WITH_OPENMP`, `TACO_WITH_MPI`, `TACO_WITH_CUDA` (or HIP/SYCL variants).
 - Detect cuFFT/hipFFT; fallback to CPU FFT.
 
 Risks & Mitigations
 - Memory: compute-at-tidx/windowed series to avoid nf^3 blow-up.
 - Transfer overhead: pinned buffers + overlap.
+- Large Nt: full-series extraction and L4 D2H are bandwidth-bound; mitigate by batching, on-device reductions, or limiting time indices.
 - Small N performance: prefer CPU for MIKX/assemble unless profiling suggests otherwise.
 
 Deliverables Summary
