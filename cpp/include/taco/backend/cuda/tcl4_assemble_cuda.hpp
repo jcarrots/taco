@@ -42,6 +42,26 @@ void assemble_liouvillian_cuda_device_raw(const cuDoubleComplex* dM,
                                           int num_ops,
                                           cuDoubleComplex* dGW_raw,
                                           cudaStream_t stream);
+
+void assemble_liouvillian_cuda_device_f32(const cuFloatComplex* dM,
+                                          const cuFloatComplex* dI,
+                                          const cuFloatComplex* dK,
+                                          const cuFloatComplex* dX,
+                                          const cuFloatComplex* d_ops,
+                                          int N,
+                                          int num_ops,
+                                          cuFloatComplex* dGW,
+                                          cudaStream_t stream);
+
+void assemble_liouvillian_cuda_device_raw_f32(const cuFloatComplex* dM,
+                                              const cuFloatComplex* dI,
+                                              const cuFloatComplex* dK,
+                                              const cuFloatComplex* dX,
+                                              const cuFloatComplex* d_ops,
+                                              int N,
+                                              int num_ops,
+                                              cuFloatComplex* dGW_raw,
+                                              cudaStream_t stream);
 #endif
 
 } // namespace taco::tcl4

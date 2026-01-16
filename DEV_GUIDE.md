@@ -30,8 +30,9 @@ CMake Options
 - `TACO_WITH_OPENMP` (default ON): enable OpenMP when available (controls `_OPENMP` code paths).
 - `TACO_WITH_MPI` (default OFF): enable MPI (distributed CPU) support (`TACO_HAS_MPI=1`).
 - `TACO_WITH_CUDA` (default OFF): enable CUDA targets when a CUDA Toolkit is available.
-- `TACO_BUILD_PYTHON` (default ON): build the pybind11 extension module.
-  - If CMake cannot find Python, pass `-DPython_EXECUTABLE=...` (and, on Windows, `-DPython_INCLUDE_DIR=...`, `-DPython_LIBRARY=...`).
+- `TACO_BUILD_PYTHON` (default OFF): build the pybind11 extension module (`_taco`).
+  - Requires NumPy headers; CMake uses `find_package(Python COMPONENTS Interpreter Development NumPy)`.
+  - If CMake cannot find Python, pass `-DPython_EXECUTABLE=...`.
 - `TACO_BUILD_GAMMA_TESTS` (default ON): build `gamma_tests` (and only then look for Boost).
 
 CUDA (Optional)
@@ -79,9 +80,9 @@ Profiling CUDA (Nsight)
 
 Python Extension
 ----------------
-- Configure: `cmake -S . -B build -DTACO_BUILD_PYTHON=ON -DPython_EXECUTABLE=...`
-- Build: `cmake --build build --config Release --target _taco_native`
-- Import test: `python -c "import sys; sys.path.insert(0,'python'); import taco; print(taco.version())"`
+- Install (CPU-only): `pip install .`
+- Install (CUDA): `CMAKE_ARGS="-DTACO_BUILD_CUDA=ON -DTACO_BUILD_PYTHON=ON" pip install .`
+- Import test: `python -c "import taco; print(taco.version()); print(taco.build_info())"`
 
 VS Code
 -------
@@ -206,6 +207,16 @@ L_series[steps] = build_L_at(t0 + steps * dt);
 Eigen::VectorXcd r = initial_state_vec; // size N^2
 taco::tcl::propagate_rk4_dense_serial(L_series, L_half_series, r, t0, dt);
 ```
+
+Dense RK4 (CUDA)
+----------------
+Header: `taco/backend/cuda/rk4_dense_cuda.hpp`
+- One-step RK4 update on GPU for dense complex systems: `taco::tcl::rk4_update_cuda(...)`.
+- FP32 variant: `taco::tcl::rk4_update_cuda_f32(...)` (casts host inputs/outputs; device type `cuFloatComplex`).
+- Matvec backend selection: `Rk4DenseCudaMethod::WarpKernel` (default custom warp kernel) or `Rk4DenseCudaMethod::CublasGemv` (cuBLAS `cublasZgemv`).
+- Matrix storage: column-major (Eigen default); FP64 uses `cuDoubleComplex`, FP32 uses `cuFloatComplex`.
+- Intended for small dense systems (allocates/stores the full dense generator `L` on device).
+- Smoke test: configure with `-DTACO_WITH_CUDA=ON` and build/run `rk4_dense_cuda_smoke` (`tests/rk4_dense_cuda_smoke.cu`).
 
 TCL Driver (YAML)
 -----------------

@@ -9,21 +9,37 @@ A fast parallel and scalable time-convolutionless (TCL) runtime with C++ backend
 - Higher-order TCL (TCL6/TCL2n) planning in docs; symbolic road-map.
 
 ## Install
-pip install taco-qme
+From source (CPU-only):
+- `pip install .`
+
+From source (CUDA):
+- `CMAKE_ARGS="-DTACO_BUILD_CUDA=ON -DTACO_BUILD_PYTHON=ON -DCMAKE_CUDA_ARCHITECTURES=native" pip install .`
 
 ## Quickstart
 ```python
-import taco as tc
-L = tc.kernels.tcl4.build_liouvillian(H, C_ops, bath, order=4)
-rt = tc.runtime.Engine(backend="cuda")  # "serial" | "omp" | "cuda" (MPI backends are C++-only today)
-rho_t = rt.propagate(L, rho0, tspan, dt_adapt=True)
+import numpy as np
+import taco
+
+H = np.array([[0.0, 0.5], [0.5, 0.0]], dtype=np.complex128)
+A = np.array([[0.5, 0.0], [0.0, -0.5]], dtype=np.complex128)
+rho0 = np.array([[1.0, 0.0], [0.0, 0.0]], dtype=np.complex128)
+
+omega = np.linspace(0.0, 20.0, 256, dtype=np.float64)
+J = omega * np.exp(-omega / 5.0)
+
+bath = taco.tcl.BathTabulated(temperature=2.0, omega=omega, J=J, bcf_end_time=1.0)
+cfg = taco.tcl.SimConfig(dt=1e-2, t_end=1.0, save_stride=1, order=4)
+
+res = taco.tcl.simulate(H, A, bath, cfg, rho0, device="cpu")  # or device="cuda"
+# For CUDA FP32 kernels: taco.tcl.simulate(..., device="cuda", precision="fp32")
+print(res.t.shape, res.rho.shape)
 ```
 
 ## Build from source (C++)
 - Configure: `cmake -S . -B build`
 - Build (Release): `cmake --build build --config Release`
 - Enable MPI (distributed CPU): `-DTACO_WITH_MPI=ON` (requires MPI)
-- Enable Python extension: `-DTACO_BUILD_PYTHON=ON` (add `-DPython_EXECUTABLE=...` if needed)
+- Enable Python extension: `-DTACO_BUILD_PYTHON=ON` (default OFF; add `-DPython_EXECUTABLE=...` if needed)
 - Disable gamma tests: `-DTACO_BUILD_GAMMA_TESTS=OFF`
 
 ## CUDA backend (C++, performance-focused)
@@ -33,23 +49,29 @@ rho_t = rt.propagate(L, rho0, tspan, dt_adapt=True)
   - Fused end-to-end L4 builders keep intermediates on device and copy L4 back in one transfer:
     - `build_TCL4_generator_cuda_fused(...)` (single time index)
     - `build_TCL4_generator_cuda_fused_batch(...)` (multiple time indices)
+  - Dense RK4 propagation on GPU (for small dense systems):
+    - API: `taco/backend/cuda/rk4_dense_cuda.hpp` (`taco::tcl::rk4_update_cuda`)
+    - Matvec backends: `Rk4DenseCudaMethod::WarpKernel` (default) or `Rk4DenseCudaMethod::CublasGemv` (cuBLAS `cublasZgemv`)
+    - Smoke test: `rk4_dense_cuda_smoke` (`tests/rk4_dense_cuda_smoke.cu`)
   - CUDA Graphs can capture/replay the fixed MIKX -> GW -> L4 launch sequence to reduce host launch overhead:
     - Disable with `TCL4_USE_CUDA_GRAPH=0`
     - Diagnostics with `TCL4_CUDA_GRAPH_VERBOSE=1`
 - CPU vs CUDA compare tool: `tcl4_e2e_cuda_compare`
   - Build: `cmake --build build-cuda --config Release --target tcl4_e2e_cuda_compare`
-  - Run (PowerShell): `.\build-cuda\Release\tcl4_e2e_cuda_compare.exe --N=200000 --tidx=0:1:10000 --gpu_warmup=1 --threads=8`
+  - Run (PowerShell): `.\build-cuda\Release\tcl4_e2e_cuda_compare.exe --N=200000 --tidx=0:1:10000 --gpu_warmup=1 --threads=8 --rk4_method=warp`
+  - Try cuBLAS RK4: add `--rk4_method=cublas` (usually slower for very small D due to overhead)
 - More details: `cpp/src/backend/cuda/README.md`
 
 ## MPI + OpenMP (CPU over distributed memory system, experimental)
 - C++ API: `taco/backend/cpu/tcl4_mpi_omp.hpp` (`build_TCL4_generator_cpu_mpi_omp_batch`).
 - Rank 0 returns the gathered `L4(t)` vector; non-root ranks return `{}`.
 
-## Python extension(Under development)
-- Configure: `cmake -S . -B build -DTACO_BUILD_PYTHON=ON -DPython_EXECUTABLE=...`
-- Build: `cmake --build build --config Release --target _taco_native`
-- Import test: `python -c "import sys; sys.path.insert(0,'python'); import taco; print(taco.version())"`
-- Windows output: `_taco_native.pyd` lands under `python/taco/Release` or `python/taco/Debug`
+## Python bindings
+- Build/install (CPU-only): `pip install .`
+- Build/install (CUDA): `CMAKE_ARGS="-DTACO_BUILD_CUDA=ON -DTACO_BUILD_PYTHON=ON -DCMAKE_CUDA_ARCHITECTURES=native" pip install .`
+- Tests: `pytest -q`
+- Note: when built with CUDA, `taco.tcl.simulate(..., device="cuda")` uses the existing CUDA L4 builder (order=4) and CUDA RK4 for propagation; inputs/outputs are host NumPy arrays (host<->device copies happen internally).
+- Optional: `precision="fp32"` selects the FP32 CUDA kernels (casts on upload/download; outputs remain `complex128`).
 
 ## TCL4 Demo & Test
 - Demo driver: `tcl_driver` loads a YAML config (matrix `H`, `A` and `J_expr`) and runs TCL4 assembly

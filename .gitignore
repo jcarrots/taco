@@ -21,6 +21,7 @@ compile_commands.json
 *.so
 *.dylib
 *.exe
+*.pyd
 *.pdb
 *.idb
 *.tlog/

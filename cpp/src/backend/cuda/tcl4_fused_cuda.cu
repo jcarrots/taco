@@ -134,6 +134,7 @@ struct FusedCudaWorkspace {
     int gpu_id{-1};
     cudaStream_t stream{nullptr};
     cuda_fcr::FcrWorkspace fcr;
+    cuda_fcr::FcrWorkspaceF32 fcr_f32;
 
     DeviceBuffer gamma;
     DeviceBuffer omegas;
@@ -365,11 +366,19 @@ struct FusedCudaWorkspace {
             if (st != cudaSuccess) return false;
 
             std::size_t num_edges = 0;
+            #if CUDART_VERSION >= 13000
+            st = cudaGraphGetEdges(g, nullptr, nullptr, nullptr, &num_edges);
+            #else
             st = cudaGraphGetEdges(g, nullptr, nullptr, &num_edges);
+            #endif
             if (st != cudaSuccess) return false;
             std::vector<cudaGraphNode_t> from(num_edges);
             std::vector<cudaGraphNode_t> to(num_edges);
+            #if CUDART_VERSION >= 13000
+            st = cudaGraphGetEdges(g, from.data(), to.data(), nullptr, &num_edges);
+            #else
             st = cudaGraphGetEdges(g, from.data(), to.data(), &num_edges);
+            #endif
             if (st != cudaSuccess) return false;
 
             std::unordered_map<cudaGraphNode_t, std::size_t> idx;
@@ -642,6 +651,22 @@ struct FusedCudaWorkspace {
         fcr.plan_batch = 0;
         fcr.plan_Nfft = 0;
 
+        if (fcr_f32.plan) {
+            cufftDestroy(fcr_f32.plan);
+            fcr_f32.plan = 0;
+        }
+        if (fcr_f32.A) cudaFree(fcr_f32.A);
+        if (fcr_f32.B) cudaFree(fcr_f32.B);
+        if (fcr_f32.B_conj) cudaFree(fcr_f32.B_conj);
+        if (fcr_f32.scan_tmp) cudaFree(fcr_f32.scan_tmp);
+        fcr_f32.A = nullptr;
+        fcr_f32.B = nullptr;
+        fcr_f32.B_conj = nullptr;
+        fcr_f32.scan_tmp = nullptr;
+        fcr_f32.scan_tmp_bytes = 0;
+        fcr_f32.plan_batch = 0;
+        fcr_f32.plan_Nfft = 0;
+
         release_buffer(gamma);
         release_buffer(omegas);
         release_buffer(mirror);
@@ -704,6 +729,26 @@ inline void copy_time_column(cuDoubleComplex* dst,
                what);
 }
 
+inline void copy_time_column(cuFloatComplex* dst,
+                             const cuFloatComplex* src,
+                             std::size_t Nt,
+                             std::size_t lane_count,
+                             std::size_t time_index,
+                             cudaStream_t stream,
+                             const char* what)
+{
+    const std::size_t pitch = Nt * sizeof(cuFloatComplex);
+    cuda_check(cudaMemcpy2DAsync(dst,
+                                 sizeof(cuFloatComplex),
+                                 src + time_index,
+                                 pitch,
+                                 sizeof(cuFloatComplex),
+                                 lane_count,
+                                 cudaMemcpyDeviceToDevice,
+                                 stream),
+               what);
+}
+
 constexpr int kTransposeTile = 16;
 
 __global__ void kernel_extract_time_slices_transpose(const cuDoubleComplex* __restrict__ F_batch,
@@ -742,6 +787,65 @@ __global__ void kernel_extract_time_slices_transpose(const cuDoubleComplex* __re
     }
 }
 
+__global__ void kernel_extract_time_slices_transpose_f32(const cuFloatComplex* __restrict__ F_batch,
+                                                         const cuFloatComplex* __restrict__ C_batch,
+                                                         const cuFloatComplex* __restrict__ R_batch,
+                                                         cuFloatComplex* __restrict__ F_out,
+                                                         cuFloatComplex* __restrict__ C_out,
+                                                         cuFloatComplex* __restrict__ R_out,
+                                                         std::size_t Nt,
+                                                         std::size_t base_idx,
+                                                         std::size_t lane_count,
+                                                         std::size_t nf3)
+{
+    __shared__ cuFloatComplex tileF[kTransposeTile][kTransposeTile + 1];
+    __shared__ cuFloatComplex tileC[kTransposeTile][kTransposeTile + 1];
+    __shared__ cuFloatComplex tileR[kTransposeTile][kTransposeTile + 1];
+
+    const std::size_t x = static_cast<std::size_t>(blockIdx.x) * kTransposeTile + threadIdx.x; // time
+    const std::size_t y = static_cast<std::size_t>(blockIdx.y) * kTransposeTile + threadIdx.y; // lane
+
+    if (x < Nt && y < lane_count) {
+        const std::size_t src = y * Nt + x;
+        tileF[threadIdx.y][threadIdx.x] = F_batch[src];
+        tileC[threadIdx.y][threadIdx.x] = C_batch[src];
+        tileR[threadIdx.y][threadIdx.x] = R_batch[src];
+    }
+    __syncthreads();
+
+    const std::size_t x2 = static_cast<std::size_t>(blockIdx.y) * kTransposeTile + threadIdx.x; // lane
+    const std::size_t y2 = static_cast<std::size_t>(blockIdx.x) * kTransposeTile + threadIdx.y; // time
+    if (x2 < lane_count && y2 < Nt) {
+        const std::size_t dst = y2 * nf3 + base_idx + x2;
+        F_out[dst] = tileF[threadIdx.x][threadIdx.y];
+        C_out[dst] = tileC[threadIdx.x][threadIdx.y];
+        R_out[dst] = tileR[threadIdx.x][threadIdx.y];
+    }
+}
+
+__global__ void kernel_extract_time_slices_offset_f32(const cuFloatComplex* __restrict__ F_batch,
+                                                      const cuFloatComplex* __restrict__ C_batch,
+                                                      const cuFloatComplex* __restrict__ R_batch,
+                                                      cuFloatComplex* __restrict__ F_out,
+                                                      cuFloatComplex* __restrict__ C_out,
+                                                      cuFloatComplex* __restrict__ R_out,
+                                                      const unsigned int* __restrict__ time_indices,
+                                                      std::size_t num_times,
+                                                      std::size_t Nt,
+                                                      std::size_t base_idx,
+                                                      std::size_t lane_count,
+                                                      std::size_t nf3)
+{
+    const std::size_t lane = static_cast<std::size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    const std::size_t tpos = static_cast<std::size_t>(blockIdx.y) * blockDim.y + threadIdx.y;
+    if (lane >= lane_count || tpos >= num_times) return;
+    const std::size_t time_index = static_cast<std::size_t>(time_indices[tpos]);
+    const std::size_t dst = tpos * nf3 + base_idx + lane;
+    const std::size_t src = time_index + Nt * lane;
+    F_out[dst] = F_batch[src];
+    C_out[dst] = C_batch[src];
+    R_out[dst] = R_batch[src];
+}
 __global__ void kernel_extract_time_slices_offset(const cuDoubleComplex* __restrict__ F_batch,
                                                   const cuDoubleComplex* __restrict__ C_batch,
                                                   const cuDoubleComplex* __restrict__ R_batch,
@@ -808,6 +912,37 @@ __global__ void kernel_gw_raw_sym_to_liouvillian(const cuDoubleComplex* __restri
     L4[row_L + col_L * N2] = cd_add(t_rc, cd_conj(t_cr));
 }
 
+__device__ __forceinline__ cuFloatComplex cf_add(cuFloatComplex a, cuFloatComplex b) {
+    return make_cuFloatComplex(a.x + b.x, a.y + b.y);
+}
+
+__device__ __forceinline__ cuFloatComplex cf_conj(cuFloatComplex a) {
+    return make_cuFloatComplex(a.x, -a.y);
+}
+
+__global__ void kernel_gw_raw_sym_to_liouvillian_f32(const cuFloatComplex* __restrict__ GW_raw,
+                                                     cuFloatComplex* __restrict__ L4,
+                                                     int N)
+{
+    const std::size_t N_u = static_cast<std::size_t>(N);
+    const std::size_t N2 = N_u * N_u;
+    const std::size_t row_L = static_cast<std::size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    const std::size_t col_L = static_cast<std::size_t>(blockIdx.y) * blockDim.y + threadIdx.y;
+    if (row_L >= N2 || col_L >= N2) return;
+
+    const std::size_t n = row_L % N_u;
+    const std::size_t m = row_L / N_u;
+
+    const std::size_t i = col_L % N_u;
+    const std::size_t j = col_L / N_u;
+
+    const std::size_t row_G = n + i * N_u;
+    const std::size_t col_G = m + j * N_u;
+
+    const cuFloatComplex t_rc = GW_raw[row_G + col_G * N2];
+    const cuFloatComplex t_cr = GW_raw[col_G + row_G * N2];
+    L4[row_L + col_L * N2] = cf_add(t_rc, cf_conj(t_cr));
+}
 } // namespace
 
 Eigen::MatrixXcd build_TCL4_generator_cuda_fused(const sys::System& system,
@@ -822,6 +957,15 @@ Eigen::MatrixXcd build_TCL4_generator_cuda_fused(const sys::System& system,
     }
     if (time_index >= static_cast<std::size_t>(gamma_series.rows())) {
         throw std::out_of_range("build_TCL4_generator_cuda_fused: time_index out of range");
+    }
+
+    if (exec.cuda_precision == CudaPrecision::Fp32) {
+        const std::vector<std::size_t> tids = {time_index};
+        auto out = build_TCL4_generator_cuda_fused_batch(system, gamma_series, dt, tids, method, exec);
+        if (out.size() != 1) {
+            throw std::runtime_error("build_TCL4_generator_cuda_fused: internal error (unexpected batch output size)");
+        }
+        return out.front();
     }
 
     const std::size_t Nt = static_cast<std::size_t>(gamma_series.rows());
@@ -1214,6 +1358,311 @@ std::vector<Eigen::MatrixXcd> build_TCL4_generator_cuda_fused_batch(const sys::S
         throw std::overflow_error("build_TCL4_generator_cuda_fused_batch: FCR buffer too large");
     }
     const std::size_t total_fcr_elems = nf3 * num_times;
+
+    if (exec.cuda_precision == CudaPrecision::Fp32) {
+        const float dt_f32 = static_cast<float>(dt);
+        if (!(dt_f32 > 0.0f)) {
+            throw std::invalid_argument("build_TCL4_generator_cuda_fused_batch: dt is too small for FP32");
+        }
+
+        std::vector<float> h_omegas_f32(nf);
+        for (std::size_t i = 0; i < nf; ++i) h_omegas_f32[i] = static_cast<float>(h_omegas[i]);
+
+        std::vector<cuFloatComplex> h_ops_f32(num_ops * N2);
+        for (std::size_t i = 0; i < num_ops * N2; ++i) {
+            const std::complex<double> z = h_ops[i];
+            h_ops_f32[i] = make_cuFloatComplex(static_cast<float>(z.real()), static_cast<float>(z.imag()));
+        }
+
+        std::vector<cuFloatComplex> h_gamma_f32(Nt * nf);
+        {
+            const std::complex<double>* src = gamma_series.data();
+            for (std::size_t i = 0; i < Nt * nf; ++i) {
+                const std::complex<double> z = src[i];
+                h_gamma_f32[i] = make_cuFloatComplex(static_cast<float>(z.real()), static_cast<float>(z.imag()));
+            }
+        }
+
+        cuda_check(cudaSetDevice(exec.gpu_id), "cudaSetDevice");
+        FusedCudaWorkspace& ws = get_fused_workspace(exec.gpu_id);
+        cudaStream_t stream = ws.stream;
+        auto& fcr_ws = ws.fcr_f32;
+
+        CudaEvent ev_fcr_start;
+        CudaEvent ev_fcr_stop;
+        if (cuda_fcr_ms) {
+            ev_fcr_start = CudaEvent(cudaEventDefault);
+            ev_fcr_stop = CudaEvent(cudaEventDefault);
+        }
+
+        cuFloatComplex* d_gamma = nullptr;
+        float* d_omegas = nullptr;
+        int* d_mirror = nullptr;
+        int* d_pair_to_freq = nullptr;
+        cuFloatComplex* d_ops = nullptr;
+        unsigned int* d_time_indices = nullptr;
+
+        cuFloatComplex* d_F_all = nullptr;
+        cuFloatComplex* d_C_all = nullptr;
+        cuFloatComplex* d_R_all = nullptr;
+        cuFloatComplex* d_Ftmp = nullptr;
+        cuFloatComplex* d_Ctmp = nullptr;
+        cuFloatComplex* d_Rtmp = nullptr;
+
+        cuFloatComplex* dM = nullptr;
+        cuFloatComplex* dI = nullptr;
+        cuFloatComplex* dK = nullptr;
+        cuFloatComplex* dX = nullptr;
+        cuFloatComplex* dGW = nullptr;
+        cuFloatComplex* dL4_all = nullptr;
+
+        d_gamma = ensure_buffer<cuFloatComplex>(ws.gamma, Nt * nf, "cudaMalloc(d_gamma_f32)");
+        d_omegas = ensure_buffer<float>(ws.omegas, nf, "cudaMalloc(d_omegas_f32)");
+        d_mirror = ensure_buffer<int>(ws.mirror, nf, "cudaMalloc(d_mirror)");
+        d_pair_to_freq = ensure_buffer<int>(ws.pair_to_freq, N2, "cudaMalloc(d_pair_to_freq)");
+        d_ops = ensure_buffer<cuFloatComplex>(ws.ops, num_ops * N2, "cudaMalloc(d_ops_f32)");
+        if (!use_all_times) {
+            d_time_indices = ensure_buffer<unsigned int>(ws.time_indices, num_times, "cudaMalloc(d_time_indices)");
+        }
+
+        cuda_check(cudaMemcpyAsync(d_gamma,
+                                   h_gamma_f32.data(),
+                                   Nt * nf * sizeof(cuFloatComplex),
+                                   cudaMemcpyHostToDevice,
+                                   stream),
+                   "cudaMemcpyAsync(gamma_f32)");
+        cuda_check(cudaMemcpyAsync(d_omegas,
+                                   h_omegas_f32.data(),
+                                   nf * sizeof(float),
+                                   cudaMemcpyHostToDevice,
+                                   stream),
+                   "cudaMemcpyAsync(omegas_f32)");
+        cuda_check(cudaMemcpyAsync(d_mirror,
+                                   h_mirror.data(),
+                                   nf * sizeof(int),
+                                   cudaMemcpyHostToDevice,
+                                   stream),
+                   "cudaMemcpyAsync(mirror)");
+        cuda_check(cudaMemcpyAsync(d_pair_to_freq,
+                                   map.pair_to_freq.data(),
+                                   N2 * sizeof(int),
+                                   cudaMemcpyHostToDevice,
+                                   stream),
+                   "cudaMemcpyAsync(pair_to_freq)");
+        cuda_check(cudaMemcpyAsync(d_ops,
+                                   h_ops_f32.data(),
+                                   num_ops * N2 * sizeof(cuFloatComplex),
+                                   cudaMemcpyHostToDevice,
+                                   stream),
+                   "cudaMemcpyAsync(coupling_ops_f32)");
+        if (!use_all_times) {
+            cuda_check(cudaMemcpyAsync(d_time_indices,
+                                       h_time_indices.data(),
+                                       num_times * sizeof(unsigned int),
+                                       cudaMemcpyHostToDevice,
+                                       stream),
+                       "cudaMemcpyAsync(time_indices)");
+        }
+
+        d_F_all = ensure_buffer<cuFloatComplex>(ws.F_all, total_fcr_elems, "cudaMalloc(d_F_all_f32)");
+        d_C_all = ensure_buffer<cuFloatComplex>(ws.C_all, total_fcr_elems, "cudaMalloc(d_C_all_f32)");
+        d_R_all = ensure_buffer<cuFloatComplex>(ws.R_all, total_fcr_elems, "cudaMalloc(d_R_all_f32)");
+
+        const std::size_t out_elems = Nt * Bplan;
+        d_Ftmp = ensure_buffer<cuFloatComplex>(ws.Ftmp, out_elems, "cudaMalloc(d_Ftmp_f32)");
+        d_Ctmp = ensure_buffer<cuFloatComplex>(ws.Ctmp, out_elems, "cudaMalloc(d_Ctmp_f32)");
+        d_Rtmp = ensure_buffer<cuFloatComplex>(ws.Rtmp, out_elems, "cudaMalloc(d_Rtmp_f32)");
+
+        dM = ensure_buffer<cuFloatComplex>(ws.M, N2 * N2, "cudaMalloc(dM_f32)");
+        dI = ensure_buffer<cuFloatComplex>(ws.I, N2 * N2, "cudaMalloc(dI_f32)");
+        dK = ensure_buffer<cuFloatComplex>(ws.K, N2 * N2, "cudaMalloc(dK_f32)");
+        dX = ensure_buffer<cuFloatComplex>(ws.X, N6, "cudaMalloc(dX_f32)");
+        dGW = ensure_buffer<cuFloatComplex>(ws.GW, N2 * N2, "cudaMalloc(dGW_f32)");
+        dL4_all = ensure_buffer<cuFloatComplex>(ws.L4_all, total_out_elems, "cudaMalloc(dL4_all_f32)");
+
+        cuda_fcr::FcrDeviceInputsF32 inputs;
+        inputs.gamma = d_gamma;
+        inputs.omegas = d_omegas;
+        inputs.mirror = d_mirror;
+        inputs.Nt = Nt;
+        inputs.nf = nf;
+        inputs.dt = dt_f32;
+
+        const dim3 block_transpose(kTransposeTile, kTransposeTile);
+        constexpr int block_extract_x = 256;
+        constexpr int block_extract_y = 4;
+        const dim3 block_extract(block_extract_x, block_extract_y);
+        constexpr std::size_t kSmallTimeMemcpyThreshold = 8;
+        const bool use_small_time_memcpy = (!use_all_times && num_times <= kSmallTimeMemcpyThreshold);
+
+        if (cuda_fcr_ms) {
+            cuda_check(cudaEventRecord(ev_fcr_start.ev, stream), "cudaEventRecord(fcr_start)");
+        }
+
+        for (std::size_t i = 0; i < nf; ++i) {
+            for (std::size_t j = 0; j < nf; ++j) {
+                std::size_t k0 = 0;
+                for (; k0 + Bplan <= nf; k0 += Bplan) {
+                    cuda_fcr::FcrBatchF32 b;
+                    b.batch = Bplan;
+                    b.Nfft = Nfft;
+                    b.i = static_cast<int>(i);
+                    b.j = static_cast<int>(j);
+                    b.k0 = static_cast<int>(k0);
+                    b.F = d_Ftmp;
+                    b.C = d_Ctmp;
+                    b.R = d_Rtmp;
+
+                    cuda_fcr::compute_fcr_convolution_batched_f32(inputs, b, fcr_ws, stream);
+
+                    const std::size_t base_idx = (i * nf + j) * nf + k0;
+                    if (use_all_times) {
+                        const dim3 grid_transpose(static_cast<unsigned>((Nt + kTransposeTile - 1) / kTransposeTile),
+                                                  static_cast<unsigned>((Bplan + kTransposeTile - 1) / kTransposeTile));
+                        kernel_extract_time_slices_transpose_f32<<<grid_transpose, block_transpose, 0, stream>>>(
+                            d_Ftmp, d_Ctmp, d_Rtmp,
+                            d_F_all, d_C_all, d_R_all,
+                            Nt, base_idx, Bplan, nf3);
+                        cuda_check(cudaGetLastError(), "kernel_extract_time_slices_transpose_f32 launch");
+                    } else if (use_small_time_memcpy) {
+                        for (std::size_t tpos = 0; tpos < num_times; ++tpos) {
+                            const std::size_t time_index = tids[tpos];
+                            copy_time_column(d_F_all + tpos * nf3 + base_idx,
+                                             d_Ftmp, Nt, Bplan, time_index, stream,
+                                             "cudaMemcpy2DAsync(F_all_f32)");
+                            copy_time_column(d_C_all + tpos * nf3 + base_idx,
+                                             d_Ctmp, Nt, Bplan, time_index, stream,
+                                             "cudaMemcpy2DAsync(C_all_f32)");
+                            copy_time_column(d_R_all + tpos * nf3 + base_idx,
+                                             d_Rtmp, Nt, Bplan, time_index, stream,
+                                             "cudaMemcpy2DAsync(R_all_f32)");
+                        }
+                    } else {
+                        const dim3 grid_extract(static_cast<unsigned>((Bplan + block_extract_x - 1) / block_extract_x),
+                                                static_cast<unsigned>((num_times + block_extract_y - 1) / block_extract_y));
+                        kernel_extract_time_slices_offset_f32<<<grid_extract, block_extract, 0, stream>>>(
+                            d_Ftmp, d_Ctmp, d_Rtmp,
+                            d_F_all, d_C_all, d_R_all,
+                            d_time_indices, num_times, Nt, base_idx, Bplan, nf3);
+                        cuda_check(cudaGetLastError(), "kernel_extract_time_slices_offset_f32 launch");
+                    }
+                }
+
+                if (k0 < nf) {
+                    const std::size_t rem = nf - k0;
+
+                    cuda_fcr::FcrBatchF32 b;
+                    b.batch = rem;
+                    b.Nfft = Nfft;
+                    b.i = static_cast<int>(i);
+                    b.j = static_cast<int>(j);
+                    b.k0 = static_cast<int>(k0);
+                    b.F = d_Ftmp;
+                    b.C = d_Ctmp;
+                    b.R = d_Rtmp;
+
+                    cuda_fcr::compute_fcr_convolution_batched_f32(inputs, b, fcr_ws, stream);
+
+                    const std::size_t base_idx = (i * nf + j) * nf + k0;
+                    if (use_all_times) {
+                        const dim3 grid_transpose(static_cast<unsigned>((Nt + kTransposeTile - 1) / kTransposeTile),
+                                                  static_cast<unsigned>((rem + kTransposeTile - 1) / kTransposeTile));
+                        kernel_extract_time_slices_transpose_f32<<<grid_transpose, block_transpose, 0, stream>>>(
+                            d_Ftmp, d_Ctmp, d_Rtmp,
+                            d_F_all, d_C_all, d_R_all,
+                            Nt, base_idx, rem, nf3);
+                        cuda_check(cudaGetLastError(), "kernel_extract_time_slices_transpose_f32 tail launch");
+                    } else if (use_small_time_memcpy) {
+                        for (std::size_t tpos = 0; tpos < num_times; ++tpos) {
+                            const std::size_t time_index = tids[tpos];
+                            copy_time_column(d_F_all + tpos * nf3 + base_idx,
+                                             d_Ftmp, Nt, rem, time_index, stream,
+                                             "cudaMemcpy2DAsync(F_all_f32 tail)");
+                            copy_time_column(d_C_all + tpos * nf3 + base_idx,
+                                             d_Ctmp, Nt, rem, time_index, stream,
+                                             "cudaMemcpy2DAsync(C_all_f32 tail)");
+                            copy_time_column(d_R_all + tpos * nf3 + base_idx,
+                                             d_Rtmp, Nt, rem, time_index, stream,
+                                             "cudaMemcpy2DAsync(R_all_f32 tail)");
+                        }
+                    } else {
+                        const dim3 grid_extract(static_cast<unsigned>((rem + block_extract_x - 1) / block_extract_x),
+                                                static_cast<unsigned>((num_times + block_extract_y - 1) / block_extract_y));
+                        kernel_extract_time_slices_offset_f32<<<grid_extract, block_extract, 0, stream>>>(
+                            d_Ftmp, d_Ctmp, d_Rtmp,
+                            d_F_all, d_C_all, d_R_all,
+                            d_time_indices, num_times, Nt, base_idx, rem, nf3);
+                        cuda_check(cudaGetLastError(), "kernel_extract_time_slices_offset_f32 tail launch");
+                    }
+                }
+            }
+        }
+
+        if (cuda_fcr_ms) {
+            cuda_check(cudaEventRecord(ev_fcr_stop.ev, stream), "cudaEventRecord(fcr_stop)");
+        }
+
+        cuda_mikx::MikxDeviceInputsF32 in;
+        in.F = d_F_all;
+        in.C = d_C_all;
+        in.R = d_R_all;
+        in.pair_to_freq = d_pair_to_freq;
+        in.N = map.N;
+        in.nf = static_cast<int>(nf);
+
+        cuda_mikx::MikxDeviceOutputsF32 out;
+        out.M = dM;
+        out.I = dI;
+        out.K = dK;
+        out.X = dX;
+
+        constexpr unsigned block = 16;
+        const dim3 block_l4(block, block);
+        const dim3 grid_l4(static_cast<unsigned>((N2 + block_l4.x - 1) / block_l4.x),
+                           static_cast<unsigned>((N2 + block_l4.y - 1) / block_l4.y));
+
+        const std::size_t l4_stride = N2 * N2;
+        for (std::size_t out_idx = 0; out_idx < num_times; ++out_idx) {
+            in.F = d_F_all + out_idx * nf3;
+            in.C = d_C_all + out_idx * nf3;
+            in.R = d_R_all + out_idx * nf3;
+
+            cuda_mikx::build_mikx_device_f32(in, out, stream);
+
+            assemble_liouvillian_cuda_device_raw_f32(dM, dI, dK, dX, d_ops,
+                                                     map.N, static_cast<int>(num_ops), dGW, stream);
+
+            cuFloatComplex* dL4_out = dL4_all + out_idx * l4_stride;
+            kernel_gw_raw_sym_to_liouvillian_f32<<<grid_l4, block_l4, 0, stream>>>(dGW, dL4_out, map.N);
+            cuda_check(cudaGetLastError(), "kernel_gw_raw_sym_to_liouvillian_f32 launch");
+        }
+
+        std::vector<cuFloatComplex> hL4(total_out_elems);
+        cuda_check(cudaMemcpyAsync(hL4.data(), dL4_all, total_out_elems * sizeof(cuFloatComplex),
+                                   cudaMemcpyDeviceToHost, stream), "cudaMemcpyAsync(L4_all_f32)");
+        cuda_check(cudaStreamSynchronize(stream), "cudaStreamSynchronize");
+
+        if (cuda_fcr_ms) {
+            float ms = 0.0f;
+            cuda_check(cudaEventElapsedTime(&ms, ev_fcr_start.ev, ev_fcr_stop.ev),
+                       "cudaEventElapsedTime(fcr)");
+            *cuda_fcr_ms = static_cast<double>(ms);
+        }
+
+        std::vector<Eigen::MatrixXcd> out_series;
+        out_series.resize(tids.size());
+        for (std::size_t idx = 0; idx < tids.size(); ++idx) {
+            Eigen::MatrixXcd L4(static_cast<Eigen::Index>(N2), static_cast<Eigen::Index>(N2));
+            const cuFloatComplex* src = hL4.data() + idx * l4_stride;
+            std::complex<double>* dst = L4.data();
+            for (std::size_t e = 0; e < l4_stride; ++e) {
+                dst[e] = std::complex<double>(static_cast<double>(src[e].x), static_cast<double>(src[e].y));
+            }
+            out_series[idx] = std::move(L4);
+        }
+
+        return out_series;
+    }
 
     cuda_check(cudaSetDevice(exec.gpu_id), "cudaSetDevice");
     FusedCudaWorkspace& ws = get_fused_workspace(exec.gpu_id);

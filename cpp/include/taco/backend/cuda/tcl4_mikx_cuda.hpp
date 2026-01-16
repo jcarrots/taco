@@ -29,6 +29,15 @@ struct MikxDeviceInputs {
     int nf{0};
 };
 
+struct MikxDeviceInputsF32 {
+    const cuFloatComplex* F{nullptr}; // [nf^3]
+    const cuFloatComplex* C{nullptr}; // [nf^3]
+    const cuFloatComplex* R{nullptr}; // [nf^3]
+    const int* pair_to_freq{nullptr}; // [N*N] column-major (a + b*N)
+    int N{0};
+    int nf{0};
+};
+
 // Device-side outputs in the same indexing/layout conventions used by the CPU reference:
 // - M/I/K are (N^2 x N^2) matrices in Eigen's default column-major layout.
 // - X is a length N^6 vector in column-major flat6 order:
@@ -40,10 +49,21 @@ struct MikxDeviceOutputs {
     cuDoubleComplex* X{nullptr}; // [N^6]
 };
 
+struct MikxDeviceOutputsF32 {
+    cuFloatComplex* M{nullptr}; // [N^4]
+    cuFloatComplex* I{nullptr}; // [N^4]
+    cuFloatComplex* K{nullptr}; // [N^4]
+    cuFloatComplex* X{nullptr}; // [N^6]
+};
+
 // Compute M/I/K/X on the GPU given flattened F/C/R at a single time index.
 void build_mikx_device(const MikxDeviceInputs& inputs,
                        const MikxDeviceOutputs& outputs,
                        cudaStream_t stream);
+
+void build_mikx_device_f32(const MikxDeviceInputsF32& inputs,
+                           const MikxDeviceOutputsF32& outputs,
+                           cudaStream_t stream);
 
 } // namespace taco::tcl4::cuda_mikx
 

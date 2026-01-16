@@ -26,6 +26,16 @@ struct FcrDeviceInputs {
     double dt{0.0};
 };
 
+// FP32 variant (cuFloatComplex).
+struct FcrDeviceInputsF32 {
+    const cuFloatComplex* gamma{nullptr}; // [Nt, nf] column-major: gamma[t + Nt*b]
+    const float* omegas{nullptr};         // [nf]
+    const int* mirror{nullptr};           // [nf]
+    std::size_t Nt{0};
+    std::size_t nf{0};
+    float dt{0.0f};
+};
+
 struct FcrBatch {
     std::size_t batch{0};
     std::size_t Nfft{0};
@@ -42,6 +52,19 @@ struct FcrBatch {
     cuDoubleComplex* F{nullptr}; // [Nt, batch]
     cuDoubleComplex* C{nullptr}; // [Nt, batch]
     cuDoubleComplex* R{nullptr}; // [Nt, batch]
+};
+
+struct FcrBatchF32 {
+    std::size_t batch{0};
+    std::size_t Nfft{0};
+
+    int i{0};
+    int j{0};
+    int k0{0};
+
+    cuFloatComplex* F{nullptr}; // [Nt, batch]
+    cuFloatComplex* C{nullptr}; // [Nt, batch]
+    cuFloatComplex* R{nullptr}; // [Nt, batch]
 };
 
 // Persistent CUDA workspace for the convolution/FFT method.
@@ -77,6 +100,30 @@ void launch_axpby(const cuDoubleComplex* x,
                   cuDoubleComplex b,
                   cudaStream_t stream);
 
+// FP32 workspace + helpers.
+struct FcrWorkspaceF32 {
+    cufftHandle plan{0};
+    std::size_t plan_batch{0};
+    std::size_t plan_Nfft{0};
+
+    cuFloatComplex* A{nullptr};
+    cuFloatComplex* B{nullptr};
+    cuFloatComplex* B_conj{nullptr};
+
+    void* scan_tmp{nullptr};
+    std::size_t scan_tmp_bytes{0};
+};
+
+void launch_scale_f32(cuFloatComplex* data, std::size_t n, float scale, cudaStream_t stream);
+void launch_pointwise_mul_f32(cuFloatComplex* inout, const cuFloatComplex* other, std::size_t n, cudaStream_t stream);
+void launch_axpby_f32(const cuFloatComplex* x,
+                      const cuFloatComplex* y,
+                      cuFloatComplex* out,
+                      std::size_t n,
+                      cuFloatComplex a,
+                      cuFloatComplex b,
+                      cudaStream_t stream);
+
 // Compute a batch of F/C/R time-series values on the GPU for fixed (i,j) and contiguous k.
 //
 // Batch mapping:
@@ -89,6 +136,11 @@ void compute_fcr_convolution_batched(const FcrDeviceInputs& inputs,
                                      const FcrBatch& batch,
                                      FcrWorkspace& ws,
                                      cudaStream_t stream);
+
+void compute_fcr_convolution_batched_f32(const FcrDeviceInputsF32& inputs,
+                                         const FcrBatchF32& batch,
+                                         FcrWorkspaceF32& ws,
+                                         cudaStream_t stream);
 
 } // namespace taco::tcl4::cuda_fcr
 #endif

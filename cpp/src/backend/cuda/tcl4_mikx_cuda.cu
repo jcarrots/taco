@@ -25,6 +25,14 @@ __device__ __forceinline__ cuDoubleComplex cd_sub(cuDoubleComplex a, cuDoubleCom
     return make_cuDoubleComplex(a.x - b.x, a.y - b.y);
 }
 
+__device__ __forceinline__ cuFloatComplex cf_add(cuFloatComplex a, cuFloatComplex b) {
+    return make_cuFloatComplex(a.x + b.x, a.y + b.y);
+}
+
+__device__ __forceinline__ cuFloatComplex cf_sub(cuFloatComplex a, cuFloatComplex b) {
+    return make_cuFloatComplex(a.x - b.x, a.y - b.y);
+}
+
 __device__ __forceinline__ std::size_t idx3(std::size_t nf, int i, int j, int k) {
     return (static_cast<std::size_t>(i) * nf + static_cast<std::size_t>(j)) * nf + static_cast<std::size_t>(k);
 }
@@ -108,6 +116,75 @@ __global__ void kernel_build_mikx_fused(const cuDoubleComplex* __restrict__ F,
     }
 }
 
+__global__ void kernel_build_mikx_fused_f32(const cuFloatComplex* __restrict__ F,
+                                            const cuFloatComplex* __restrict__ C,
+                                            const cuFloatComplex* __restrict__ R,
+                                            const int* __restrict__ pair_to_freq,
+                                            int N,
+                                            int nf,
+                                            cuFloatComplex* __restrict__ M,
+                                            cuFloatComplex* __restrict__ I,
+                                            cuFloatComplex* __restrict__ K,
+                                            cuFloatComplex* __restrict__ X)
+{
+    const std::size_t tid = static_cast<std::size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    const std::size_t stride = static_cast<std::size_t>(blockDim.x) * gridDim.x;
+
+    const std::size_t N_u = static_cast<std::size_t>(N);
+    const std::size_t N2 = N_u * N_u;
+    const std::size_t N4 = N2 * N2;
+    const std::size_t N6 = N4 * N2;
+    const std::size_t nf_u = static_cast<std::size_t>(nf);
+
+    for (std::size_t idx = tid; idx < N4; idx += stride) {
+        const std::size_t row_u = idx % N2;
+        const std::size_t col_u = idx / N2;
+
+        const std::size_t j_u = row_u % N_u;
+        const std::size_t k_u = row_u / N_u;
+        const std::size_t p_u = col_u % N_u;
+        const std::size_t q_u = col_u / N_u;
+
+        const std::size_t jk = row_u;
+        const std::size_t jq = j_u + N_u * q_u;
+        const std::size_t pj = p_u + N_u * j_u;
+        const std::size_t pq = col_u;
+        const std::size_t qk = q_u + N_u * k_u;
+        const std::size_t kq = k_u + N_u * q_u;
+        const std::size_t qp = q_u + N_u * p_u;
+        const std::size_t qj = q_u + N_u * j_u;
+
+        const int f_jk = pair_to_freq[jk];
+        const int f_jq = pair_to_freq[jq];
+        const int f_pj = pair_to_freq[pj];
+        const int f_pq = pair_to_freq[pq];
+        const int f_qk = pair_to_freq[qk];
+        const int f_kq = pair_to_freq[kq];
+        const int f_qp = pair_to_freq[qp];
+        const int f_qj = pair_to_freq[qj];
+
+        const cuFloatComplex M1 = F[idx3(nf_u, f_jq, f_jk, f_pj)];
+        const cuFloatComplex M2 = R[idx3(nf_u, f_jq, f_pq, f_qk)];
+        M[idx] = cf_sub(M1, M2);
+
+        I[idx] = F[idx3(nf_u, f_jk, f_qp, f_kq)];
+        K[idx] = R[idx3(nf_u, f_jk, f_pq, f_qj)];
+    }
+
+    for (std::size_t idx = tid; idx < N6; idx += stride) {
+        const std::size_t jk = idx % N2;
+        const std::size_t pq = (idx / N2) % N2;
+        const std::size_t rs = idx / N4;
+
+        const int f_jk = pair_to_freq[jk];
+        const int f_pq = pair_to_freq[pq];
+        const int f_rs = pair_to_freq[rs];
+
+        const std::size_t fidx = idx3(nf_u, f_jk, f_pq, f_rs);
+        X[idx] = cf_add(C[fidx], R[fidx]);
+    }
+}
+
 } // namespace
 
 void build_mikx_device(const MikxDeviceInputs& inputs,
@@ -141,6 +218,38 @@ void build_mikx_device(const MikxDeviceInputs& inputs,
         outputs.K,
         outputs.X);
     cuda_check(cudaGetLastError(), "kernel_build_mikx_fused launch");
+}
+
+void build_mikx_device_f32(const MikxDeviceInputsF32& inputs,
+                           const MikxDeviceOutputsF32& outputs,
+                           cudaStream_t stream)
+{
+    if (inputs.N <= 0) throw std::invalid_argument("build_mikx_device_f32: N must be > 0");
+    if (inputs.nf <= 0) throw std::invalid_argument("build_mikx_device_f32: nf must be > 0");
+    if (!inputs.F || !inputs.C || !inputs.R) throw std::invalid_argument("build_mikx_device_f32: null F/C/R");
+    if (!inputs.pair_to_freq) throw std::invalid_argument("build_mikx_device_f32: null pair_to_freq");
+    if (!outputs.M || !outputs.I || !outputs.K || !outputs.X) throw std::invalid_argument("build_mikx_device_f32: null outputs");
+
+    constexpr int block = 256;
+    const std::size_t N_u = static_cast<std::size_t>(inputs.N);
+    const std::size_t N2 = N_u * N_u;
+    const std::size_t N4 = N2 * N2;
+    const std::size_t N6 = N4 * N2;
+    const std::size_t total = (N6 > N4) ? N6 : N4;
+
+    const dim3 grid(static_cast<unsigned>((total + block - 1) / block));
+    kernel_build_mikx_fused_f32<<<grid, block, 0, stream>>>(
+        inputs.F,
+        inputs.C,
+        inputs.R,
+        inputs.pair_to_freq,
+        inputs.N,
+        inputs.nf,
+        outputs.M,
+        outputs.I,
+        outputs.K,
+        outputs.X);
+    cuda_check(cudaGetLastError(), "kernel_build_mikx_fused_f32 launch");
 }
 
 } // namespace taco::tcl4::cuda_mikx

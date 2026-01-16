@@ -46,6 +46,28 @@ __device__ __forceinline__ cuDoubleComplex cd_neg(cuDoubleComplex a) {
     return make_cuDoubleComplex(-a.x, -a.y);
 }
 
+__device__ __forceinline__ cuFloatComplex cf_add(cuFloatComplex a, cuFloatComplex b) {
+    return make_cuFloatComplex(a.x + b.x, a.y + b.y);
+}
+
+__device__ __forceinline__ cuFloatComplex cf_sub(cuFloatComplex a, cuFloatComplex b) {
+    return make_cuFloatComplex(a.x - b.x, a.y - b.y);
+}
+
+__device__ __forceinline__ cuFloatComplex cf_mul(cuFloatComplex a, cuFloatComplex b) {
+    const float real = fmaf(a.x, b.x, -a.y * b.y);
+    const float imag = fmaf(a.x, b.y, a.y * b.x);
+    return make_cuFloatComplex(real, imag);
+}
+
+__device__ __forceinline__ cuFloatComplex cf_conj(cuFloatComplex a) {
+    return make_cuFloatComplex(a.x, -a.y);
+}
+
+__device__ __forceinline__ cuFloatComplex cf_neg(cuFloatComplex a) {
+    return make_cuFloatComplex(-a.x, -a.y);
+}
+
 inline int read_env_int(const char* name, int fallback) {
 #ifdef _MSC_VER
     char* buf = nullptr;
@@ -226,6 +248,243 @@ __device__ __forceinline__ cuDoubleComplex compute_gw_sum(const cuDoubleComplex*
     return res;
 }
 
+template <bool Diag>
+__device__ __forceinline__ cuFloatComplex compute_gw_sum_f32(const cuFloatComplex* __restrict__ M,
+                                                             const cuFloatComplex* __restrict__ I,
+                                                             const cuFloatComplex* __restrict__ K,
+                                                             const cuFloatComplex* __restrict__ X,
+                                                             const cuFloatComplex* __restrict__ coupling,
+                                                             int N,
+                                                             int num_ops,
+                                                             std::size_t N_u,
+                                                             std::size_t N2,
+                                                             std::size_t N3,
+                                                             std::size_t N4,
+                                                             std::size_t N5,
+                                                             std::size_t n_u,
+                                                             std::size_t i_u,
+                                                             std::size_t j_u,
+                                                             std::size_t m_u)
+{
+    const std::size_t nN = n_u * N_u;
+    const std::size_t iN = i_u * N_u;
+    const std::size_t jN2 = j_u * N2;
+    const std::size_t mN3 = m_u * N3;
+    const std::size_t nN4 = n_u * N4;
+    const std::size_t iN5 = i_u * N5;
+    const std::size_t base_anjbni = nN + jN2 + nN4 + iN5;
+    const std::size_t base_iajbni = i_u + jN2 + nN4 + iN5;
+    const std::size_t base_bajmai = jN2 + mN3 + iN5;
+    const std::size_t base_ibjmai = i_u + jN2 + mN3 + iN5;
+    const std::size_t N4_plus_N = N4 + N_u;
+
+    cuFloatComplex res = make_cuFloatComplex(0.0f, 0.0f);
+
+    for (int iA = 0; iA < num_ops; ++iA) {
+        const cuFloatComplex* __restrict__ A = coupling + static_cast<std::size_t>(iA) * N2;
+        const cuFloatComplex* __restrict__ A_col_m = A + m_u * N_u;
+        const cuFloatComplex* __restrict__ A_col_i = A + i_u * N_u;
+        const cuFloatComplex A_jm = A_col_m[j_u];
+        for (int iB = 0; iB < num_ops; ++iB) {
+            const cuFloatComplex* __restrict__ B = coupling + static_cast<std::size_t>(iB) * N2;
+            const cuFloatComplex* __restrict__ B_col_m = B + m_u * N_u;
+            const cuFloatComplex* __restrict__ B_col_i = B + i_u * N_u;
+            const cuFloatComplex B_jm = B_col_m[j_u];
+            for (int a = 0; a < N; ++a) {
+                const std::size_t a_u = static_cast<std::size_t>(a);
+                const std::size_t aN = a_u * N_u;
+                const std::size_t col_na = n_u + aN;
+                const std::size_t row_an = a_u + nN;
+                const cuFloatComplex* __restrict__ A_col_a = A + aN;
+                const cuFloatComplex* __restrict__ B_col_a = B + aN;
+                const cuFloatComplex A_na = A_col_a[n_u];
+                const cuFloatComplex B_na = B_col_a[n_u];
+                const cuFloatComplex A_ai = A_col_i[a_u];
+                const cuFloatComplex B_ai = B_col_i[a_u];
+                for (int b = 0; b < N; ++b) {
+                    const std::size_t b_u = static_cast<std::size_t>(b);
+                    const std::size_t bN = b_u * N_u;
+                    const std::size_t row_bi = b_u + iN;
+                    const std::size_t row_ib = i_u + bN;
+                    const std::size_t col_ib = i_u + bN;
+                    const cuFloatComplex* __restrict__ A_col_b = A + bN;
+                    const cuFloatComplex* __restrict__ B_col_b = B + bN;
+                    const cuFloatComplex A_ab = A_col_b[a_u];
+                    const cuFloatComplex B_ab = B_col_b[a_u];
+                    const cuFloatComplex A_bi = A_col_i[b_u];
+                    const cuFloatComplex B_bi = B_col_i[b_u];
+                    const cuFloatComplex A_bm = A_col_m[b_u];
+                    const cuFloatComplex B_jb = B_col_b[j_u];
+
+                    const std::size_t idx_M = row_bi + col_na * N2;
+                    const std::size_t idx_I = row_an + col_ib * N2;
+                    const std::size_t idx_K = row_ib + col_na * N2;
+
+                    const cuFloatComplex M_bi_na = M[idx_M];
+                    const cuFloatComplex I_an_ib = I[idx_I];
+                    const cuFloatComplex K_ib_na = K[idx_K];
+
+                    const std::size_t idx_anjbni = base_anjbni + bN + a_u * N4_plus_N;
+                    const std::size_t idx_iajbni = base_iajbni + bN + a_u * N4_plus_N;
+                    const std::size_t idx_bajmai = base_bajmai + a_u * N_u + b_u * N4_plus_N;
+                    const std::size_t idx_ibjmai = base_ibjmai + bN + a_u * N4_plus_N;
+
+                    const cuFloatComplex X_anjbni = X[idx_anjbni];
+                    const cuFloatComplex X_iajbni = X[idx_iajbni];
+                    const cuFloatComplex X_bajmai = X[idx_bajmai];
+                    const cuFloatComplex X_ibjmai = X[idx_ibjmai];
+
+                    const cuFloatComplex t1 = cf_mul(B_na, cf_mul(A_ab, cf_mul(B_bi, cf_mul(A_jm, M_bi_na))));
+                    const cuFloatComplex t2 = cf_mul(A_na, cf_mul(B_ab, cf_mul(B_bi, cf_mul(A_jm, I_an_ib))));
+                    const cuFloatComplex t3 = cf_mul(B_na, cf_mul(B_ab, cf_mul(A_bi, cf_mul(A_jm, K_ib_na))));
+                    const cuFloatComplex t4 = cf_mul(A_na, cf_mul(B_ai, cf_mul(B_jb, cf_mul(A_bm, X_anjbni))));
+                    const cuFloatComplex t5 = cf_mul(B_na, cf_mul(A_ai, cf_mul(B_jb, cf_mul(A_bm, X_iajbni))));
+                    const cuFloatComplex t6 = cf_mul(A_na, cf_mul(A_ab, cf_mul(B_bi, cf_mul(B_jm, X_bajmai))));
+                    const cuFloatComplex t7 = cf_mul(A_na, cf_mul(B_ab, cf_mul(A_bi, cf_mul(B_jm, X_ibjmai))));
+
+                    cuFloatComplex tmp = cf_add(cf_sub(t1, t2), cf_add(t3, t4));
+                    tmp = cf_sub(tmp, t5);
+                    tmp = cf_sub(tmp, t6);
+                    tmp = cf_add(tmp, t7);
+                    res = cf_sub(res, tmp);
+                }
+            }
+
+            if constexpr (Diag) {
+                for (int a = 0; a < N; ++a) {
+                    const std::size_t a_u = static_cast<std::size_t>(a);
+                    const std::size_t aN = a_u * N_u;
+                    const std::size_t row_ba_base = aN;
+                    const cuFloatComplex* __restrict__ A_col_a = A + aN;
+                    const cuFloatComplex A_na = A_col_a[n_u];
+                    for (int b = 0; b < N; ++b) {
+                        const std::size_t b_u = static_cast<std::size_t>(b);
+                        const std::size_t bN = b_u * N_u;
+                        const std::size_t col_ab = a_u + bN;
+                        const std::size_t row_ba = b_u + row_ba_base;
+                        const cuFloatComplex* __restrict__ A_col_b = A + bN;
+                        const cuFloatComplex* __restrict__ B_col_b = B + bN;
+                        const cuFloatComplex A_ab = A_col_b[a_u];
+                        const cuFloatComplex B_ab = B_col_b[a_u];
+                        for (int c = 0; c < N; ++c) {
+                            const std::size_t c_u = static_cast<std::size_t>(c);
+                            const std::size_t cN = c_u * N_u;
+                            const std::size_t row_ci = c_u + iN;
+                            const std::size_t row_ic = i_u + cN;
+                            const std::size_t col_ic = i_u + cN;
+                            const cuFloatComplex* __restrict__ A_col_c = A + cN;
+                            const cuFloatComplex* __restrict__ B_col_c = B + cN;
+                            const cuFloatComplex A_bc = A_col_c[b_u];
+                            const cuFloatComplex B_bc = B_col_c[b_u];
+                            const cuFloatComplex A_ci = A_col_i[c_u];
+                            const cuFloatComplex B_ci = B_col_i[c_u];
+
+                            const std::size_t idx_M = row_ci + col_ab * N2;
+                            const std::size_t idx_K = row_ic + col_ab * N2;
+                            const std::size_t idx_I = row_ba + col_ic * N2;
+
+                            const cuFloatComplex M_ci_ab = M[idx_M];
+                            const cuFloatComplex K_ic_ab = K[idx_K];
+                            const cuFloatComplex I_ba_ic = I[idx_I];
+
+                            const cuFloatComplex add1 =
+                                cf_mul(A_na, cf_mul(B_ab, cf_mul(A_bc, cf_mul(B_ci, M_ci_ab))));
+                            const cuFloatComplex add2 =
+                                cf_mul(A_na, cf_mul(B_ab, cf_mul(B_bc, cf_mul(A_ci, K_ic_ab))));
+                            const cuFloatComplex add3 =
+                                cf_neg(cf_mul(A_na, cf_mul(A_ab, cf_mul(B_bc, cf_mul(B_ci, I_ba_ic)))));
+
+                            res = cf_add(res, cf_add(add1, cf_add(add2, add3)));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    return res;
+}
+
+__global__ void kernel_assemble_gw_raw_f32(const cuFloatComplex* __restrict__ M,
+                                          const cuFloatComplex* __restrict__ I,
+                                          const cuFloatComplex* __restrict__ K,
+                                          const cuFloatComplex* __restrict__ X,
+                                          const cuFloatComplex* __restrict__ coupling,
+                                          int N,
+                                          int num_ops,
+                                          cuFloatComplex* __restrict__ GW)
+{
+    const std::size_t N_u = static_cast<std::size_t>(N);
+    const std::size_t N2 = N_u * N_u;
+    const std::size_t N3 = N2 * N_u;
+    const std::size_t N4 = N2 * N2;
+    const std::size_t N5 = N4 * N_u;
+    const std::size_t idx = static_cast<std::size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    const std::size_t total = N2 * N2;
+    if (idx >= total) return;
+
+    const std::size_t col_u = idx / N2;
+    const std::size_t row_u = idx - col_u * N2;
+
+    const std::size_t i_u = row_u / N_u;
+    const std::size_t n_u = row_u - i_u * N_u;
+    const std::size_t j_u = col_u / N_u;
+    const std::size_t m_u = col_u - j_u * N_u;
+
+    const bool is_diag = (j_u == m_u);
+    const cuFloatComplex res = is_diag
+                                    ? compute_gw_sum_f32<true>(M,
+                                                              I,
+                                                              K,
+                                                              X,
+                                                              coupling,
+                                                              N,
+                                                              num_ops,
+                                                              N_u,
+                                                              N2,
+                                                              N3,
+                                                              N4,
+                                                              N5,
+                                                              n_u,
+                                                              i_u,
+                                                              j_u,
+                                                              m_u)
+                                    : compute_gw_sum_f32<false>(M,
+                                                               I,
+                                                               K,
+                                                               X,
+                                                               coupling,
+                                                               N,
+                                                               num_ops,
+                                                               N_u,
+                                                               N2,
+                                                               N3,
+                                                               N4,
+                                                               N5,
+                                                               n_u,
+                                                               i_u,
+                                                               j_u,
+                                                               m_u);
+    GW[idx] = res;
+}
+
+__global__ void kernel_symmetrize_gw_f32(cuFloatComplex* __restrict__ GW, std::size_t N2) {
+    const std::size_t idx = static_cast<std::size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    const std::size_t total = N2 * N2;
+    if (idx >= total) return;
+    const std::size_t col = idx / N2;
+    const std::size_t row = idx - col * N2;
+    if (row > col) return;
+
+    const cuFloatComplex t_rc = GW[row + col * N2];
+    const cuFloatComplex t_cr = GW[col + row * N2];
+    const cuFloatComplex g_rc = cf_add(t_rc, cf_conj(t_cr));
+    GW[row + col * N2] = g_rc;
+    if (row != col) {
+        GW[col + row * N2] = cf_conj(g_rc);
+    }
+}
+
 __global__ void kernel_assemble_gw_raw(const cuDoubleComplex* __restrict__ M,
                                       const cuDoubleComplex* __restrict__ I,
                                       const cuDoubleComplex* __restrict__ K,
@@ -367,6 +626,57 @@ void assemble_liouvillian_cuda_device_raw(const cuDoubleComplex* dM,
     const dim3 grid(static_cast<unsigned>((total + block - 1) / block));
     kernel_assemble_gw_raw<<<grid, block, 0, stream>>>(dM, dI, dK, dX, d_ops, N, num_ops, dGW_raw);
     cuda_check(cudaGetLastError(), "kernel_assemble_gw_raw launch");
+}
+
+void assemble_liouvillian_cuda_device_f32(const cuFloatComplex* dM,
+                                          const cuFloatComplex* dI,
+                                          const cuFloatComplex* dK,
+                                          const cuFloatComplex* dX,
+                                          const cuFloatComplex* d_ops,
+                                          int N,
+                                          int num_ops,
+                                          cuFloatComplex* dGW,
+                                          cudaStream_t stream)
+{
+    assemble_liouvillian_cuda_device_raw_f32(dM, dI, dK, dX, d_ops, N, num_ops, dGW, stream);
+
+    const std::size_t N_u = static_cast<std::size_t>(N);
+    const std::size_t N2 = N_u * N_u;
+    constexpr int block = 128;
+    const std::size_t total = N2 * N2;
+    const dim3 grid(static_cast<unsigned>((total + block - 1) / block));
+    kernel_symmetrize_gw_f32<<<grid, block, 0, stream>>>(dGW, N2);
+    cuda_check(cudaGetLastError(), "kernel_symmetrize_gw_f32 launch");
+}
+
+void assemble_liouvillian_cuda_device_raw_f32(const cuFloatComplex* dM,
+                                              const cuFloatComplex* dI,
+                                              const cuFloatComplex* dK,
+                                              const cuFloatComplex* dX,
+                                              const cuFloatComplex* d_ops,
+                                              int N,
+                                              int num_ops,
+                                              cuFloatComplex* dGW_raw,
+                                              cudaStream_t stream)
+{
+    if (N <= 0) {
+        throw std::invalid_argument("assemble_liouvillian_cuda_device_raw_f32: N must be > 0");
+    }
+    if (num_ops <= 0) {
+        throw std::invalid_argument("assemble_liouvillian_cuda_device_raw_f32: num_ops must be > 0");
+    }
+    if (!dM || !dI || !dK || !dX || !d_ops || !dGW_raw) {
+        throw std::invalid_argument("assemble_liouvillian_cuda_device_raw_f32: null device pointer");
+    }
+
+    const std::size_t N_u = static_cast<std::size_t>(N);
+    const std::size_t N2 = N_u * N_u;
+
+    constexpr int block = 128;
+    const std::size_t total = N2 * N2;
+    const dim3 grid(static_cast<unsigned>((total + block - 1) / block));
+    kernel_assemble_gw_raw_f32<<<grid, block, 0, stream>>>(dM, dI, dK, dX, d_ops, N, num_ops, dGW_raw);
+    cuda_check(cudaGetLastError(), "kernel_assemble_gw_raw_f32 launch");
 }
 
 Eigen::MatrixXcd assemble_liouvillian_cuda(const MikxTensors& tensors,

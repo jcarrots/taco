@@ -12,13 +12,22 @@ include(FetchContent)
 option(TACO_WITH_OPENMP "Enable OpenMP parallelization" ON)
 option(TACO_WITH_MPI "Enable MPI distributed backend" OFF)
 option(TACO_WITH_CUDA "Enable CUDA backend (requires NVIDIA CUDA Toolkit)" OFF)
-option(TACO_BUILD_PYTHON "Build Python extension module" ON)
+option(TACO_BUILD_CUDA "Enable CUDA backend (alias for TACO_WITH_CUDA)" OFF)
+option(TACO_BUILD_PYTHON "Build Python extension module" OFF)
 option(TACO_BUILD_GAMMA_TESTS "Build gamma_tests executable" ON)
+
+if (TACO_BUILD_CUDA)
+  set(TACO_WITH_CUDA ON CACHE BOOL "Enable CUDA backend (requires NVIDIA CUDA Toolkit)" FORCE)
+endif()
 
 if (TACO_WITH_CUDA)
   include(CheckLanguage)
   check_language(CUDA)
   if (CMAKE_CUDA_COMPILER)
+    # Default to building for the local GPU to avoid PTX JIT/toolchain mismatches at runtime.
+    if (NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
+      set(CMAKE_CUDA_ARCHITECTURES native)
+    endif()
     enable_language(CUDA)
     set(CMAKE_CUDA_STANDARD 17)
     set(CMAKE_CUDA_STANDARD_REQUIRED ON)
@@ -59,10 +68,11 @@ if (TACO_WITH_CUDA AND CMAKE_CUDA_COMPILER)
     cpp/src/backend/cuda/tcl4_fused_cuda.cu
     cpp/src/backend/cuda/tcl4_kernels_cuda.cu
     cpp/src/backend/cuda/tcl4_mikx_cuda.cu
+    cpp/src/backend/cuda/rk4_dense_cuda.cu
   )
   target_compile_definitions(taco_tcl PUBLIC TACO_HAS_CUDA=1)
   target_compile_definitions(taco_tcl PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:EIGEN_NO_CUDA>)
-  target_link_libraries(taco_tcl PUBLIC CUDA::cudart CUDA::cufft)
+  target_link_libraries(taco_tcl PUBLIC CUDA::cudart CUDA::cufft CUDA::cublas)
 endif()
 
 if (TACO_WITH_OPENMP)
@@ -110,7 +120,7 @@ endif()
 # FFT backend: built-in radix-2 FFT (pocketfft disabled)
 
 if (TACO_BUILD_PYTHON)
-  find_package(Python COMPONENTS Interpreter Development REQUIRED)
+  find_package(Python COMPONENTS Interpreter Development NumPy REQUIRED)
 
   FetchContent_Declare(
     pybind11
@@ -119,17 +129,24 @@ if (TACO_BUILD_PYTHON)
   )
   FetchContent_MakeAvailable(pybind11)
 
-  pybind11_add_module(_taco_native
-    cpp/python/_taco_native.cpp
+  pybind11_add_module(_taco
+    cpp/python/_taco.cpp
   )
-  target_link_libraries(_taco_native PRIVATE taco_tcl)
+  target_link_libraries(_taco PRIVATE taco_tcl Python::NumPy)
 
   set_target_properties(taco_tcl PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
-  set_target_properties(_taco_native PROPERTIES
-    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/python/taco"
-    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/python/taco"
+  install(TARGETS _taco
+    LIBRARY DESTINATION taco
+    RUNTIME DESTINATION taco
   )
+
+  if (NOT DEFINED SKBUILD)
+    set_target_properties(_taco PROPERTIES
+      LIBRARY_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/python/taco"
+      RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/python/taco"
+    )
+  endif()
 endif()
 
 find_package(yaml-cpp CONFIG QUIET)
@@ -181,6 +198,10 @@ add_executable(tcl4_e2e_cuda_compare tests/tcl4_e2e_cuda_compare.cpp)
 if (TACO_WITH_CUDA AND CMAKE_CUDA_COMPILER)
   add_executable(cuda_smoke tests/cuda_smoke.cu)
   target_link_libraries(cuda_smoke PRIVATE CUDA::cudart)
+
+  add_executable(rk4_dense_cuda_smoke tests/rk4_dense_cuda_smoke.cu)
+  target_link_libraries(rk4_dense_cuda_smoke PRIVATE taco_tcl)
+  target_include_directories(rk4_dense_cuda_smoke PRIVATE cpp/include)
 endif()
 
 if (TACO_BUILD_GAMMA_TESTS)

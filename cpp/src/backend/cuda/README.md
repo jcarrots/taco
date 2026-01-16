@@ -10,8 +10,15 @@ Status
 Usage
 -----
 - Build with `-DTACO_WITH_CUDA=ON` (defines `TACO_HAS_CUDA`).
-- Select with `Exec{backend=Backend::Cuda, gpu_id, streams, pinned}`.
+- Select with `Exec{backend=Backend::Cuda, gpu_id, streams, pinned, cuda_precision}`.
   - Current implementation uses a single stream and honors `gpu_id` and `pinned`.
+- Precision:
+  - Default is FP64 (`exec.cuda_precision = CudaPrecision::Fp64`).
+  - Set `exec.cuda_precision = CudaPrecision::Fp32` to run the FP32 CUDA kernels (casts inputs on upload and outputs on download).
+- Dense RK4 integrator: `taco/backend/cuda/rk4_dense_cuda.hpp`:
+  - FP64: `rk4_update_cuda` (`cuDoubleComplex`, `double dt`)
+  - FP32: `rk4_update_cuda_f32` (`cuFloatComplex`, `float dt`)
+  - Matvec backend selection: `Rk4DenseCudaMethod::{WarpKernel,CublasGemv}`
 - Fused L4 helpers:
   - `build_TCL4_generator_cuda_fused(...)` for a single time index.
   - `build_TCL4_generator_cuda_fused_batch(...)` for multiple time indices in one call.
@@ -32,6 +39,7 @@ Recent optimizations
 - CUDA Graphs: capture/replay the fixed MIKX -> GW -> L4 launch sequence to reduce host-side launch overhead.
   - Disable with `TCL4_USE_CUDA_GRAPH=0`.
   - Diagnostics with `TCL4_CUDA_GRAPH_VERBOSE=1`.
+  - Note: currently only enabled for the FP64 fused path.
 
 Performance
 -----------
@@ -40,10 +48,12 @@ Performance
 - CUDA Graphs help when the per-time MIKX/GW/L4 stage is dominated by kernel-launch overhead (many small time steps).
   - Repro (PowerShell, Release build):
     - Note: the compare tool uses `--threads=...` (plural).
+    - For perf-only runs (especially FP32), add `--no_check` / `--no-check` to avoid failing on CPU vs GPU mismatches.
     - Graphs off:
-      - `$env:TCL4_USE_CUDA_GRAPH=0; $env:TCL4_CUDA_GRAPH_VERBOSE=0; .\build-cuda-vs\Release\tcl4_e2e_cuda_compare.exe --N=200000 --tidx=0:1:10000 --gpu_warmup=1 --threads=8`
+      - FP64: `$env:TCL4_USE_CUDA_GRAPH=0; $env:TCL4_CUDA_GRAPH_VERBOSE=0; .\build-cuda-vs\Release\tcl4_e2e_cuda_compare.exe --N=200000 --tidx=0:1:10000 --gpu_warmup=1 --threads=8 --precision=fp64`
+      - FP32: `$env:TCL4_USE_CUDA_GRAPH=0; $env:TCL4_CUDA_GRAPH_VERBOSE=0; .\build-cuda-vs\Release\tcl4_e2e_cuda_compare.exe --N=200000 --tidx=0:1:10000 --gpu_warmup=1 --threads=8 --precision=fp32 --no_check`
     - Graphs on (capture+replay, prints once):
-      - `$env:TCL4_USE_CUDA_GRAPH=1; $env:TCL4_CUDA_GRAPH_VERBOSE=1; .\build-cuda-vs\Release\tcl4_e2e_cuda_compare.exe --N=200000 --tidx=0:1:10000 --gpu_warmup=1 --threads=8`
+      - FP64 only: `$env:TCL4_USE_CUDA_GRAPH=1; $env:TCL4_CUDA_GRAPH_VERBOSE=1; .\build-cuda-vs\Release\tcl4_e2e_cuda_compare.exe --N=200000 --tidx=0:1:10000 --gpu_warmup=1 --threads=8 --precision=fp64`
   - Example result (RTX 3070, CUDA 12.5, Win11, Release):
     - Graphs off: `gpu_total_ms=417.3` (`gpu_avg_ms=0.0417`)
     - Graphs on:  `gpu_total_ms=358.7` (`gpu_avg_ms=0.0359`)

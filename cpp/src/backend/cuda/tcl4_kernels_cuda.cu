@@ -111,6 +111,211 @@ TripleKernelSeries compute_triple_kernels_cuda(const sys::System& system,
     constexpr std::size_t kDefaultBatch = 64;
     const std::size_t Bplan = std::min(nf, kDefaultBatch);
 
+    if (exec.cuda_precision == CudaPrecision::Fp32) {
+        const float dt_f32 = static_cast<float>(dt);
+        if (!(dt_f32 > 0.0f)) {
+            throw std::invalid_argument("compute_triple_kernels_cuda: dt is too small for FP32");
+        }
+
+        std::vector<float> h_omegas_f32(nf);
+        for (std::size_t b = 0; b < nf; ++b) h_omegas_f32[b] = static_cast<float>(h_omegas[b]);
+
+        std::vector<cuFloatComplex> h_gamma_f32(Nt * nf);
+        {
+            const std::complex<double>* src = gamma_series.data();
+            for (std::size_t i = 0; i < Nt * nf; ++i) {
+                const std::complex<double> z = src[i];
+                h_gamma_f32[i] = make_cuFloatComplex(static_cast<float>(z.real()), static_cast<float>(z.imag()));
+            }
+        }
+
+        cudaStream_t stream = nullptr;
+        cuda_check(cudaSetDevice(exec.gpu_id), "cudaSetDevice");
+        cuda_check(cudaStreamCreate(&stream), "cudaStreamCreate");
+
+        cuFloatComplex* d_gamma = nullptr;
+        float* d_omegas = nullptr;
+        int* d_mirror = nullptr;
+        cuFloatComplex* d_F = nullptr;
+        cuFloatComplex* d_C = nullptr;
+        cuFloatComplex* d_R = nullptr;
+
+        cuFloatComplex* h_F = nullptr;
+        cuFloatComplex* h_C = nullptr;
+        cuFloatComplex* h_R = nullptr;
+        std::vector<cuFloatComplex> h_F_vec, h_C_vec, h_R_vec;
+
+        const std::size_t out_elems = Nt * Bplan;
+        const std::size_t out_bytes = out_elems * sizeof(cuFloatComplex);
+
+        cuda_fcr::FcrWorkspaceF32 ws;
+
+        try {
+            cuda_check(cudaMalloc(reinterpret_cast<void**>(&d_gamma), Nt * nf * sizeof(cuFloatComplex)), "cudaMalloc(d_gamma_f32)");
+            cuda_check(cudaMalloc(reinterpret_cast<void**>(&d_omegas), nf * sizeof(float)), "cudaMalloc(d_omegas_f32)");
+            cuda_check(cudaMalloc(reinterpret_cast<void**>(&d_mirror), nf * sizeof(int)), "cudaMalloc(d_mirror)");
+            cuda_check(cudaMalloc(reinterpret_cast<void**>(&d_F), out_bytes), "cudaMalloc(d_F_f32)");
+            cuda_check(cudaMalloc(reinterpret_cast<void**>(&d_C), out_bytes), "cudaMalloc(d_C_f32)");
+            cuda_check(cudaMalloc(reinterpret_cast<void**>(&d_R), out_bytes), "cudaMalloc(d_R_f32)");
+
+            cuda_check(cudaMemcpy(d_gamma, h_gamma_f32.data(), Nt * nf * sizeof(cuFloatComplex), cudaMemcpyHostToDevice),
+                       "cudaMemcpy(gamma_f32)");
+            cuda_check(cudaMemcpy(d_omegas, h_omegas_f32.data(), nf * sizeof(float), cudaMemcpyHostToDevice),
+                       "cudaMemcpy(omegas_f32)");
+            cuda_check(cudaMemcpy(d_mirror, h_mirror.data(), nf * sizeof(int), cudaMemcpyHostToDevice), "cudaMemcpy(mirror)");
+
+            if (exec.pinned) {
+                cuda_check(cudaMallocHost(reinterpret_cast<void**>(&h_F), out_bytes), "cudaMallocHost(h_F_f32)");
+                cuda_check(cudaMallocHost(reinterpret_cast<void**>(&h_C), out_bytes), "cudaMallocHost(h_C_f32)");
+                cuda_check(cudaMallocHost(reinterpret_cast<void**>(&h_R), out_bytes), "cudaMallocHost(h_R_f32)");
+            } else {
+                h_F_vec.resize(out_elems);
+                h_C_vec.resize(out_elems);
+                h_R_vec.resize(out_elems);
+                h_F = h_F_vec.data();
+                h_C = h_C_vec.data();
+                h_R = h_R_vec.data();
+            }
+
+            cuda_fcr::FcrDeviceInputsF32 inputs;
+            inputs.gamma = d_gamma;
+            inputs.omegas = d_omegas;
+            inputs.mirror = d_mirror;
+            inputs.Nt = Nt;
+            inputs.nf = nf;
+            inputs.dt = dt_f32;
+
+            const Eigen::Index Nt_e = static_cast<Eigen::Index>(Nt);
+
+            for (std::size_t i = 0; i < nf; ++i) {
+                for (std::size_t j = 0; j < nf; ++j) {
+                    std::size_t k0 = 0;
+                    for (; k0 + Bplan <= nf; k0 += Bplan) {
+                        cuda_fcr::FcrBatchF32 b;
+                        b.batch = Bplan;
+                        b.Nfft = Nfft;
+                        b.i = static_cast<int>(i);
+                        b.j = static_cast<int>(j);
+                        b.k0 = static_cast<int>(k0);
+                        b.F = d_F;
+                        b.C = d_C;
+                        b.R = d_R;
+
+                        cuda_fcr::compute_fcr_convolution_batched_f32(inputs, b, ws, stream);
+
+                        cuda_check(cudaMemcpyAsync(h_F, d_F, out_bytes, cudaMemcpyDeviceToHost, stream), "cudaMemcpyAsync(F_f32)");
+                        cuda_check(cudaMemcpyAsync(h_C, d_C, out_bytes, cudaMemcpyDeviceToHost, stream), "cudaMemcpyAsync(C_f32)");
+                        cuda_check(cudaMemcpyAsync(h_R, d_R, out_bytes, cudaMemcpyDeviceToHost, stream), "cudaMemcpyAsync(R_f32)");
+                        cuda_check(cudaStreamSynchronize(stream), "cudaStreamSynchronize_f32");
+
+                        for (std::size_t lane = 0; lane < Bplan; ++lane) {
+                            const std::size_t k = k0 + lane;
+                            Eigen::VectorXcd Fv(Nt_e), Cv(Nt_e), Rv(Nt_e);
+                            const cuFloatComplex* srcF = h_F + lane * Nt;
+                            const cuFloatComplex* srcC = h_C + lane * Nt;
+                            const cuFloatComplex* srcR = h_R + lane * Nt;
+                            for (std::size_t t = 0; t < Nt; ++t) {
+                                const auto f = srcF[t];
+                                const auto c = srcC[t];
+                                const auto r = srcR[t];
+                                Fv(static_cast<Eigen::Index>(t)) = std::complex<double>(static_cast<double>(f.x), static_cast<double>(f.y));
+                                Cv(static_cast<Eigen::Index>(t)) = std::complex<double>(static_cast<double>(c.x), static_cast<double>(c.y));
+                                Rv(static_cast<Eigen::Index>(t)) = std::complex<double>(static_cast<double>(r.x), static_cast<double>(r.y));
+                            }
+                            result.F[i][j][k] = std::move(Fv);
+                            result.C[i][j][k] = std::move(Cv);
+                            result.R[i][j][k] = std::move(Rv);
+                        }
+                    }
+
+                    if (k0 < nf) {
+                        const std::size_t rem = nf - k0;
+                        const std::size_t k0_last = nf - Bplan;
+                        const std::size_t lane0 = Bplan - rem;
+
+                        cuda_fcr::FcrBatchF32 b;
+                        b.batch = Bplan;
+                        b.Nfft = Nfft;
+                        b.i = static_cast<int>(i);
+                        b.j = static_cast<int>(j);
+                        b.k0 = static_cast<int>(k0_last);
+                        b.F = d_F;
+                        b.C = d_C;
+                        b.R = d_R;
+
+                        cuda_fcr::compute_fcr_convolution_batched_f32(inputs, b, ws, stream);
+
+                        cuda_check(cudaMemcpyAsync(h_F, d_F, out_bytes, cudaMemcpyDeviceToHost, stream), "cudaMemcpyAsync(F_f32 tail)");
+                        cuda_check(cudaMemcpyAsync(h_C, d_C, out_bytes, cudaMemcpyDeviceToHost, stream), "cudaMemcpyAsync(C_f32 tail)");
+                        cuda_check(cudaMemcpyAsync(h_R, d_R, out_bytes, cudaMemcpyDeviceToHost, stream), "cudaMemcpyAsync(R_f32 tail)");
+                        cuda_check(cudaStreamSynchronize(stream), "cudaStreamSynchronize_f32 tail");
+
+                        for (std::size_t lane = lane0; lane < Bplan; ++lane) {
+                            const std::size_t k = k0_last + lane;
+                            Eigen::VectorXcd Fv(Nt_e), Cv(Nt_e), Rv(Nt_e);
+                            const cuFloatComplex* srcF = h_F + lane * Nt;
+                            const cuFloatComplex* srcC = h_C + lane * Nt;
+                            const cuFloatComplex* srcR = h_R + lane * Nt;
+                            for (std::size_t t = 0; t < Nt; ++t) {
+                                const auto f = srcF[t];
+                                const auto c = srcC[t];
+                                const auto r = srcR[t];
+                                Fv(static_cast<Eigen::Index>(t)) = std::complex<double>(static_cast<double>(f.x), static_cast<double>(f.y));
+                                Cv(static_cast<Eigen::Index>(t)) = std::complex<double>(static_cast<double>(c.x), static_cast<double>(c.y));
+                                Rv(static_cast<Eigen::Index>(t)) = std::complex<double>(static_cast<double>(r.x), static_cast<double>(r.y));
+                            }
+                            result.F[i][j][k] = std::move(Fv);
+                            result.C[i][j][k] = std::move(Cv);
+                            result.R[i][j][k] = std::move(Rv);
+                        }
+                    }
+                }
+            }
+
+            if (ws.plan) cufftDestroy(ws.plan);
+            if (ws.A) cudaFree(ws.A);
+            if (ws.B) cudaFree(ws.B);
+            if (ws.B_conj) cudaFree(ws.B_conj);
+            if (ws.scan_tmp) cudaFree(ws.scan_tmp);
+
+            if (exec.pinned) {
+                cudaFreeHost(h_F);
+                cudaFreeHost(h_C);
+                cudaFreeHost(h_R);
+            }
+
+            cudaFree(d_R);
+            cudaFree(d_C);
+            cudaFree(d_F);
+            cudaFree(d_mirror);
+            cudaFree(d_omegas);
+            cudaFree(d_gamma);
+            cudaStreamDestroy(stream);
+        } catch (...) {
+            if (ws.plan) cufftDestroy(ws.plan);
+            if (ws.A) cudaFree(ws.A);
+            if (ws.B) cudaFree(ws.B);
+            if (ws.B_conj) cudaFree(ws.B_conj);
+            if (ws.scan_tmp) cudaFree(ws.scan_tmp);
+
+            if (exec.pinned) {
+                if (h_F) cudaFreeHost(h_F);
+                if (h_C) cudaFreeHost(h_C);
+                if (h_R) cudaFreeHost(h_R);
+            }
+            if (d_R) cudaFree(d_R);
+            if (d_C) cudaFree(d_C);
+            if (d_F) cudaFree(d_F);
+            if (d_mirror) cudaFree(d_mirror);
+            if (d_omegas) cudaFree(d_omegas);
+            if (d_gamma) cudaFree(d_gamma);
+            if (stream) cudaStreamDestroy(stream);
+            throw;
+        }
+
+        return result;
+    }
+
     // We treat device buffers as `cuDoubleComplex` and host staging as `std::complex<double>`.
     // These have the same binary layout (two doubles) in practice, and this assertion enforces it.
     static_assert(sizeof(std::complex<double>) == sizeof(cuDoubleComplex),
