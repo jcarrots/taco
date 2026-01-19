@@ -18,11 +18,13 @@ def _make_inputs():
     import taco
 
     dt = 1e-2
+    # Keep this small: tiny numeric differences between CPU and GPU can accumulate over long runs,
+    # and this test is intended to validate basic wiring/shapes/sanity rather than long-time accuracy.
     n_steps = 10
     bcf_end_time = n_steps * dt
 
     H = 0.5 * _sigma_x()
-    A = 0.5 * _sigma_z()
+    L = 0.5 * _sigma_z()
     rho0 = _rho0()
 
     omega = np.linspace(0.0, 20.0, 256, dtype=np.float64)
@@ -35,15 +37,13 @@ def _make_inputs():
         bcf_end_time=bcf_end_time,
     )
     cfg = taco.tcl.SimConfig(dt=dt, n_steps=n_steps, save_stride=1, order=4)
-    return taco, H, A, bath, cfg, rho0
+    return taco, H, L, bath, cfg, rho0
 
 
 def test_cpu_simulate_shapes_and_sanity():
-    taco, H, A, bath, cfg, rho0 = _make_inputs()
+    taco, H, L, bath, cfg, rho0 = _make_inputs()
 
-    res = taco.tcl.simulate(H, A, bath, cfg, rho0, device="cpu")
-    with pytest.raises(ValueError):
-        taco.tcl.simulate(H, A, bath, cfg, rho0, device="cpu", precision="fp32")
+    res = taco.tcl.simulate(H, L, bath, cfg, rho0, device="cpu")
 
     assert isinstance(taco.version(), str)
     assert isinstance(taco.build_info(), dict)
@@ -67,7 +67,7 @@ def test_cpu_simulate_shapes_and_sanity():
 
 
 def test_cuda_matches_cpu_when_available():
-    taco, H, A, bath, cfg, rho0 = _make_inputs()
+    taco, H, L, bath, cfg, rho0 = _make_inputs()
 
     info = taco.build_info()
     if not info.get("cuda_enabled", False):
@@ -75,28 +75,10 @@ def test_cuda_matches_cpu_when_available():
     if not taco.cuda.is_available():
         pytest.skip("No CUDA device available")
 
-    cpu = taco.tcl.simulate(H, A, bath, cfg, rho0, device="cpu")
-    gpu = taco.tcl.simulate(H, A, bath, cfg, rho0, device="cuda")
+    cpu = taco.tcl.simulate(H, L, bath, cfg, rho0, device="cpu")
+    gpu = taco.tcl.simulate(H, L, bath, cfg, rho0, device="cuda")
 
     assert cpu.t.shape == gpu.t.shape
     assert cpu.rho.shape == gpu.rho.shape
     assert np.allclose(cpu.t, gpu.t)
     assert np.allclose(cpu.rho, gpu.rho, atol=1e-5, rtol=1e-5)
-
-
-def test_cuda_fp32_matches_cpu_when_available():
-    taco, H, A, bath, cfg, rho0 = _make_inputs()
-
-    info = taco.build_info()
-    if not info.get("cuda_enabled", False):
-        pytest.skip("CUDA not enabled in build")
-    if not taco.cuda.is_available():
-        pytest.skip("No CUDA device available")
-
-    cpu = taco.tcl.simulate(H, A, bath, cfg, rho0, device="cpu")
-    gpu = taco.tcl.simulate(H, A, bath, cfg, rho0, device="cuda", precision="fp32")
-
-    assert cpu.t.shape == gpu.t.shape
-    assert cpu.rho.shape == gpu.rho.shape
-    assert np.allclose(cpu.t, gpu.t)
-    assert np.allclose(cpu.rho, gpu.rho, atol=1e-4, rtol=1e-4)

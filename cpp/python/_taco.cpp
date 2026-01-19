@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <chrono>
 #include <cmath>
 #include <complex>
 #include <cstddef>
@@ -22,6 +23,8 @@
 #include "taco/rk4_dense.hpp"
 #include "taco/system.hpp"
 #include "taco/tcl4.hpp"
+#include "taco/tcl4_assemble.hpp"
+#include "taco/tcl4_mikx.hpp"
 #include "taco/version.hpp"
 
 #ifdef TACO_HAS_CUDA
@@ -42,6 +45,109 @@ namespace {
 std::string to_lower(std::string s) {
     std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
     return s;
+}
+
+double max_abs_diff(const Eigen::MatrixXcd& a, const Eigen::MatrixXcd& b) {
+    if (a.rows() != b.rows() || a.cols() != b.cols()) return std::numeric_limits<double>::infinity();
+    return (a - b).cwiseAbs().maxCoeff();
+}
+
+double max_abs_diff(const Eigen::VectorXcd& a, const Eigen::VectorXcd& b) {
+    if (a.size() != b.size()) return std::numeric_limits<double>::infinity();
+    return (a - b).cwiseAbs().maxCoeff();
+}
+
+std::size_t clamp_tidx(std::size_t tidx, std::size_t Nt) {
+    if (Nt == 0) return 0;
+    return std::min(tidx, Nt - 1);
+}
+
+std::vector<std::size_t> parse_tidx_spec(const std::string& spec, std::size_t Nt) {
+    if (spec.empty()) return {};
+
+    std::vector<std::size_t> parts;
+    parts.reserve(3);
+    std::size_t pos = 0;
+    while (pos <= spec.size()) {
+        const std::size_t next = spec.find(':', pos);
+        const std::size_t len = (next == std::string::npos) ? (spec.size() - pos) : (next - pos);
+        const std::string token = spec.substr(pos, len);
+        if (token.empty()) {
+            throw std::invalid_argument("invalid tidx spec (empty token)");
+        }
+        parts.push_back(static_cast<std::size_t>(std::stoull(token)));
+        if (next == std::string::npos) break;
+        pos = next + 1;
+    }
+
+    if (parts.size() == 1) {
+        return {clamp_tidx(parts[0], Nt)};
+    }
+
+    std::size_t start = 0;
+    std::size_t step = 1;
+    std::size_t end = 0;
+    if (parts.size() == 2) {
+        start = parts[0];
+        end = parts[1];
+    } else if (parts.size() == 3) {
+        start = parts[0];
+        step = parts[1];
+        end = parts[2];
+    } else {
+        throw std::invalid_argument("invalid tidx spec (expected k or a:b or a:step:b)");
+    }
+
+    if (step == 0) {
+        throw std::invalid_argument("invalid tidx spec (step must be > 0)");
+    }
+
+    start = clamp_tidx(start, Nt);
+    end = clamp_tidx(end, Nt);
+    if (start > end) {
+        throw std::invalid_argument("invalid tidx spec (start must be <= end)");
+    }
+
+    std::vector<std::size_t> out;
+    out.reserve((end - start) / step + 1);
+    for (std::size_t t = start; t <= end; t += step) {
+        out.push_back(t);
+    }
+    return out;
+}
+
+std::vector<std::size_t> parse_tidx_from_python(const py::object& tidx, std::size_t Nt) {
+    if (!tidx || tidx.is_none()) {
+        if (Nt == 0) return {};
+        std::vector<std::size_t> out = {0, Nt / 2, Nt - 1};
+        std::sort(out.begin(), out.end());
+        out.erase(std::unique(out.begin(), out.end()), out.end());
+        return out;
+    }
+
+    if (py::isinstance<py::str>(tidx)) {
+        std::string spec = py::cast<std::string>(tidx);
+        spec = to_lower(std::move(spec));
+        if (spec.empty()) {
+            return parse_tidx_from_python(py::none(), Nt);
+        }
+        if (spec == "series" || spec == "all") {
+            std::vector<std::size_t> out;
+            out.resize(Nt);
+            for (std::size_t i = 0; i < Nt; ++i) out[i] = i;
+            return out;
+        }
+        return parse_tidx_spec(spec, Nt);
+    }
+
+    std::vector<std::size_t> out;
+    for (py::handle h : py::iterable(tidx)) {
+        out.push_back(clamp_tidx(py::cast<std::size_t>(h), Nt));
+    }
+    if (out.empty()) return out;
+    std::sort(out.begin(), out.end());
+    out.erase(std::unique(out.begin(), out.end()), out.end());
+    return out;
 }
 
 struct TabulatedSpectrum {
@@ -1123,6 +1229,612 @@ std::tuple<py::array, py::array> tcl_simulate_from_bcf(py::handle H,
     return {t_out, rho_out};
 }
 
+py::dict tcl4_e2e_cuda_compare_spin_boson(std::size_t Nt_samples,
+                                         double dt,
+                                         double temperature,
+                                         double omega_c,
+                                         py::object tidx,
+                                         int threads,
+                                         int gpu_id,
+                                         int gpu_warmup,
+                                         std::size_t rk4_steps,
+                                         int rk4_order,
+                                         std::string rk4_method,
+                                         std::string precision,
+                                         bool check) {
+    if (!(Nt_samples > 0)) throw py::value_error("Nt_samples must be > 0");
+    if (!(dt > 0.0)) throw py::value_error("dt must be > 0");
+    if (!std::isfinite(omega_c) || omega_c <= 0.0) throw py::value_error("omega_c must be finite and > 0");
+    if (threads < 0) throw py::value_error("threads must be >= 0");
+    if (gpu_id < 0) throw py::value_error("gpu_id must be >= 0");
+    if (gpu_warmup < 0) throw py::value_error("gpu_warmup must be >= 0");
+    if (!(rk4_order == 0 || rk4_order == 2 || rk4_order == 4)) {
+        throw py::value_error("rk4_order must be 0, 2, or 4");
+    }
+
+    precision = to_lower(std::move(precision));
+    if (!(precision == "fp64" || precision == "f64" || precision == "double" ||
+          precision == "fp32" || precision == "f32" || precision == "float")) {
+        throw py::value_error("precision must be 'fp64' or 'fp32'");
+    }
+    const bool want_fp32 = (precision == "fp32" || precision == "f32" || precision == "float");
+    const char* gpu_prec_name = want_fp32 ? "fp32" : "fp64";
+
+    rk4_method = to_lower(std::move(rk4_method));
+
+    struct L4Metrics {
+        bool has_gpu{false};
+        double max_abs{0.0};
+        double max_rel{0.0};
+        double cpu_fcr_ms{0.0};
+        double gpu_fcr_ms{0.0};
+        double cpu_total_ms{0.0};
+        double cpu_avg_ms{0.0};
+        double gpu_total_ms{0.0};
+        double gpu_avg_ms{0.0};
+    };
+    struct Rk4Metrics {
+        bool ran{false};
+        bool has_gpu{false};
+        std::size_t steps{0};
+        int order{0};
+        std::string method;
+        double max_abs_r{0.0};
+        double max_abs_rho{0.0};
+        double max_rel_rho{0.0};
+        double cpu_rk4_ms{0.0};
+        double gpu_rk4_ms{0.0};
+        double gpu_fcr_ms_rk4{0.0};
+    };
+
+    L4Metrics l4;
+    Rk4Metrics rk4;
+    std::size_t Nt = 0;
+    std::vector<std::size_t> tidx_list;
+
+    {
+        // Compute the system + gamma series without holding the GIL.
+        py::gil_scoped_release release;
+
+        Eigen::MatrixXcd H = 0.5 * taco::ops::sigma_x();
+        Eigen::MatrixXcd A = 0.5 * taco::ops::sigma_z();
+
+        taco::sys::System system;
+        system.build(H, {A}, 1e-9);
+
+        const std::size_t nf = system.fidx.buckets.size();
+        std::vector<double> omegas(nf);
+        for (std::size_t b = 0; b < nf; ++b) omegas[b] = system.fidx.buckets[b].omega;
+
+        const double beta = beta_from_temperature(temperature);
+
+        std::vector<double> tgrid;
+        std::vector<cd> Ccorr;
+        const auto J = [&](double w) { return (w > 0.0) ? (w * std::exp(-w / omega_c)) : 0.0; };
+        bcf::bcf_fft_fun(Nt_samples, dt, J, beta, tgrid, Ccorr);
+
+        Eigen::MatrixXcd gamma_series = taco::gamma::compute_trapz_prefix_multi_matrix(Ccorr, dt, omegas);
+        Nt = static_cast<std::size_t>(gamma_series.rows());
+        if (Nt == 0) {
+            throw std::runtime_error("gamma_series is empty");
+        }
+
+        // Parse tidx list under the GIL (depends on Nt).
+        {
+            py::gil_scoped_acquire acquire;
+            tidx_list = parse_tidx_from_python(tidx, Nt);
+        }
+        if (tidx_list.empty()) {
+            throw std::runtime_error("tidx selection is empty");
+        }
+
+        const double count = static_cast<double>(tidx_list.size());
+
+        taco::Exec exec_cpu;
+#ifdef _OPENMP
+        exec_cpu.backend = taco::Backend::Omp;
+        exec_cpu.threads = threads;
+#else
+        exec_cpu.backend = taco::Backend::Serial;
+        (void)threads;
+#endif
+
+        // CPU reference: F/C/R kernels once, then build L4 at each tidx.
+        std::vector<Eigen::MatrixXcd> L4_cpu_list;
+        L4_cpu_list.reserve(tidx_list.size());
+
+        const auto t_cpu_kernel_start = std::chrono::high_resolution_clock::now();
+        const auto kernels = taco::tcl4::compute_triple_kernels(system, gamma_series, dt, /*nmax*/ 2,
+                                                                taco::tcl4::FCRMethod::Convolution, exec_cpu);
+        const taco::tcl4::Tcl4Map map = taco::tcl4::build_map(system, /*time_grid*/ {});
+        const auto t_cpu_kernel_end = std::chrono::high_resolution_clock::now();
+        l4.cpu_fcr_ms =
+            std::chrono::duration<double, std::milli>(t_cpu_kernel_end - t_cpu_kernel_start).count();
+
+        double cpu_total_ms = 0.0;
+        for (std::size_t tidx_i : tidx_list) {
+            const auto t0 = std::chrono::high_resolution_clock::now();
+            auto mikx = taco::tcl4::build_mikx(map, kernels, tidx_i);
+            const Eigen::MatrixXcd GW = taco::tcl4::assemble_liouvillian(mikx, system.A_eig);
+            const Eigen::MatrixXcd L4_cpu = taco::tcl4::gw_to_liouvillian(GW, system.eig.dim);
+            const auto t1 = std::chrono::high_resolution_clock::now();
+            cpu_total_ms += std::chrono::duration<double, std::milli>(t1 - t0).count();
+            L4_cpu_list.push_back(L4_cpu);
+        }
+        l4.cpu_total_ms = l4.cpu_fcr_ms + cpu_total_ms;
+        l4.cpu_avg_ms = l4.cpu_total_ms / count;
+
+#ifdef TACO_HAS_CUDA
+        if (cuda_is_available()) {
+            taco::Exec exec_gpu;
+            exec_gpu.backend = taco::Backend::Cuda;
+            exec_gpu.gpu_id = gpu_id;
+            exec_gpu.cuda_precision = want_fp32 ? taco::CudaPrecision::Fp32 : taco::CudaPrecision::Fp64;
+
+            for (int w = 0; w < gpu_warmup; ++w) {
+                (void)taco::tcl4::build_TCL4_generator_cuda_fused_batch(system, gamma_series, dt, tidx_list,
+                                                                        taco::tcl4::FCRMethod::Convolution, exec_gpu,
+                                                                        nullptr);
+            }
+
+            const auto t_gpu_start = std::chrono::high_resolution_clock::now();
+            const auto L4_gpu_list =
+                taco::tcl4::build_TCL4_generator_cuda_fused_batch(system, gamma_series, dt, tidx_list,
+                                                                  taco::tcl4::FCRMethod::Convolution, exec_gpu,
+                                                                  &l4.gpu_fcr_ms);
+            const auto t_gpu_end = std::chrono::high_resolution_clock::now();
+            l4.gpu_total_ms = std::chrono::duration<double, std::milli>(t_gpu_end - t_gpu_start).count();
+            l4.gpu_avg_ms = l4.gpu_total_ms / count;
+
+            l4.has_gpu = true;
+            for (std::size_t i = 0; i < tidx_list.size(); ++i) {
+                const Eigen::MatrixXcd& L4_cpu = L4_cpu_list[i];
+                const Eigen::MatrixXcd& L4_gpu = L4_gpu_list[i];
+                const double err = max_abs_diff(L4_cpu, L4_gpu);
+                const double ref = std::max(1.0, L4_cpu.cwiseAbs().maxCoeff());
+                const double rel = err / ref;
+                l4.max_abs = std::max(l4.max_abs, err);
+                l4.max_rel = std::max(l4.max_rel, rel);
+            }
+
+            if (check) {
+                const double tol = want_fp32 ? 1e-4 : 1e-8;
+                if (l4.max_abs > tol && l4.max_rel > tol) {
+                    throw std::runtime_error("L4 mismatch above tolerance");
+                }
+            }
+
+            if (rk4_steps > 0 && Nt >= 2) {
+                rk4.ran = true;
+                rk4.has_gpu = true;
+                rk4.steps = std::min(rk4_steps, Nt - 1);
+                rk4.order = rk4_order;
+                rk4.method = rk4_method;
+
+                const std::size_t dim = system.eig.dim;
+                const std::size_t D_u = dim * dim;
+                if (D_u == 0 || D_u > static_cast<std::size_t>(std::numeric_limits<int>::max())) {
+                    throw std::runtime_error("RK4 compare: state dimension too large for int indexing");
+                }
+                if (D_u > std::numeric_limits<std::size_t>::max() / D_u) {
+                    throw std::overflow_error("RK4 compare: dense matrix size overflow");
+                }
+
+                std::vector<std::size_t> rk_tidx(rk4.steps + 1);
+                for (std::size_t k = 0; k <= rk4.steps; ++k) rk_tidx[k] = k;
+
+                std::vector<Eigen::MatrixXcd> L4_cpu_series;
+                std::vector<Eigen::MatrixXcd> L4_gpu_series;
+
+                if (rk4_order == 4) {
+                    L4_cpu_series.reserve(rk_tidx.size());
+                    for (std::size_t tidx_i : rk_tidx) {
+                        auto mikx = taco::tcl4::build_mikx(map, kernels, tidx_i);
+                        const Eigen::MatrixXcd GW = taco::tcl4::assemble_liouvillian(mikx, system.A_eig);
+                        L4_cpu_series.push_back(taco::tcl4::gw_to_liouvillian(GW, system.eig.dim));
+                    }
+                    for (int w = 0; w < gpu_warmup; ++w) {
+                        (void)taco::tcl4::build_TCL4_generator_cuda_fused_batch(system, gamma_series, dt, rk_tidx,
+                                                                                taco::tcl4::FCRMethod::Convolution,
+                                                                                exec_gpu, nullptr);
+                    }
+                    L4_gpu_series =
+                        taco::tcl4::build_TCL4_generator_cuda_fused_batch(system, gamma_series, dt, rk_tidx,
+                                                                          taco::tcl4::FCRMethod::Convolution, exec_gpu,
+                                                                          &rk4.gpu_fcr_ms_rk4);
+                } else {
+                    L4_cpu_series.assign(rk_tidx.size(), Eigen::MatrixXcd::Zero(static_cast<Eigen::Index>(D_u),
+                                                                                static_cast<Eigen::Index>(D_u)));
+                    L4_gpu_series = L4_cpu_series;
+                }
+
+                const Eigen::MatrixXcd H0 = system.eig.eps.asDiagonal().toDenseMatrix().cast<cd>();
+                const Eigen::MatrixXcd L0 = taco::tcl2::build_unitary_superop(system, H0);
+
+                taco::tcl2::SpectralKernels K2;
+                K2.buckets.resize(nf);
+                for (std::size_t b = 0; b < nf; ++b) {
+                    K2.buckets[b].omega = system.fidx.buckets[b].omega;
+                    K2.buckets[b].Gamma = Eigen::MatrixXcd::Zero(1, 1);
+                }
+
+                auto fill_tcl2_kernels = [&](std::size_t time_index) {
+                    for (std::size_t b = 0; b < nf; ++b) {
+                        K2.buckets[b].Gamma(0, 0) =
+                            gamma_series(static_cast<Eigen::Index>(time_index), static_cast<Eigen::Index>(b));
+                    }
+                };
+
+                auto build_L_at = [&](std::size_t time_index, const std::vector<Eigen::MatrixXcd>& L4_series) -> Eigen::MatrixXcd {
+                    if (rk4_order == 0) return L0;
+                    fill_tcl2_kernels(time_index);
+                    const taco::tcl2::TCL2Components comps2 = taco::tcl2::build_tcl2_components(system, K2, /*cutoff=*/0.0);
+                    Eigen::MatrixXcd L = comps2.total();
+                    if (rk4_order == 4) {
+                        L.noalias() += L4_series[time_index];
+                    }
+                    return L;
+                };
+
+                Eigen::MatrixXcd rho0 = Eigen::MatrixXcd::Zero(static_cast<Eigen::Index>(dim), static_cast<Eigen::Index>(dim));
+                rho0(0, 0) = 1.0;
+                const Eigen::MatrixXcd rho0_eig = system.eig.rho_to_eigen(rho0);
+
+                Eigen::VectorXcd r_cpu = taco::ops::vec(rho0_eig);
+                Eigen::VectorXcd r_gpu = r_cpu;
+
+                const auto cpu_start = std::chrono::high_resolution_clock::now();
+                {
+                    taco::tcl::Rk4DenseWorkspace ws;
+                    ws.resize(static_cast<Eigen::Index>(D_u));
+
+                    Eigen::MatrixXcd L_cur = build_L_at(0, L4_cpu_series);
+                    Eigen::MatrixXcd L_next = build_L_at(1, L4_cpu_series);
+                    for (std::size_t step = 0; step < rk4.steps; ++step) {
+                        const Eigen::MatrixXcd Lhalf = 0.5 * (L_cur + L_next);
+                        taco::tcl::rk4_update_serial(L_cur, Lhalf, L_next, r_cpu, ws, dt);
+
+                        const std::size_t step1 = step + 1;
+                        if (step1 < rk4.steps) {
+                            L_cur = std::move(L_next);
+                            L_next = build_L_at(step + 2, L4_cpu_series);
+                        }
+                    }
+                }
+                const auto cpu_end = std::chrono::high_resolution_clock::now();
+                rk4.cpu_rk4_ms = std::chrono::duration<double, std::milli>(cpu_end - cpu_start).count();
+
+                taco::tcl::Rk4DenseCudaMethod rk4_cuda_method = taco::tcl::Rk4DenseCudaMethod::WarpKernel;
+                if (rk4_method == "warp" || rk4_method == "kernel") {
+                    rk4_cuda_method = taco::tcl::Rk4DenseCudaMethod::WarpKernel;
+                } else if (rk4_method == "cublas" || rk4_method == "cublasgemv") {
+                    rk4_cuda_method = taco::tcl::Rk4DenseCudaMethod::CublasGemv;
+                } else {
+                    throw std::invalid_argument("rk4_method must be 'warp' or 'cublas'");
+                }
+
+                const auto gpu_start_rk4 = std::chrono::high_resolution_clock::now();
+                {
+                    cuda_check(cudaSetDevice(gpu_id), "cudaSetDevice(rk4)");
+
+                    const int D = static_cast<int>(D_u);
+                    const std::size_t L_elems = D_u * D_u;
+                    const cudaStream_t stream = 0;
+
+                    if (want_fp32) {
+                        const float dt_f32 = static_cast<float>(dt);
+                        const std::size_t vbytes = D_u * sizeof(cuFloatComplex);
+                        const std::size_t Lbytes = L_elems * sizeof(cuFloatComplex);
+
+                        auto pack_vec = [&](const Eigen::VectorXcd& src, std::vector<cuFloatComplex>& dst) {
+                            dst.resize(D_u);
+                            for (std::size_t i = 0; i < D_u; ++i) {
+                                const cd z = src(static_cast<Eigen::Index>(i));
+                                dst[i] = make_cuFloatComplex(static_cast<float>(z.real()), static_cast<float>(z.imag()));
+                            }
+                        };
+                        auto unpack_vec = [&](const std::vector<cuFloatComplex>& src, Eigen::VectorXcd& dst) {
+                            for (std::size_t i = 0; i < D_u; ++i) {
+                                const auto z = src[i];
+                                dst(static_cast<Eigen::Index>(i)) = cd(static_cast<double>(z.x), static_cast<double>(z.y));
+                            }
+                        };
+                        auto pack_mat = [&](const Eigen::MatrixXcd& src, std::vector<cuFloatComplex>& dst) {
+                            dst.resize(L_elems);
+                            const auto* p = src.data(); // column-major
+                            for (std::size_t i = 0; i < L_elems; ++i) {
+                                dst[i] = make_cuFloatComplex(static_cast<float>(p[i].real()), static_cast<float>(p[i].imag()));
+                            }
+                        };
+
+                        std::vector<cuFloatComplex> h_r;
+                        std::vector<cuFloatComplex> h_L;
+
+                        cuFloatComplex* d_r = nullptr;
+                        cuda_check(cudaMalloc(&d_r, vbytes), "cudaMalloc(r_f32)");
+                        auto free_r = [&] {
+                            if (d_r) cudaFree(d_r);
+                            d_r = nullptr;
+                        };
+
+                        taco::tcl::Rk4DenseCudaWorkspaceF32 ws_cuda;
+
+                        try {
+                            pack_vec(r_gpu, h_r);
+                            cuda_check(cudaMemcpy(d_r, h_r.data(), vbytes, cudaMemcpyHostToDevice), "cudaMemcpy(r_f32 H2D)");
+
+                            if (rk4_order == 0) {
+                                Eigen::MatrixXcd Lconst = build_L_at(0, L4_gpu_series);
+                                cuFloatComplex* d_L = nullptr;
+                                cuda_check(cudaMalloc(&d_L, Lbytes), "cudaMalloc(L_f32)");
+                                auto free_L = [&] {
+                                    if (d_L) cudaFree(d_L);
+                                    d_L = nullptr;
+                                };
+
+                                try {
+                                    pack_mat(Lconst, h_L);
+                                    cuda_check(cudaMemcpy(d_L, h_L.data(), Lbytes, cudaMemcpyHostToDevice), "cudaMemcpy(L_f32 H2D)");
+                                    for (std::size_t step = 0; step < rk4.steps; ++step) {
+                                        taco::tcl::rk4_update_cuda_f32(d_L, d_r, D, ws_cuda, dt_f32, stream, rk4_cuda_method);
+                                    }
+                                } catch (...) {
+                                    free_L();
+                                    throw;
+                                }
+                                free_L();
+                            } else {
+                                cuFloatComplex* d_L0 = nullptr;
+                                cuFloatComplex* d_L1 = nullptr;
+                                cuFloatComplex* d_Lhalf = nullptr;
+                                cuda_check(cudaMalloc(&d_L0, Lbytes), "cudaMalloc(L0_f32)");
+                                cuda_check(cudaMalloc(&d_L1, Lbytes), "cudaMalloc(L1_f32)");
+                                cuda_check(cudaMalloc(&d_Lhalf, Lbytes), "cudaMalloc(Lhalf_f32)");
+
+                                auto free_mats = [&] {
+                                    if (d_L0) cudaFree(d_L0);
+                                    if (d_L1) cudaFree(d_L1);
+                                    if (d_Lhalf) cudaFree(d_Lhalf);
+                                };
+
+                                try {
+                                    Eigen::MatrixXcd L_cur = build_L_at(0, L4_gpu_series);
+                                    Eigen::MatrixXcd L_next = build_L_at(1, L4_gpu_series);
+
+                                    pack_mat(L_cur, h_L);
+                                    cuda_check(cudaMemcpy(d_L0, h_L.data(), Lbytes, cudaMemcpyHostToDevice), "cudaMemcpy(L0_f32 H2D)");
+                                    pack_mat(L_next, h_L);
+                                    cuda_check(cudaMemcpy(d_L1, h_L.data(), Lbytes, cudaMemcpyHostToDevice), "cudaMemcpy(L1_f32 H2D)");
+
+                                    for (std::size_t step = 0; step < rk4.steps; ++step) {
+                                        taco::tcl::half_sum_cuda_f32(d_L0, d_L1, d_Lhalf, L_elems, stream);
+                                        taco::tcl::rk4_update_cuda_f32(d_L0, d_Lhalf, d_L1, d_r, D, ws_cuda, dt_f32, stream, rk4_cuda_method);
+
+                                        const std::size_t step1 = step + 1;
+                                        if (step1 < rk4.steps) {
+                                            L_cur = std::move(L_next);
+                                            L_next = build_L_at(step + 2, L4_gpu_series);
+
+                                            std::swap(d_L0, d_L1);
+                                            pack_mat(L_next, h_L);
+                                            cuda_check(cudaMemcpy(d_L1, h_L.data(), Lbytes, cudaMemcpyHostToDevice),
+                                                       "cudaMemcpy(Lnext_f32 H2D)");
+                                        }
+                                    }
+                                } catch (...) {
+                                    free_mats();
+                                    throw;
+                                }
+
+                                free_mats();
+                            }
+
+                            cuda_check(cudaDeviceSynchronize(), "cudaDeviceSynchronize(rk4_f32)");
+                            cuda_check(cudaMemcpy(h_r.data(), d_r, vbytes, cudaMemcpyDeviceToHost), "cudaMemcpy(r_f32 D2H)");
+                            unpack_vec(h_r, r_gpu);
+                        } catch (...) {
+                            free_r();
+                            throw;
+                        }
+
+                        free_r();
+                    } else {
+                        const std::size_t vbytes = D_u * sizeof(cuDoubleComplex);
+                        const std::size_t Lbytes = L_elems * sizeof(cuDoubleComplex);
+
+                        auto pack_vec = [&](const Eigen::VectorXcd& src, std::vector<cuDoubleComplex>& dst) {
+                            dst.resize(D_u);
+                            for (std::size_t i = 0; i < D_u; ++i) {
+                                const cd z = src(static_cast<Eigen::Index>(i));
+                                dst[i] = make_cuDoubleComplex(z.real(), z.imag());
+                            }
+                        };
+                        auto unpack_vec = [&](const std::vector<cuDoubleComplex>& src, Eigen::VectorXcd& dst) {
+                            for (std::size_t i = 0; i < D_u; ++i) {
+                                const auto z = src[i];
+                                dst(static_cast<Eigen::Index>(i)) = cd(z.x, z.y);
+                            }
+                        };
+                        auto pack_mat = [&](const Eigen::MatrixXcd& src, std::vector<cuDoubleComplex>& dst) {
+                            dst.resize(L_elems);
+                            const auto* p = src.data(); // column-major
+                            for (std::size_t i = 0; i < L_elems; ++i) {
+                                dst[i] = make_cuDoubleComplex(p[i].real(), p[i].imag());
+                            }
+                        };
+
+                        std::vector<cuDoubleComplex> h_r;
+                        std::vector<cuDoubleComplex> h_L;
+
+                        cuDoubleComplex* d_r = nullptr;
+                        cuda_check(cudaMalloc(&d_r, vbytes), "cudaMalloc(r)");
+                        auto free_r = [&] {
+                            if (d_r) cudaFree(d_r);
+                            d_r = nullptr;
+                        };
+
+                        taco::tcl::Rk4DenseCudaWorkspace ws_cuda;
+
+                        try {
+                            pack_vec(r_gpu, h_r);
+                            cuda_check(cudaMemcpy(d_r, h_r.data(), vbytes, cudaMemcpyHostToDevice), "cudaMemcpy(r H2D)");
+
+                            if (rk4_order == 0) {
+                                Eigen::MatrixXcd Lconst = build_L_at(0, L4_gpu_series);
+                                cuDoubleComplex* d_L = nullptr;
+                                cuda_check(cudaMalloc(&d_L, Lbytes), "cudaMalloc(L)");
+                                auto free_L = [&] {
+                                    if (d_L) cudaFree(d_L);
+                                    d_L = nullptr;
+                                };
+
+                                try {
+                                    pack_mat(Lconst, h_L);
+                                    cuda_check(cudaMemcpy(d_L, h_L.data(), Lbytes, cudaMemcpyHostToDevice), "cudaMemcpy(L H2D)");
+                                    for (std::size_t step = 0; step < rk4.steps; ++step) {
+                                        taco::tcl::rk4_update_cuda(d_L, d_r, D, ws_cuda, dt, stream, rk4_cuda_method);
+                                    }
+                                } catch (...) {
+                                    free_L();
+                                    throw;
+                                }
+                                free_L();
+                            } else {
+                                cuDoubleComplex* d_L0 = nullptr;
+                                cuDoubleComplex* d_L1 = nullptr;
+                                cuDoubleComplex* d_Lhalf = nullptr;
+                                cuda_check(cudaMalloc(&d_L0, Lbytes), "cudaMalloc(L0)");
+                                cuda_check(cudaMalloc(&d_L1, Lbytes), "cudaMalloc(L1)");
+                                cuda_check(cudaMalloc(&d_Lhalf, Lbytes), "cudaMalloc(Lhalf)");
+
+                                auto free_mats = [&] {
+                                    if (d_L0) cudaFree(d_L0);
+                                    if (d_L1) cudaFree(d_L1);
+                                    if (d_Lhalf) cudaFree(d_Lhalf);
+                                };
+
+                                try {
+                                    Eigen::MatrixXcd L_cur = build_L_at(0, L4_gpu_series);
+                                    Eigen::MatrixXcd L_next = build_L_at(1, L4_gpu_series);
+
+                                    pack_mat(L_cur, h_L);
+                                    cuda_check(cudaMemcpy(d_L0, h_L.data(), Lbytes, cudaMemcpyHostToDevice), "cudaMemcpy(L0 H2D)");
+                                    pack_mat(L_next, h_L);
+                                    cuda_check(cudaMemcpy(d_L1, h_L.data(), Lbytes, cudaMemcpyHostToDevice), "cudaMemcpy(L1 H2D)");
+
+                                    for (std::size_t step = 0; step < rk4.steps; ++step) {
+                                        taco::tcl::half_sum_cuda(d_L0, d_L1, d_Lhalf, L_elems, stream);
+                                        taco::tcl::rk4_update_cuda(d_L0, d_Lhalf, d_L1, d_r, D, ws_cuda, dt, stream, rk4_cuda_method);
+
+                                        const std::size_t step1 = step + 1;
+                                        if (step1 < rk4.steps) {
+                                            L_cur = std::move(L_next);
+                                            L_next = build_L_at(step + 2, L4_gpu_series);
+
+                                            std::swap(d_L0, d_L1);
+                                            pack_mat(L_next, h_L);
+                                            cuda_check(cudaMemcpy(d_L1, h_L.data(), Lbytes, cudaMemcpyHostToDevice),
+                                                       "cudaMemcpy(Lnext H2D)");
+                                        }
+                                    }
+                                } catch (...) {
+                                    free_mats();
+                                    throw;
+                                }
+
+                                free_mats();
+                            }
+
+                            cuda_check(cudaDeviceSynchronize(), "cudaDeviceSynchronize(rk4)");
+                            cuda_check(cudaMemcpy(h_r.data(), d_r, vbytes, cudaMemcpyDeviceToHost), "cudaMemcpy(r D2H)");
+                            unpack_vec(h_r, r_gpu);
+                        } catch (...) {
+                            free_r();
+                            throw;
+                        }
+
+                        free_r();
+                    }
+                }
+                const auto gpu_end_rk4 = std::chrono::high_resolution_clock::now();
+                rk4.gpu_rk4_ms = std::chrono::duration<double, std::milli>(gpu_end_rk4 - gpu_start_rk4).count();
+
+                const auto rho_from_r = [&](const Eigen::VectorXcd& r) {
+                    Eigen::MatrixXcd rho_eig = taco::ops::unvec(r, static_cast<std::size_t>(dim));
+                    rho_eig = taco::ops::hermitize_and_normalize(rho_eig);
+                    return system.eig.rho_to_lab(rho_eig);
+                };
+
+                const Eigen::MatrixXcd rho_cpu = rho_from_r(r_cpu);
+                const Eigen::MatrixXcd rho_gpu = rho_from_r(r_gpu);
+
+                rk4.max_abs_r = max_abs_diff(r_cpu, r_gpu);
+                rk4.max_abs_rho = max_abs_diff(rho_cpu, rho_gpu);
+                const double rho_ref = std::max(1.0, rho_cpu.cwiseAbs().maxCoeff());
+                rk4.max_rel_rho = rk4.max_abs_rho / rho_ref;
+
+                if (check) {
+                    const double rk4_tol = want_fp32 ? 1e-4 : 1e-5;
+                    if (rk4.max_abs_rho > rk4_tol && rk4.max_rel_rho > rk4_tol) {
+                        throw std::runtime_error("RK4 propagation mismatch above tolerance");
+                    }
+                }
+            }
+        }
+#endif // TACO_HAS_CUDA
+    }
+
+    py::dict out;
+    out["Nt_samples"] = Nt_samples;
+    out["dt"] = dt;
+    out["temperature"] = temperature;
+    out["omega_c"] = omega_c;
+    out["precision"] = gpu_prec_name;
+
+#ifdef TACO_HAS_CUDA
+    out["cuda_enabled"] = true;
+    out["cuda_available"] = cuda_is_available();
+#else
+    out["cuda_enabled"] = false;
+    out["cuda_available"] = false;
+#endif
+
+    py::list tidx_py;
+    for (std::size_t v : tidx_list) tidx_py.append(py::int_(static_cast<unsigned long long>(v)));
+    out["tidx"] = tidx_py;
+
+    py::dict l4_py;
+    l4_py["has_gpu"] = l4.has_gpu;
+    l4_py["max_abs"] = l4.has_gpu ? py::float_(l4.max_abs) : py::none();
+    l4_py["max_rel"] = l4.has_gpu ? py::float_(l4.max_rel) : py::none();
+    l4_py["cpu_fcr_ms"] = l4.cpu_fcr_ms;
+    l4_py["gpu_fcr_ms"] = l4.has_gpu ? py::float_(l4.gpu_fcr_ms) : py::none();
+    l4_py["cpu_total_ms"] = l4.cpu_total_ms;
+    l4_py["cpu_avg_ms"] = l4.cpu_avg_ms;
+    l4_py["gpu_total_ms"] = l4.has_gpu ? py::float_(l4.gpu_total_ms) : py::none();
+    l4_py["gpu_avg_ms"] = l4.has_gpu ? py::float_(l4.gpu_avg_ms) : py::none();
+    out["l4"] = l4_py;
+
+    if (!rk4.ran) {
+        out["rk4"] = py::none();
+    } else {
+        py::dict rk4_py;
+        rk4_py["has_gpu"] = rk4.has_gpu;
+        rk4_py["steps"] = rk4.steps;
+        rk4_py["order"] = rk4.order;
+        rk4_py["method"] = rk4.method;
+        rk4_py["max_abs_r"] = rk4.has_gpu ? py::float_(rk4.max_abs_r) : py::none();
+        rk4_py["max_abs_rho"] = rk4.has_gpu ? py::float_(rk4.max_abs_rho) : py::none();
+        rk4_py["max_rel_rho"] = rk4.has_gpu ? py::float_(rk4.max_rel_rho) : py::none();
+        rk4_py["cpu_rk4_ms"] = rk4.cpu_rk4_ms;
+        rk4_py["gpu_rk4_ms"] = rk4.has_gpu ? py::float_(rk4.gpu_rk4_ms) : py::none();
+        rk4_py["gpu_fcr_ms_rk4"] = rk4.has_gpu ? py::float_(rk4.gpu_fcr_ms_rk4) : py::none();
+        out["rk4"] = rk4_py;
+    }
+
+    return out;
+}
+
 } // namespace taco::python
 
 PYBIND11_MODULE(_taco, m) {
@@ -1170,4 +1882,19 @@ PYBIND11_MODULE(_taco, m) {
           py::arg("precision") = "fp64",
           py::arg("order") = 4,
           py::arg("gpu_id") = 0);
+
+    m.def("tcl4_e2e_cuda_compare_spin_boson", &taco::python::tcl4_e2e_cuda_compare_spin_boson,
+          py::arg("Nt_samples") = 100000,
+          py::arg("dt") = 0.000625,
+          py::arg("temperature") = 2.0,
+          py::arg("omega_c") = 10.0,
+          py::arg("tidx") = py::none(),
+          py::arg("threads") = 0,
+          py::arg("gpu_id") = 0,
+          py::arg("gpu_warmup") = 1,
+          py::arg("rk4_steps") = 50,
+          py::arg("rk4_order") = 4,
+          py::arg("rk4_method") = "warp",
+          py::arg("precision") = "fp64",
+          py::arg("check") = true);
 }

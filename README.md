@@ -9,11 +9,16 @@ A fast parallel and scalable time-convolutionless (TCL) runtime with C++ backend
 - Higher-order TCL (TCL6/TCL2n) planning in docs; symbolic road-map.
 
 ## Install
+### Python package (recommended)
 From source (CPU-only):
-- `pip install .`
+- `CMAKE_ARGS="-DTACO_BUILD_PYTHON=ON" pip install .`
 
 From source (CUDA):
 - `CMAKE_ARGS="-DTACO_BUILD_CUDA=ON -DTACO_BUILD_PYTHON=ON -DCMAKE_CUDA_ARCHITECTURES=native" pip install .`
+
+### C++ only (no Python)
+- Configure: `cmake -S . -B build`
+- Build (Release): `cmake --build build --config Release`
 
 ## Quickstart
 ```python
@@ -29,15 +34,17 @@ J = omega * np.exp(-omega / 5.0)
 
 bath = taco.tcl.BathTabulated(temperature=2.0, omega=omega, J=J, bcf_end_time=1.0)
 cfg = taco.tcl.SimConfig(dt=1e-2, t_end=1.0, save_stride=1, order=4)
+# (equivalently: cfg = taco.tcl.SimConfig(dt=1e-2, n_steps=100, save_stride=1, order=4))
 
 res = taco.tcl.simulate(H, A, bath, cfg, rho0, device="cpu")  # or device="cuda"
 # For CUDA FP32 kernels: taco.tcl.simulate(..., device="cuda", precision="fp32")
 print(res.t.shape, res.rho.shape)
 ```
 
+For a detailed end-to-end example (spin-boson model + bath + parameters + plots + E2E benchmark), open:
+- `python/examples/tcl4_e2e_cuda_compare.ipynb`
+
 ## Build from source (C++)
-- Configure: `cmake -S . -B build`
-- Build (Release): `cmake --build build --config Release`
 - Enable MPI (distributed CPU): `-DTACO_WITH_MPI=ON` (requires MPI)
 - Enable Python extension: `-DTACO_BUILD_PYTHON=ON` (default OFF; add `-DPython_EXECUTABLE=...` if needed)
 - Disable gamma tests: `-DTACO_BUILD_GAMMA_TESTS=OFF`
@@ -67,11 +74,15 @@ print(res.t.shape, res.rho.shape)
 - Rank 0 returns the gathered `L4(t)` vector; non-root ranks return `{}`.
 
 ## Python bindings
-- Build/install (CPU-only): `pip install .`
+- Build/install (CPU-only): `CMAKE_ARGS="-DTACO_BUILD_PYTHON=ON" pip install .`
 - Build/install (CUDA): `CMAKE_ARGS="-DTACO_BUILD_CUDA=ON -DTACO_BUILD_PYTHON=ON -DCMAKE_CUDA_ARCHITECTURES=native" pip install .`
 - Tests: `pytest -q`
+- Repo-checkout usage (no install): `python -c "import sys; sys.path.insert(0,'python'); import taco; print(taco.version())"`
+- Jupyter/VS Code: open `python/examples/tcl4_e2e_cuda_compare.ipynb` (kernel Python must match the built `taco/_taco*.pyd` ABI tag).
 - Note: when built with CUDA, `taco.tcl.simulate(..., device="cuda")` uses the existing CUDA L4 builder (order=4) and CUDA RK4 for propagation; inputs/outputs are host NumPy arrays (host<->device copies happen internally).
 - Optional: `precision="fp32"` selects the FP32 CUDA kernels (casts on upload/download; outputs remain `complex128`).
+- E2E benchmark helper: `taco.tcl.e2e_cuda_compare_spin_boson(...)` (mirrors `tcl4_e2e_cuda_compare`); notebook: `python/examples/tcl4_e2e_cuda_compare.ipynb`
+- More details (including RK4 wiring + building for a specific notebook/kernel Python): `python/README.md`
 
 ## TCL4 Demo & Test
 - Demo driver: `tcl_driver` loads a YAML config (matrix `H`, `A` and `J_expr`) and runs TCL4 assembly

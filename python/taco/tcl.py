@@ -273,10 +273,80 @@ def simulate(
     return SimResult(t=np.asarray(t, dtype=np.float64), rho=np.asarray(rho, dtype=np.complex128))
 
 
+def e2e_cuda_compare_spin_boson(
+    *,
+    Nt_samples: int = 100000,
+    dt: float = 6.25e-4,
+    temperature: float = 2.0,
+    omega_c: float = 10.0,
+    tidx: str | list[int] | np.ndarray | None = None,
+    threads: int = 0,
+    gpu_id: int = 0,
+    gpu_warmup: int = 1,
+    rk4_steps: int = 50,
+    rk4_order: int = 4,
+    rk4_method: Literal["warp", "cublas"] = "warp",
+    precision: Literal["fp64", "fp32"] = "fp64",
+    check: bool = True,
+) -> dict:
+    """
+    Run the spin-boson CPU vs CUDA end-to-end compare (the same workload as `tcl4_e2e_cuda_compare`).
+
+    This is intended for benchmarking and validation (it returns timings + max CPU/GPU differences).
+    For perf-only runs (especially FP32), pass `check=False` to avoid raising on mismatches.
+    """
+    if not isinstance(Nt_samples, int) or Nt_samples <= 0:
+        raise ValueError("Nt_samples must be an int > 0")
+    if not np.isfinite(dt) or dt <= 0.0:
+        raise ValueError("dt must be finite and > 0")
+    if not np.isfinite(temperature) or temperature < 0.0:
+        raise ValueError("temperature must be finite and >= 0")
+    if not np.isfinite(omega_c) or omega_c <= 0.0:
+        raise ValueError("omega_c must be finite and > 0")
+    if threads < 0:
+        raise ValueError("threads must be >= 0")
+    if gpu_id < 0:
+        raise ValueError("gpu_id must be >= 0")
+    if gpu_warmup < 0:
+        raise ValueError("gpu_warmup must be >= 0")
+    if rk4_steps < 0:
+        raise ValueError("rk4_steps must be >= 0")
+    if rk4_order not in (0, 2, 4):
+        raise ValueError("rk4_order must be 0, 2, or 4")
+    if rk4_method not in ("warp", "cublas"):
+        raise ValueError("rk4_method must be 'warp' or 'cublas'")
+    if precision not in ("fp64", "fp32"):
+        raise ValueError("precision must be 'fp64' or 'fp32'")
+
+    if isinstance(tidx, np.ndarray):
+        tidx_arg = [int(x) for x in tidx.ravel().tolist()]
+    else:
+        tidx_arg = tidx
+
+    return dict(
+        _native.tcl4_e2e_cuda_compare_spin_boson(
+            Nt_samples=int(Nt_samples),
+            dt=float(dt),
+            temperature=float(temperature),
+            omega_c=float(omega_c),
+            tidx=tidx_arg,
+            threads=int(threads),
+            gpu_id=int(gpu_id),
+            gpu_warmup=int(gpu_warmup),
+            rk4_steps=int(rk4_steps),
+            rk4_order=int(rk4_order),
+            rk4_method=str(rk4_method),
+            precision=str(precision),
+            check=bool(check),
+        )
+    )
+
+
 __all__ = [
     "BathTabulated",
     "SimConfig",
     "SimResult",
+    "e2e_cuda_compare_spin_boson",
     "precompute_bcf",
     "simulate",
 ]

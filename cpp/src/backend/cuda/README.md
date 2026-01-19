@@ -15,13 +15,14 @@ Usage
 - Precision:
   - Default is FP64 (`exec.cuda_precision = CudaPrecision::Fp64`).
   - Set `exec.cuda_precision = CudaPrecision::Fp32` to run the FP32 CUDA kernels (casts inputs on upload and outputs on download).
-- Dense RK4 integrator: `taco/backend/cuda/rk4_dense_cuda.hpp`:
-  - FP64: `rk4_update_cuda` (`cuDoubleComplex`, `double dt`)
-  - FP32: `rk4_update_cuda_f32` (`cuFloatComplex`, `float dt`)
-  - Matvec backend selection: `Rk4DenseCudaMethod::{WarpKernel,CublasGemv}`
-- Fused L4 helpers:
-  - `build_TCL4_generator_cuda_fused(...)` for a single time index.
-  - `build_TCL4_generator_cuda_fused_batch(...)` for multiple time indices in one call.
+  - Dense RK4 integrator: `taco/backend/cuda/rk4_dense_cuda.hpp`:
+    - FP64: `rk4_update_cuda` (`cuDoubleComplex`, `double dt`)
+    - FP32: `rk4_update_cuda_f32` (`cuFloatComplex`, `float dt`)
+    - Matvec backend selection: `Rk4DenseCudaMethod::{WarpKernel,CublasGemv}`
+  - Python: `taco.tcl.simulate(..., device="cuda")` uses the same CUDA RK4 integrator internally for propagation (host NumPy in/out).
+  - Fused L4 helpers:
+    - `build_TCL4_generator_cuda_fused(...)` for a single time index.
+    - `build_TCL4_generator_cuda_fused_batch(...)` for multiple time indices in one call.
 
 Notes and limitations
 ---------------------

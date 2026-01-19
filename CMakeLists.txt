@@ -122,6 +122,11 @@ endif()
 if (TACO_BUILD_PYTHON)
   find_package(Python COMPONENTS Interpreter Development NumPy REQUIRED)
 
+  # Ensure pybind11 uses the *same* Python interpreter/version that CMake found above
+  # (important when multiple Pythons are installed, e.g. a system Python + a Conda env).
+  set(PYBIND11_FINDPYTHON ON CACHE BOOL "Use FindPython for pybind11" FORCE)
+  set(PYTHON_EXECUTABLE "${Python_EXECUTABLE}" CACHE FILEPATH "Python executable for pybind11 (legacy)" FORCE)
+
   FetchContent_Declare(
     pybind11
     GIT_REPOSITORY https://github.com/pybind/pybind11.git
