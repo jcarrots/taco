@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/taco_time_convolutionless_master_equation_system_1280x640.png" alt="TACO banner" width="100%" />
+</p>
+
 # TACO - TCL-Accelerated Compute Orchestrator
 This is TCL = **Time-Convolutionless** master-equation solvers.
 A fast parallel and scalable time-convolutionless (TCL) runtime with C++ backend for open-quantum-system dynamics. TACO backends: serial, omp, cuda, mpi_omp, mpi_cuda.
@@ -43,6 +47,9 @@ print(res.t.shape, res.rho.shape)
 
 For a detailed end-to-end example (spin-boson model + bath + parameters + plots + E2E benchmark), open:
 - `python/examples/tcl4_e2e_cuda_compare.ipynb`
+
+MATLAB code lives in:
+- `matlab/README.md`
 
 ## Build from source (C++)
 - Enable MPI (distributed CPU): `-DTACO_WITH_MPI=ON` (requires MPI)
