@@ -4,13 +4,14 @@
 
 # TACO - TCL-Accelerated Compute Orchestrator
 This is TCL = **Time-Convolutionless** master-equation solvers.
-A fast parallel and scalable time-convolutionless (TCL) runtime with C++ backend for open-quantum-system dynamics. TACO backends: serial, omp, cuda, mpi_omp, mpi_cuda.
+A fast parallel and scalable time-convolutionless (TCL) runtime with C++ backend and python interface for open-quantum-system dynamics. It also comes with a standalone matlab version. TACO currently supports single node paralleism using OPENMP and CUDA. Across node impelmentation is under development. 
 
 ## Features
-- Backends: serial, omp, cuda, mpi_omp, mpi_cuda
+- Backends:
+  C++(serial, openmp, cuda) with Python as frontend. Matlab: standalone. 
 - TCL2 generator + Liouvillian builders
 - TCL4 kernels and assembly in seconds
-- Higher-order TCL (TCL6/TCL2n) planning in docs; symbolic road-map.
+- Higher-order TCL (TCL6/TCL2n) under development.
 
 ## Install
 ### Python package (recommended)
