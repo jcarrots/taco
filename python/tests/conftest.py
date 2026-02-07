@@ -22,3 +22,22 @@ def pytest_configure() -> None:
 
     if has_local_ext:
         sys.path.insert(0, str(python_dir))
+        return
+
+    # No local extension detected, so tests will import installed package.
+    # Fail fast if the installed wheel does not match this repo's expected API.
+    try:
+        import taco  # type: ignore
+    except Exception as exc:
+        raise RuntimeError(
+            "No local native extension found under python/taco and failed to import installed `taco`. "
+            "Build/install this repo first (for example: `pip install .`)."
+        ) from exc
+
+    has_expected_api = hasattr(taco, "tcl") and hasattr(taco.tcl, "e2e_cuda_compare_spin_boson")
+    if not has_expected_api:
+        installed_path = getattr(taco, "__file__", "<unknown>")
+        raise RuntimeError(
+            "Installed `taco` package is stale/incompatible for this test suite "
+            f"(imported from: {installed_path}). Reinstall this repo package with `pip install --force-reinstall .`."
+        )

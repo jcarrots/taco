@@ -1804,15 +1804,19 @@ py::dict tcl4_e2e_cuda_compare_spin_boson(std::size_t Nt_samples,
     out["tidx"] = tidx_py;
 
     py::dict l4_py;
+    auto maybe_float = [](bool enabled, double value) -> py::object {
+        if (enabled) return py::float_(value);
+        return py::none();
+    };
     l4_py["has_gpu"] = l4.has_gpu;
-    l4_py["max_abs"] = l4.has_gpu ? py::float_(l4.max_abs) : py::none();
-    l4_py["max_rel"] = l4.has_gpu ? py::float_(l4.max_rel) : py::none();
+    l4_py["max_abs"] = maybe_float(l4.has_gpu, l4.max_abs);
+    l4_py["max_rel"] = maybe_float(l4.has_gpu, l4.max_rel);
     l4_py["cpu_fcr_ms"] = l4.cpu_fcr_ms;
-    l4_py["gpu_fcr_ms"] = l4.has_gpu ? py::float_(l4.gpu_fcr_ms) : py::none();
+    l4_py["gpu_fcr_ms"] = maybe_float(l4.has_gpu, l4.gpu_fcr_ms);
     l4_py["cpu_total_ms"] = l4.cpu_total_ms;
     l4_py["cpu_avg_ms"] = l4.cpu_avg_ms;
-    l4_py["gpu_total_ms"] = l4.has_gpu ? py::float_(l4.gpu_total_ms) : py::none();
-    l4_py["gpu_avg_ms"] = l4.has_gpu ? py::float_(l4.gpu_avg_ms) : py::none();
+    l4_py["gpu_total_ms"] = maybe_float(l4.has_gpu, l4.gpu_total_ms);
+    l4_py["gpu_avg_ms"] = maybe_float(l4.has_gpu, l4.gpu_avg_ms);
     out["l4"] = l4_py;
 
     if (!rk4.ran) {
@@ -1823,12 +1827,12 @@ py::dict tcl4_e2e_cuda_compare_spin_boson(std::size_t Nt_samples,
         rk4_py["steps"] = rk4.steps;
         rk4_py["order"] = rk4.order;
         rk4_py["method"] = rk4.method;
-        rk4_py["max_abs_r"] = rk4.has_gpu ? py::float_(rk4.max_abs_r) : py::none();
-        rk4_py["max_abs_rho"] = rk4.has_gpu ? py::float_(rk4.max_abs_rho) : py::none();
-        rk4_py["max_rel_rho"] = rk4.has_gpu ? py::float_(rk4.max_rel_rho) : py::none();
+        rk4_py["max_abs_r"] = maybe_float(rk4.has_gpu, rk4.max_abs_r);
+        rk4_py["max_abs_rho"] = maybe_float(rk4.has_gpu, rk4.max_abs_rho);
+        rk4_py["max_rel_rho"] = maybe_float(rk4.has_gpu, rk4.max_rel_rho);
         rk4_py["cpu_rk4_ms"] = rk4.cpu_rk4_ms;
-        rk4_py["gpu_rk4_ms"] = rk4.has_gpu ? py::float_(rk4.gpu_rk4_ms) : py::none();
-        rk4_py["gpu_fcr_ms_rk4"] = rk4.has_gpu ? py::float_(rk4.gpu_fcr_ms_rk4) : py::none();
+        rk4_py["gpu_rk4_ms"] = maybe_float(rk4.has_gpu, rk4.gpu_rk4_ms);
+        rk4_py["gpu_fcr_ms_rk4"] = maybe_float(rk4.has_gpu, rk4.gpu_fcr_ms_rk4);
         out["rk4"] = rk4_py;
     }
 

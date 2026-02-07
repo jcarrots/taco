@@ -2,7 +2,7 @@
 
 The Python package `taco` is a thin wrapper over the existing C++ CPU and CUDA implementations (no physics/numerics are redesigned in Python).
 
-## What’s wired (today)
+## What's wired (today)
 
 - **TCL simulation**: `taco.tcl.simulate(H, A, bath, cfg, rho0, device=...)`
   - **CPU**: uses the existing C++ CPU TCL2/TCL4 builders and **dense RK4** propagation.
@@ -62,3 +62,5 @@ Then make sure your VS Code notebook kernel uses the same Python version.
 ```powershell
 pytest -q
 ```
+
+Note: if you have another `taco` package installed in the same environment, `pytest` may import that instead of your newly built one. For reliable results, run tests in a fresh virtual environment after `pip install .`.

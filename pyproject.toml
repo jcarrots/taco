@@ -1,5 +1,5 @@
 [build-system]
-requires = ["scikit-build-core>=0.9.0", "numpy>=1.21"]
+requires = ["scikit-build-core>=0.9.0", "numpy>=1.21,<2"]
 build-backend = "scikit_build_core.build"
 
 [project]
@@ -7,8 +7,14 @@ name = "taco-tcl"
 version = "0.1.0"
 description = "TACO Time-Convolutionless master-equation solvers (C++/CUDA with Python bindings)"
 readme = "README.md"
+license = { file = "LICENSE" }
 requires-python = ">=3.9"
-dependencies = ["numpy>=1.21"]
+dependencies = ["numpy>=1.21,<2"]
+classifiers = [
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: C++",
+  "Programming Language :: Python :: 3",
+]
 
 [project.optional-dependencies]
 test = ["pytest>=7.0"]

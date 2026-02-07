@@ -2,21 +2,21 @@
 
 This folder contains a MATLAB reference implementation of parts of the TCL4 pipeline used in TACO (Time-Convolutionless master-equation solvers). It is primarily useful for **prototyping**, **sanity checks**, and **derivation validation**; the production CPU/CUDA implementations live under `cpp/` and are exposed to Python under `python/`.
 
-## What’s in this folder
+## What's in this folder
 
 - `bcf_fft_ohmic_simple.m`
-  - Computes a bath correlation function `C(t)` for an Ohmic spectral density `J(ω)=ω exp(-ω/ωc)` using an FFT-based construction.
+  - Computes a bath correlation function `C(t)` for an Ohmic spectral density `J(omega)=omega exp(-omega/omega_c)` using an FFT-based construction.
 - `tcl4_kernels.m`
   - Computes the TCL4 intermediate kernels `F(t)`, `C(t)`, `R(t)` from time series inputs using prefix integrals and (causal) convolutions.
   - Uses `pagemtimes` when available and falls back to a loop otherwise.
 - `MIKX.m`
   - Assembles the intermediate objects `M, I, K, X` used downstream in the TCL4 generator construction.
-  - Uses MATLAB’s `tensorprod` if available (see requirements below).
+  - Uses MATLAB's `tensorprod` if available (see requirements below).
 - `NAKZWAN_v9.m`
   - Builds the TCL4 Liouvillian from `M, I, K, X` and coupling operators.
 - `tcl4_driver.m`
-  - Example script that wires together a full pipeline (BCF → F/C/R time series → M/I/K/X → generator).
-  - **Note:** this driver references helper functions that are not currently included in this repo (see “Known gaps”).
+  - Example script that wires together a full pipeline (BCF -> F/C/R time series -> M/I/K/X -> generator).
+  - **Note:** this driver references helper functions that are not currently included in this repo (see "Known gaps").
 
 ## Requirements
 
@@ -64,7 +64,7 @@ G2 = exp(-2*t) .* (1+1i);     % example scalar time series
 
 ## Relationship to the C++/Python implementation
 
-- The repository’s supported, end-to-end workflows are:
+- The repository's supported, end-to-end workflows are:
   - C++ tools under `tests/` (e.g. `tcl4_e2e_cuda_compare`), and
   - Python API under `python/` (e.g. `taco.tcl.simulate(...)` and `python/examples/tcl4_e2e_cuda_compare.ipynb`).
 
@@ -76,4 +76,3 @@ G2 = exp(-2*t) .* (1+1i);     % example scalar time series
 - `compute_FCR_timeseries`
 - `getAsymptoticALL`
 - `G2D`
-

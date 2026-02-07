@@ -3,8 +3,9 @@
 </p>
 
 # TACO - TCL-Accelerated Compute Orchestrator
-This is TCL = **Time-Convolutionless** master-equation solvers.
-A fast parallel and scalable time-convolutionless (TCL) runtime with C++ backend and python interface for open-quantum-system dynamics. It also comes with a standalone matlab version. TACO currently supports single node paralleism using OPENMP and CUDA. Across node impelmentation is under development. 
+TCL = **Time-Convolutionless** master-equation solvers.
+
+TACO is a fast, parallel, scalable time-convolutionless (TCL) runtime with a C++ backend and Python interface for open-quantum-system dynamics. It also includes a standalone MATLAB reference implementation. TACO currently supports single-node parallelism via OpenMP and CUDA; multi-node support is under development.
 
 ## Features
 - Backends:
@@ -55,6 +56,9 @@ MATLAB code lives in:
 ## Build from source (C++)
 - Enable MPI (distributed CPU): `-DTACO_WITH_MPI=ON` (requires MPI)
 - Enable Python extension: `-DTACO_BUILD_PYTHON=ON` (default OFF; add `-DPython_EXECUTABLE=...` if needed)
+- Disable C++ tests/tools: `-DTACO_BUILD_TESTS=OFF`
+- Disable C++ examples: `-DTACO_BUILD_EXAMPLES=OFF`
+- Disable C++ benchmarks: `-DTACO_BUILD_BENCHMARKS=OFF`
 - Disable gamma tests: `-DTACO_BUILD_GAMMA_TESTS=OFF`
 
 ## CUDA backend (C++, performance-focused)
@@ -82,8 +86,7 @@ MATLAB code lives in:
 - Rank 0 returns the gathered `L4(t)` vector; non-root ranks return `{}`.
 
 ## Python bindings
-- Build/install (CPU-only): `CMAKE_ARGS="-DTACO_BUILD_PYTHON=ON" pip install .`
-- Build/install (CUDA): `CMAKE_ARGS="-DTACO_BUILD_CUDA=ON -DTACO_BUILD_PYTHON=ON -DCMAKE_CUDA_ARCHITECTURES=native" pip install .`
+- Build/install commands are listed in **Install**.
 - Tests: `pytest -q`
 - Repo-checkout usage (no install): `python -c "import sys; sys.path.insert(0,'python'); import taco; print(taco.version())"`
 - Jupyter/VS Code: open `python/examples/tcl4_e2e_cuda_compare.ipynb` (kernel Python must match the built `taco/_taco*.pyd` ABI tag).
@@ -91,6 +94,23 @@ MATLAB code lives in:
 - Optional: `precision="fp32"` selects the FP32 CUDA kernels (casts on upload/download; outputs remain `complex128`).
 - E2E benchmark helper: `taco.tcl.e2e_cuda_compare_spin_boson(...)` (mirrors `tcl4_e2e_cuda_compare`); notebook: `python/examples/tcl4_e2e_cuda_compare.ipynb`
 - More details (including RK4 wiring + building for a specific notebook/kernel Python): `python/README.md`
+
+## Repo hygiene
+
+- Clean ignored build/test artifacts: `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev.ps1 -Action clean`
+- Test artifacts (logs + copied `*_test_results.txt`) are written under `out/tests/...` by `scripts/run_tests.ps1`.
+
+## What is required vs optional
+
+Required for a usable TACO checkout:
+- `CMakeLists.txt`, `cpp/`, `configs/`, `scripts/`
+- `pyproject.toml`, `python/taco/`, `python/tests/` (for Python package + validation)
+
+Optional (safe to exclude from a lean shipment if you do not need them):
+- `matlab/` (reference/prototyping implementation)
+- `generator_simplification.py` (symbolic research helper)
+- `DEV_GUIDE.md`, `DEV_LOG.md`, `docs/*_PLAN.md` (developer planning/history docs)
+- `tests/tcl_test.h5` (large HDF5 fixture used by optional `tcl4_h5_compare`)
 
 ## TCL4 Demo & Test
 - Demo driver: `tcl_driver` loads a YAML config (matrix `H`, `A` and `J_expr`) and runs TCL4 assembly
@@ -102,3 +122,7 @@ MATLAB code lives in:
 - Test (MPI, optional): `tcl4_mpi_omp_tests`
   - Build: `cmake --build build --config Release --target tcl4_mpi_omp_tests`
   - Run: `mpiexec -n 4 build\Release\tcl4_mpi_omp_tests.exe`
+
+## License
+
+MIT, see `LICENSE`.

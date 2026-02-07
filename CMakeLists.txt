@@ -14,6 +14,9 @@ option(TACO_WITH_MPI "Enable MPI distributed backend" OFF)
 option(TACO_WITH_CUDA "Enable CUDA backend (requires NVIDIA CUDA Toolkit)" OFF)
 option(TACO_BUILD_CUDA "Enable CUDA backend (alias for TACO_WITH_CUDA)" OFF)
 option(TACO_BUILD_PYTHON "Build Python extension module" OFF)
+option(TACO_BUILD_EXAMPLES "Build C++ example executables" ON)
+option(TACO_BUILD_BENCHMARKS "Build C++ benchmark executables" ON)
+option(TACO_BUILD_TESTS "Build C++ test executables/tools" ON)
 option(TACO_BUILD_GAMMA_TESTS "Build gamma_tests executable" ON)
 
 if (TACO_BUILD_CUDA)
@@ -154,91 +157,97 @@ if (TACO_BUILD_PYTHON)
   endif()
 endif()
 
-find_package(yaml-cpp CONFIG QUIET)
-if (yaml-cpp_FOUND)
-  add_executable(tcl_driver examples/tcl_driver.cpp)
-  target_link_libraries(tcl_driver PRIVATE taco_tcl yaml-cpp::yaml-cpp)
-else()
-  message(STATUS "yaml-cpp not found; skipping tcl_driver")
-endif()
-
-add_executable(tcl4_spin_boson_example examples/TCL4_spin_boson_example.cpp)
-target_link_libraries(tcl4_spin_boson_example PRIVATE taco_tcl)
-
-add_executable(tcl4_bench examples/tcl4_bench.cpp)
-target_link_libraries(tcl4_bench PRIVATE taco_tcl)
-
-add_executable(tcl4_mikx_bench examples/tcl4_mikx_bench.cpp)
-target_link_libraries(tcl4_mikx_bench PRIVATE taco_tcl)
-
-add_executable(integrator_tests tests/integrator_tests.cpp)
- target_link_libraries(integrator_tests PRIVATE taco_tcl)
- target_include_directories(integrator_tests PRIVATE cpp/src)
- target_include_directories(integrator_tests PRIVATE cpp/include)
-
-add_executable(rk4_dense_tests tests/rk4_dense_tests.cpp)
- target_link_libraries(rk4_dense_tests PRIVATE taco_tcl)
- target_include_directories(rk4_dense_tests PRIVATE cpp/include)
-
-add_executable(spin_boson_tests tests/spin_boson_tests.cpp)
- target_link_libraries(spin_boson_tests PRIVATE taco_tcl)
- target_include_directories(spin_boson_tests PRIVATE cpp/include)
-
-add_executable(tcl4_tests tests/tcl4_tests.cpp)
- target_link_libraries(tcl4_tests PRIVATE taco_tcl)
- target_include_directories(tcl4_tests PRIVATE cpp/include)
-
-add_executable(tcl4_mpi_omp_tests tests/tcl4_mpi_omp_tests.cpp)
- target_link_libraries(tcl4_mpi_omp_tests PRIVATE taco_tcl)
- target_include_directories(tcl4_mpi_omp_tests PRIVATE cpp/include)
-
-add_executable(tcl4_mikx_tests cpp/tests/tcl4_mikx_tests.cpp)
- target_link_libraries(tcl4_mikx_tests PRIVATE taco_tcl)
- target_include_directories(tcl4_mikx_tests PRIVATE cpp/include)
-
-add_executable(tcl4_e2e_cuda_compare tests/tcl4_e2e_cuda_compare.cpp)
- target_link_libraries(tcl4_e2e_cuda_compare PRIVATE taco_tcl)
- target_include_directories(tcl4_e2e_cuda_compare PRIVATE cpp/include)
-
-if (TACO_WITH_CUDA AND CMAKE_CUDA_COMPILER)
-  add_executable(cuda_smoke tests/cuda_smoke.cu)
-  target_link_libraries(cuda_smoke PRIVATE CUDA::cudart)
-
-  add_executable(rk4_dense_cuda_smoke tests/rk4_dense_cuda_smoke.cu)
-  target_link_libraries(rk4_dense_cuda_smoke PRIVATE taco_tcl)
-  target_include_directories(rk4_dense_cuda_smoke PRIVATE cpp/include)
-endif()
-
-if (TACO_BUILD_GAMMA_TESTS)
-  add_executable(gamma_tests tests/gamma_tests.cpp)
-  target_link_libraries(gamma_tests PRIVATE taco_tcl)
-
-  # Optional: Boost (header-only) for Ei in S(omega) analytic checks
-  find_package(Boost QUIET)
-  if (Boost_FOUND)
-    target_include_directories(gamma_tests PRIVATE ${Boost_INCLUDE_DIRS})
-    target_compile_definitions(gamma_tests PRIVATE HAS_BOOST_MATH=1)
-    message(STATUS "Boost found: enabling Ei-based S(omega) checks in gamma_tests")
+if (TACO_BUILD_EXAMPLES)
+  find_package(yaml-cpp CONFIG QUIET)
+  if (yaml-cpp_FOUND)
+    add_executable(tcl_driver examples/tcl_driver.cpp)
+    target_link_libraries(tcl_driver PRIVATE taco_tcl yaml-cpp::yaml-cpp)
   else()
-    message(STATUS "Boost not found: skipping Ei-based S(omega) checks in gamma_tests")
+    message(STATUS "yaml-cpp not found; skipping tcl_driver")
   endif()
+
+  add_executable(tcl4_spin_boson_example examples/TCL4_spin_boson_example.cpp)
+  target_link_libraries(tcl4_spin_boson_example PRIVATE taco_tcl)
 endif()
 
-# Optional HDF5-based comparison tool for MATLAB exports.
-find_package(HDF5 COMPONENTS C QUIET)
-if (HDF5_FOUND)
-  add_executable(tcl4_h5_compare tests/tcl4_h5_compare.cpp)
-  target_link_libraries(tcl4_h5_compare PRIVATE taco_tcl)
-  target_include_directories(tcl4_h5_compare PRIVATE ${HDF5_INCLUDE_DIRS})
-  if (TARGET HDF5::C)
-    target_link_libraries(tcl4_h5_compare PRIVATE HDF5::C)
-  elseif (TARGET HDF5::HDF5)
-    target_link_libraries(tcl4_h5_compare PRIVATE HDF5::HDF5)
-  else()
-    target_link_libraries(tcl4_h5_compare PRIVATE ${HDF5_LIBRARIES})
+if (TACO_BUILD_BENCHMARKS)
+  add_executable(tcl4_bench examples/tcl4_bench.cpp)
+  target_link_libraries(tcl4_bench PRIVATE taco_tcl)
+
+  add_executable(tcl4_mikx_bench examples/tcl4_mikx_bench.cpp)
+  target_link_libraries(tcl4_mikx_bench PRIVATE taco_tcl)
+endif()
+
+if (TACO_BUILD_TESTS)
+  add_executable(integrator_tests tests/integrator_tests.cpp)
+  target_link_libraries(integrator_tests PRIVATE taco_tcl)
+  target_include_directories(integrator_tests PRIVATE cpp/src)
+  target_include_directories(integrator_tests PRIVATE cpp/include)
+
+  add_executable(rk4_dense_tests tests/rk4_dense_tests.cpp)
+  target_link_libraries(rk4_dense_tests PRIVATE taco_tcl)
+  target_include_directories(rk4_dense_tests PRIVATE cpp/include)
+
+  add_executable(spin_boson_tests tests/spin_boson_tests.cpp)
+  target_link_libraries(spin_boson_tests PRIVATE taco_tcl)
+  target_include_directories(spin_boson_tests PRIVATE cpp/include)
+
+  add_executable(tcl4_tests tests/tcl4_tests.cpp)
+  target_link_libraries(tcl4_tests PRIVATE taco_tcl)
+  target_include_directories(tcl4_tests PRIVATE cpp/include)
+
+  add_executable(tcl4_mpi_omp_tests tests/tcl4_mpi_omp_tests.cpp)
+  target_link_libraries(tcl4_mpi_omp_tests PRIVATE taco_tcl)
+  target_include_directories(tcl4_mpi_omp_tests PRIVATE cpp/include)
+
+  add_executable(tcl4_mikx_tests tests/tcl4_mikx_tests.cpp)
+  target_link_libraries(tcl4_mikx_tests PRIVATE taco_tcl)
+  target_include_directories(tcl4_mikx_tests PRIVATE cpp/include)
+
+  add_executable(tcl4_e2e_cuda_compare tests/tcl4_e2e_cuda_compare.cpp)
+  target_link_libraries(tcl4_e2e_cuda_compare PRIVATE taco_tcl)
+  target_include_directories(tcl4_e2e_cuda_compare PRIVATE cpp/include)
+
+  if (TACO_WITH_CUDA AND CMAKE_CUDA_COMPILER)
+    add_executable(cuda_smoke tests/cuda_smoke.cu)
+    target_link_libraries(cuda_smoke PRIVATE CUDA::cudart)
+
+    add_executable(rk4_dense_cuda_smoke tests/rk4_dense_cuda_smoke.cu)
+    target_link_libraries(rk4_dense_cuda_smoke PRIVATE taco_tcl)
+    target_include_directories(rk4_dense_cuda_smoke PRIVATE cpp/include)
   endif()
-else()
-  message(STATUS "HDF5 not found; skipping tcl4_h5_compare")
+
+  if (TACO_BUILD_GAMMA_TESTS)
+    add_executable(gamma_tests tests/gamma_tests.cpp)
+    target_link_libraries(gamma_tests PRIVATE taco_tcl)
+
+    # Optional: Boost (header-only) for Ei in S(omega) analytic checks
+    find_package(Boost QUIET)
+    if (Boost_FOUND)
+      target_include_directories(gamma_tests PRIVATE ${Boost_INCLUDE_DIRS})
+      target_compile_definitions(gamma_tests PRIVATE HAS_BOOST_MATH=1)
+      message(STATUS "Boost found: enabling Ei-based S(omega) checks in gamma_tests")
+    else()
+      message(STATUS "Boost not found: skipping Ei-based S(omega) checks in gamma_tests")
+    endif()
+  endif()
+
+  # Optional HDF5-based comparison tool for MATLAB exports.
+  find_package(HDF5 COMPONENTS C QUIET)
+  if (HDF5_FOUND)
+    add_executable(tcl4_h5_compare tests/tcl4_h5_compare.cpp)
+    target_link_libraries(tcl4_h5_compare PRIVATE taco_tcl)
+    target_include_directories(tcl4_h5_compare PRIVATE ${HDF5_INCLUDE_DIRS})
+    if (TARGET HDF5::C)
+      target_link_libraries(tcl4_h5_compare PRIVATE HDF5::C)
+    elseif (TARGET HDF5::HDF5)
+      target_link_libraries(tcl4_h5_compare PRIVATE HDF5::HDF5)
+    else()
+      target_link_libraries(tcl4_h5_compare PRIVATE ${HDF5_LIBRARIES})
+    endif()
+  else()
+    message(STATUS "HDF5 not found; skipping tcl4_h5_compare")
+  endif()
 endif()
 
 

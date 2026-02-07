@@ -1,6 +1,13 @@
 # Build and IDE artifacts
 /build/
 /build-*/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+_skbuild/
+*.egg-info/
+dist/
+out/
 .vscode/
 *.sln
 *.vcxproj
@@ -34,6 +41,8 @@ rho_timeseries.csv
 gw.csv
 gamma_test_results.txt
 integrator_test_results.txt
+*_test_results.txt
+pip_build_*.log
 
 # Local third-party deps
 /third_party/
@@ -41,3 +50,9 @@ integrator_test_results.txt
 # Python cache
 __pycache__/
 *.pyc
+.venv/
+venv/
+.env
+.env.local
+.env.*.local
+.ipynb_checkpoints/
