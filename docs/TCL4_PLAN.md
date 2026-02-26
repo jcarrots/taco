@@ -126,4 +126,4 @@ Tests & Examples
 - `examples/tcl4_bench.cpp`
 - `examples/TCL4_spin_boson_example.cpp`
 
-Status: phases 0-4 implemented; validation ongoing; performance work in progress; initial MPI+OpenMP TCL4 batch builder implemented (Exec-based dispatch still TODO).
+Status: phases 0-4 implemented; validation ongoing; performance work in progress; initial MPI+OpenMP TCL4 batch builder implemented (Exec-based dispatch for `Backend::MpiOmp` implemented; uses `MPI_COMM_WORLD`).

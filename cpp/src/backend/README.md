@@ -12,5 +12,5 @@ This folder hosts implementation files for execution backends.
 
 Implementation status:
 - serial/omp/cuda contain working code.
-- `cpu/` contains the current MPI+OpenMP TCL4 batch implementation (`TACO_WITH_MPI=ON`).
-- mpi_omp/mpi_cuda are placeholders with design notes only (Exec-based dispatch still TODO).
+- `cpu/` contains the current MPI+OpenMP TCL4 batch implementation (`TACO_WITH_MPI=ON`) used by `Backend::MpiOmp`.
+- mpi_omp/mpi_cuda contain design notes/placeholders; distributed GPU (`Backend::MpiCuda`) is still TODO.

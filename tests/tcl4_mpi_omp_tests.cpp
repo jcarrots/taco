@@ -67,8 +67,51 @@ int main(int argc, char** argv) {
                                                            taco::tcl4::FCRMethod::Convolution,
                                                            comm);
 
+    taco::Exec mpi_exec;
+    mpi_exec.backend = taco::Backend::MpiOmp;
+
+    const Eigen::MatrixXcd L4_single =
+        taco::tcl4::build_TCL4_generator(system,
+                                         gamma_series,
+                                         dt,
+                                         tids.front(),
+                                         taco::tcl4::FCRMethod::Convolution,
+                                         mpi_exec);
+
+    const auto out_series_mpi =
+        taco::tcl4::build_correction_series(system,
+                                            gamma_series,
+                                            dt,
+                                            taco::tcl4::FCRMethod::Convolution,
+                                            mpi_exec);
+
     bool ok = true;
     if (rank == 0) {
+        {
+            const double err = max_abs_diff(L4_single, ref_full[tids.front()]);
+            if (err > 1e-10) {
+                std::cerr << "FAIL: build_TCL4_generator(MpiOmp) mismatch at tidx=" << tids.front()
+                          << " (max_abs_diff=" << err << ")\n";
+                ok = false;
+            }
+        }
+
+        if (out_series_mpi.size() != Nt) {
+            std::cerr << "FAIL: build_correction_series(MpiOmp) output size mismatch (got "
+                      << out_series_mpi.size() << ", expected " << Nt << ")\n";
+            ok = false;
+        } else {
+            for (std::size_t i = 0; i < tids.size(); ++i) {
+                const double err = max_abs_diff(out_series_mpi[tids[i]], ref_full[tids[i]]);
+                if (err > 1e-10) {
+                    std::cerr << "FAIL: build_correction_series(MpiOmp) mismatch at tidx=" << tids[i]
+                              << " (max_abs_diff=" << err << ")\n";
+                    ok = false;
+                    break;
+                }
+            }
+        }
+
         if (out.size() != tids.size()) {
             std::cerr << "FAIL: output size mismatch (got " << out.size()
                       << ", expected " << tids.size() << ")\n";
@@ -84,18 +127,36 @@ int main(int argc, char** argv) {
                 }
             }
         }
-        std::cout << "tcl4_mpi_omp_tests: " << (ok ? "PASS" : "FAIL")
-                  << " (size=" << size << ")\n";
     } else {
         if (!out.empty()) {
             std::cerr << "FAIL: non-root rank returned non-empty output\n";
             ok = false;
         }
+        if (!out_series_mpi.empty()) {
+            std::cerr << "FAIL: non-root rank returned non-empty build_correction_series(MpiOmp) output\n";
+            ok = false;
+        }
+        {
+            const double err = max_abs_diff(L4_single, ref_full[tids.front()]);
+            if (err > 1e-10) {
+                std::cerr << "FAIL: build_TCL4_generator(MpiOmp) mismatch at tidx=" << tids.front()
+                          << " (max_abs_diff=" << err << ")\n";
+                ok = false;
+            }
+        }
+    }
+
+    int ok_i = ok ? 1 : 0;
+    int ok_all = 0;
+    MPI_Allreduce(&ok_i, &ok_all, 1, MPI_INT, MPI_MIN, comm);
+    const bool ok_global = (ok_all != 0);
+    if (rank == 0) {
+        std::cout << "tcl4_mpi_omp_tests: " << (ok_global ? "PASS" : "FAIL")
+                  << " (size=" << size << ")\n";
     }
 
     MPI_Finalize();
 
-    return ok ? 0 : 1;
+    return ok_global ? 0 : 1;
 #endif
 }
-

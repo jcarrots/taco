@@ -63,6 +63,7 @@ MPI (Optional)
 --------------
 - Configure: `cmake -S . -B build-mpi -DTACO_WITH_MPI=ON`
 - The current MPI+OpenMP CPU entry point is `taco/backend/cpu/tcl4_mpi_omp.hpp` (`build_TCL4_generator_cpu_mpi_omp_batch`).
+- Exec-based dispatch: `taco::tcl4::build_TCL4_generator(...)` and `taco::tcl4::build_correction_series(...)` accept `Exec{.backend=Backend::MpiOmp,...}` (uses `MPI_COMM_WORLD`).
 - Test: `tcl4_mpi_omp_tests` (run with `mpiexec -n <ranks> ...`).
 
 Profiling CUDA (Nsight)

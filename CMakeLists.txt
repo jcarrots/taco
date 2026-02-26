@@ -53,6 +53,8 @@ add_library(taco_tcl STATIC
   cpp/src/tcl/tcl4_mikx.cpp
   cpp/src/tcl/tcl4_assemble.cpp
   cpp/src/tcl/tcl4.cpp
+  cpp/src/backend/serial/tcl4_serial.cpp
+  cpp/src/backend/omp/tcl4_omp.cpp
   cpp/src/backend/cpu/tcl4_mpi_omp.cpp
   cpp/src/tcl/tcl2_generator.cpp
   cpp/src/tcl/generator.cpp

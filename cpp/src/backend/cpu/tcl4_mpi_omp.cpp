@@ -163,11 +163,20 @@ build_TCL4_generator_cpu_mpi_omp_batch(const sys::System& system,
                                        double dt,
                                        const std::vector<std::size_t>& time_indices,
                                        FCRMethod method,
-                                       MPI_Comm comm)
+                                       MPI_Comm comm,
+                                       Exec exec)
 {
     if (dt <= 0.0) {
         throw std::invalid_argument("build_TCL4_generator_cpu_mpi_omp_batch: dt must be > 0");
     }
+
+#ifdef _OPENMP
+    if (exec.threads > 0 && !omp_in_parallel()) {
+        omp_set_num_threads(exec.threads);
+    }
+#else
+    (void)exec;
+#endif
 
     const std::size_t Nt = static_cast<std::size_t>(gamma_series.rows());
     const std::size_t nf = static_cast<std::size_t>(gamma_series.cols());
@@ -331,4 +340,3 @@ build_TCL4_generator_cpu_mpi_omp_batch(const sys::System& system,
 } // namespace taco::tcl4
 
 #endif // TACO_HAS_MPI
-

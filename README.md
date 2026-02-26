@@ -84,6 +84,8 @@ MATLAB code lives in:
 ## MPI + OpenMP (CPU over distributed memory system, experimental)
 - C++ API: `taco/backend/cpu/tcl4_mpi_omp.hpp` (`build_TCL4_generator_cpu_mpi_omp_batch`).
 - Rank 0 returns the gathered `L4(t)` vector; non-root ranks return `{}`.
+- Collective: all ranks in the communicator must call with the same inputs.
+- Exec-based dispatch: `taco::tcl4::build_TCL4_generator(...)` and `taco::tcl4::build_correction_series(...)` accept `Exec{.backend=Backend::MpiOmp,...}` (uses `MPI_COMM_WORLD`).
 
 ## Python bindings
 - Build/install commands are listed in **Install**.

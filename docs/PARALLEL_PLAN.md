@@ -49,10 +49,11 @@ Phase 3 - CUDA overlap
 Phase 4 - MPI backends
 - `mpi_omp`: distributed CPU (MPI + OpenMP).
 - `mpi_cuda`: distributed GPU (MPI + CUDA), one rank per GPU.
-- Status:
+  - Status:
   - Initial MPI+OpenMP CPU implementation exists for TCL4 batched L4 construction:
     `taco/backend/cpu/tcl4_mpi_omp.hpp` (`build_TCL4_generator_cpu_mpi_omp_batch`).
-  - Exec-based dispatch (`Exec{backend=MpiOmp,...}`) is still TODO.
+  - Exec-based dispatch for `Backend::MpiOmp` is implemented for `build_TCL4_generator` and `build_correction_series`
+    (uses `MPI_COMM_WORLD`; root gathers full series, and `build_TCL4_generator` broadcasts the single matrix).
 
 Phase 5 - Optional GPU MIKX/Assemble
 - Implemented for the fused CUDA path (MIKX, GW, L4 on device).

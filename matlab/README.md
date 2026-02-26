@@ -1,4 +1,4 @@
-# MATLAB implementation (reference / prototyping)
+# MATLAB implementation
 
 This folder contains a MATLAB reference implementation of parts of the TCL4 pipeline used in TACO (Time-Convolutionless master-equation solvers). It is primarily useful for **prototyping**, **sanity checks**, and **derivation validation**; the production CPU/CUDA implementations live under `cpp/` and are exposed to Python under `python/`.
 

@@ -10,8 +10,8 @@ This folder hosts CPU-only backend implementations that don't fit the serial/omp
   - OpenMP: parallelizes the per-time `MIKX -> GW -> L4` loop within each rank.
 - Output semantics: rank 0 gathers and returns all `L4(t)` in the same order as the input `time_indices`;
   non-root ranks return an empty vector.
+- Collective semantics: all ranks in the communicator must call with the same inputs.
 - Build: requires `TACO_WITH_MPI=ON`.
 
 Related:
 - Test: `tests/tcl4_mpi_omp_tests.cpp` (run with `mpiexec -n <ranks> ...` when MPI is enabled).
-
