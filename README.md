@@ -110,8 +110,7 @@ Required for a usable TACO checkout:
 
 Optional (safe to exclude from a lean shipment if you do not need them):
 - `matlab/` (reference/prototyping implementation)
-- `generator_simplification.py` (symbolic research helper)
-- `DEV_GUIDE.md`, `DEV_LOG.md`, `docs/*_PLAN.md` (developer planning/history docs)
+- `docs/dev/DEV_GUIDE.md`, `docs/dev/DEV_LOG.md`, `docs/*_PLAN.md` (developer planning/history docs)
 - `tests/tcl_test.h5` (large HDF5 fixture used by optional `tcl4_h5_compare`)
 
 ## TCL4 Demo & Test
