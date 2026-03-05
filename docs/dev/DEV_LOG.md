@@ -56,7 +56,7 @@ Details:
   - Files:
     - Headers: cpp/include/taco/tcl4_kernels.hpp (added FCRMethod; direct/convolution selectors; wrapper), cpp/include/taco/tcl4.hpp (method plumbed into triple-series)
     - Sources: cpp/src/tcl/tcl4_kernels.cpp (factored direct; added convolution stub delegating to direct), cpp/src/tcl/tcl4.cpp (method parameter)
-    - Docs: DEV_GUIDE.md (methods section), docs/TCL4_PLAN.md (Phase 1b plan)
+    - Docs: DEV_GUIDE.md (methods section)
   - Notes:
     - `compute_FCR_time_series_convolution` currently calls the Direct implementation; will be replaced with FFT‑based Volterra convolution.
     - API defaults to `FCRMethod::Convolution` in both per‑pair and triple‑series builders.
@@ -126,7 +126,7 @@ Details:
     - Keep layout simple and cache-friendly; mirror MATLAB MIKX.m index permutations explicitly for correctness.
   - Files:
     - Core: cpp/src/tcl/tcl4_mikx.cpp, cpp/include/taco/tcl4_mikx.hpp
-    - Docs: docs/STRUCTURE.md, docs/TCL4_PLAN.md, DEV_GUIDE.md (new notes)
+    - Docs: docs/STRUCTURE.md, DEV_GUIDE.md (new notes)
   - Notes:
     - M, I, K are N^2×N^2 Eigen matrices (row=(j,k), col=(p,q)); X is a flat N^6 std::vector in row-major over (j,k,p,q,r,s).
     - Contractions map 1–1 to MATLAB:
