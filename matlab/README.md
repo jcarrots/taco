@@ -1,6 +1,6 @@
 # MATLAB implementation
 
-This folder contains a individual MATLAB implementation of TCL4 solver independent of the C++ version. 
+This folder contains a standalone MATLAB implementation of TCL4 solver independent of the C++ version. 
 
 ## What's in this folder
 
