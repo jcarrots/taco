@@ -1,6 +1,6 @@
 # MATLAB implementation
 
-This folder contains a MATLAB reference implementation of parts of the TCL4 pipeline used in TACO (Time-Convolutionless master-equation solvers). 
+This folder contains a individual MATLAB implementation of TCL4 solver independent of the C++ version. 
 
 ## What's in this folder
 
