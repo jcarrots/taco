@@ -97,10 +97,7 @@ MATLAB code lives in:
 - E2E benchmark helper: `taco.tcl.e2e_cuda_compare_spin_boson(...)` (mirrors `tcl4_e2e_cuda_compare`); notebook: `python/examples/tcl4_e2e_cuda_compare.ipynb`
 - More details (including RK4 wiring + building for a specific notebook/kernel Python): `python/README.md`
 
-## Repo hygiene
 
-- Clean ignored build/test artifacts: `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev.ps1 -Action clean`
-- Test artifacts (logs + copied `*_test_results.txt`) are written under `out/tests/...` by `scripts/run_tests.ps1`.
 
 ## What is required vs optional
 
